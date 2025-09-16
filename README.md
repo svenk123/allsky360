@@ -1,1 +1,1 @@
-# allskycamera2
+# allsky360
