@@ -1,0 +1,10 @@
+/var/log/allsky360/*.log
+{
+    rotate 30
+    daily
+    missingok
+    dateext
+    copytruncate
+    notifempty
+    compress
+}
