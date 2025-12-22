@@ -1,0 +1,282 @@
+# Example config.ini for allsky360 camera daemon
+#
+# This is an example configuration for the Player-One Uranus-C with Sony IMX585
+# and ZWO 2.1mm fisheye lens.
+#
+
+# Daytime settings
+####################
+# Take images during daytime
+daytime_capture=1
+# Exposure and gain after leaving night mode or at start
+daytime_startexposure=0.0045
+daytime_startgain=0
+# Auto-exposure settings
+daytime_meanbrightness=0.20
+# White balance
+daytime_white_balance_blue=1.4
+daytime_white_balance_red=1.0
+# Move blackpoint
+daytime_move_blackpoint=0.01
+daytime_move_blackpoint_min_shift_pct=0.005
+daytime_move_blackpoint_max_shift_pct=0.02
+daytime_move_blackpoint_dark_threshold=0.2
+# HDR exposure factor (should be 1.0 or 2.0 for good results)
+daytime_hdr_exposure_factor=2.0
+
+# Nighttime settings
+####################
+# Exposure and gain when entering night mode or at start
+nighttime_startexposure=10.0
+nighttime_startgain=0
+# Auto-expousre settings
+nighttime_meanbrightness=0.15
+# White balance
+nighttime_white_balance_blue=2.0
+nighttime_white_balance_red=1.0
+# Green cast reduction / light pollution reduction
+scnr_filter=1
+scnr_filter_amount=0.5
+# Protection modes (none, average_neutral, maximum_neutral)
+scnr_filter_protection=average_neutral
+# Move blackpoint
+nighttime_move_blackpoint=0.001
+nighttime_move_blackpoint_min_shift_pct=0.005
+nighttime_move_blackpoint_max_shift_pct=0.02
+nighttime_move_blackpoint_dark_threshold=0.2
+# HDR exposure factor (should be 1.0 or 2.0 for good results)
+nighttime_hdr_exposure_factor=2.0
+
+# Noise estimation
+##################
+nighttime_measure_noise=1
+nighttime_measure_noise_radius=250
+
+
+# Brightness measurement for auto-exposure
+##########################################
+# Percentage of the image
+measure_brightness_area=0.2
+
+# Multiscale Median Filter (reduce noise at high gains)
+#######################################################
+# max_scale | blend_factor | Effect
+# ----------|--------------|-----------------------------------------------------------
+#    1      |     0.3      | Slight smoothing of fine noise, stars remain sharp.
+#    1      |     1.0      | Strong removal of fine noise structures.
+#    2      |     0.3      | Moderate smoothing, removes small hot pixels, stars stay visible.
+#    2      |     0.7      | Noticeable smoothing, weaker stars may fade.
+#    3      |     0.5      | Strong smoothing, background becomes very uniform, stars soften.
+#    3      |     1.0      | Very strong smoothing, image looks blurred/soft.
+nighttime_multiscale_median_filter=1
+nighttime_multiscale_median_filter_max_scale=2
+nighttime_multiscale_median_filter_amount=0.9
+
+# HDR settings
+##############
+hdr=1
+# Clipping threshold depends on sensor bit depth
+hdr_clipping_threshold=0.99998
+hdr_min_clipped_pixels=0.00001
+# Value between 1.2 and 1.4
+hdr_y_max_expected=1.0
+hdr_weight_sigma=0.8
+hdr_weight_clip_factor=0.90
+# Chroma fusion modes 0, 1, 2
+hdr_chroma_mode=1
+hdr_contrast_weight_strength=0.6
+# 1..6, 0 = automatic
+hdr_pyramid_levels_override=0
+# HDR debugging
+hdr_weight_maps=0
+hdr_weight_stats=1
+hdr_save_exposures=1
+
+# HDR multiscale transform (experimental)
+#########################################
+hdrmt=0
+
+# Autostretch
+##########################
+# Use autostretch instead of nighttime_move_blackpoint or daytime_move_blackpoint
+autostretch=1
+autostretch_min_val=0.01
+autostretch_max_val=0.99
+
+# Color correction (experimental)
+#################################
+ambience_color_calibration=0
+
+# Adaptive Contrast‑Driven Noise Reduction Filter
+#################################################
+acdnr_filter=1
+acdnr_filter_lum_stddev=1.5
+acdnr_filter_lum_amount=0.15
+acdnr_filter_lum_iterations=2
+acdnr_filter_lum_kernel_size=3
+acdnr_filter_chrom_stddev=2.0
+acdnr_filter_chrom_amount=0.4
+acdnr_filter_chrom_iterations=2
+acdnr_filter_chrom_kernel_size=5
+
+# Gamma
+#######
+# default = 0.8, >1.0 darken foreground areas, <1.0 brighten background areas
+gamma=0.9
+
+# Saturation
+############
+# default = 2.8 (3x coloration), 1.0 no change, >1.0 more color, <1.0 less color
+saturation=2.0
+
+# Dehaze Filter
+###############
+# default = 0.8, 0.0 = disabled
+dehaze_amount=0.0
+dehaze_estimate=0.01
+dehaze_gamma=0.6
+dehaze_saturation=1.2
+
+# Clarity Filter
+################
+clarity_filter=0
+clarity_filter_strength = 0.35
+clarity_filter_radius = 24
+clarity_filter_midtone_width = 0.25
+clarity_filter_preserve_highlights = 1
+clarity_filter_mask_mode = 1
+
+# Automatic color calibration and background neutralization
+###########################################################
+# Set auto_color_calibration_area=0.0 to disable
+auto_color_calibration_area=80.0
+
+# Local Contrast Enhancement (TBD)
+##################################
+local_histogram_normalization=0
+local_histogram_normalization_kernel_radius=64
+local_histogram_normalization_contrast_limit=1.5
+
+# Wavelet Sharpening
+####################
+wavelet_sharpen=1
+wavelet_sharpen_gain_small=2.0
+wavelet_sharpen_gain_medium=0.0
+wavelet_sharpen_gain_large=0.0
+
+# SQM estimation
+#########################
+sqm=1
+sqm_threshold=0.6
+sqm_max_stars=1000
+sqm_radius=100
+sqm_center_x=989
+sqm_center_y=1238
+sqm_star_size=15
+sqm_star_sigma=3.0
+# the intercept representing the maximum sky darkness
+# You can get the value from lightpollutionmap.info for your location
+sqm_intercept=21.2
+# slope is controlling the sensitivity of the SQM estimate to the detected star count
+sqm_slope=1.5
+
+# Camera settings
+#########################
+camera_max_exposure=60.0
+camera_min_exposure=0.0007
+# Maximum and minimum automatic gain (depends on camera)
+camera_max_gain=200
+camera_min_gain=0
+camera_binning2x2=0
+camera_cooling=0
+camara_cooling_temperature=5
+camera_roi_width=0
+camera_roi_height=0
+camera_roi_x=0
+camera_roi_y=0
+# Debayer algorithm: nni, bilinear or vng
+debayer=vng
+
+# Lens
+######
+lens_name="ZWO 2.1mm f/2.0"
+lens_focallength=2.1
+lens_focalratio=1.6
+
+# Image settings
+######################
+# JPEG quality (0...100 %)
+jpeg_quality=100
+# mask_radius set to 0 disables masking
+mask_center_x=1925
+mask_center_y=1185
+mask_radius=1090
+image_center_x=1925
+image_center_y=1185
+image_mask_radius=1090
+image_horizon_radius=1090
+image_north_angle=-11.0
+
+# Focus measurement
+###################
+focus_center_x=989
+focus_center_y=1238
+focus_radius=200
+
+# Crop image
+############
+crop_image=1
+crop_width=2280
+crop_height=2180
+crop_x_offset=760
+crop_y_offset=0
+rotate_image=0
+
+# Panorama (horizon view)
+#########################
+# Enable/Disable panorama generation
+panorama=1
+panorama_center_x=1144
+panorama_center_y=1180
+panorama_width=3048
+panorama_height=1090
+panorama_horizontal_start=260
+
+# Thumbnails
+#########################
+thumbnail=1
+thumbnail_width=100
+
+# General settings
+######################
+# Observing location
+latitude=51.2349N
+longitude=7.4479E
+altitude=114
+city="Musterstadt/Germany"
+# Altitude of the Sun in degrees relative to the horizon at which to switch between day and night.
+sunangle=-6
+capture_interval=120
+owner="Max Mustermann"
+image_directory=/home/allskyuser/images
+video_directory=/home/allskyuser/videos
+database_directory=/home/allskyuser/database
+api-port=3000
+
+# Aurora alerts
+########################
+aurora=1
+
+# Indigo Server settings
+########################
+# IP address or hostname of the Indigo server
+indigo_server=192.168.3.61
+# Port number of the Indigo server
+indigo_port=7624
+# Name of the Indigo camera to use
+indigo_camera="Uranus-C @ 192.168.3.61"
+# Capturing format: fits, jpeg, raw
+indigo_image_format=raw
+indigo_capture_timeout=30
+
+
