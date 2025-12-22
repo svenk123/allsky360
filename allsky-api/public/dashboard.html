@@ -1,0 +1,3163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Allsky360 Viewer</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+
+  <link rel="manifest" href="manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Allsky360 Viewer">
+  <meta name="theme-color" content="#111111" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="stylesheet" href="style.css">
+  <!-- Gridstack CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@9.2.2/dist/gridstack.min.css">
+
+  <script src="js/allsky-common.js"></script>
+  <script src="js/meteors.js"></script>
+  <script src="js/comets.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0/dist/chartjs-plugin-annotation.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
+  <script src="js/astronomia.bundle.min.js" defer onerror="var s=document.createElement('script'); s.defer=true;
+                 s.src='https://cdn.jsdelivr.net/npm/astronomia@1.12.0/build/astronomia.umd.min.js';
+                 document.head.appendChild(s);"></script>
+  <!-- Gridstack JS (IIFE bundle: core + HTML5 drag&drop) -->
+  <script src="https://cdn.jsdelivr.net/npm/gridstack@9.2.2/dist/gridstack-all.js" defer></script>
+</head>
+
+<body>
+  <div id="header">
+    <div class="title-icon">
+      <img src="allsky360_256x256.png" alt="Allsky Icon" width="32" height="32" />
+      <h1>Allsky360 Dashboard</h1>
+    </div>
+
+    <!-- Hamburger Menu Button -->
+    <button id="hamburger-menu-btn" class="hamburger-menu-btn" onclick="toggleHamburgerMenu()">
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+    </button>
+
+    <!-- Navigation Menu -->
+    <nav id="nav-menu" class="nav-menu">
+      <ul class="nav-list">
+        <li><a href="dashboard.html" class="nav-link">dashboard</a></li>
+        <li><a href="archive.html" class="nav-link">Archive</a></li>
+        <li><a href="videos.html" class="nav-link">Videos</a></li>
+        <li><a href="graphs.html" class="nav-link">Graphs</a></li>
+        <li><a href="meteo.html" class="nav-link">Weather</a></li>
+        <li><a href="aurora.html" class="nav-link">Aurora</a></li>
+        <li><a href="config.html" class="nav-link">Config</a></li>
+        <li><a href="calibration.html" class="nav-link">Calibration</a></li>
+        <li><a href="processing.html" class="nav-link">Processing</a></li>
+      </ul>
+    </nav>
+  </div>
+  <!-- Grid Layout -->
+  <div class="grid-stack" id="dashboard-grid" style="margin: 8px;">
+    <!-- Controls / Subheader Widget -->
+    <div class="grid-stack-item" gs-id="subheader" gs-x="0" gs-y="0" gs-w="12" gs-h="1">
+      <div class="grid-stack-item-content">
+        <div id="subheader">
+          <div class="settings-group">
+            <button onclick="zoomIn()">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="11" y1="8" x2="11" y2="14"></line>
+                <line x1="8" y1="11" x2="14" y2="11"></line>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
+            <button onclick="zoomOut()">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="8" y1="11" x2="14" y2="11"></line>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
+            <button onclick="resetZoomAndPan()">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="1 4 1 10 7 10"></polyline>
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+              </svg>
+            </button>
+
+            <label style="align-items: center; gap: 0.3rem;">
+              <input type="checkbox" id="azimutalGridCheckbox" onchange="toggleAzimutalGridOverlay()">
+              Azimutal Grid
+            </label>
+
+            <label style="align-items: center; gap: 0.3rem;">
+              <input type="checkbox" id="equatorialGridCheckbox" onchange="toggleEquatorialGridOverlay()">
+              RA/DEC Grid
+            </label>
+
+            <label style="align-items: center; gap: 0.3rem;">
+              <input type="checkbox" id="brightestStarsGridCheckbox" onchange="toggleBrightestStarsOverlay()">
+              Brightest Stars
+            </label>
+
+            <label>
+              <input type="checkbox" id="meteorRadiansCheckbox" onchange="toggleMeteorRadiantsOverlay()" />
+              Meteor Showers
+            </label>
+
+            <label>
+              <input type="checkbox" id="sunMoonCheckbox" onchange="toggleSunMoonOverlay()" />
+              Sun and Moon
+            </label>
+
+            <label>
+              <input type="checkbox" id="cometsCheckbox" onchange="toggleCometsOverlay()" />
+              Comets
+            </label>
+
+            <label style="align-items: center; gap: 0.3rem;">
+              <input type="checkbox" id="detectedStarsCheckbox" onchange="toggleDetectedStarsOverlay()" />
+              Stars
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Widget -->
+    <div class="grid-stack-item" gs-id="image-container" gs-x="0" gs-y="1" gs-w="8" gs-h="6">
+      <div class="grid-stack-item-content">
+        <div id="image-container" style="display: flex; flex-direction: column; height: 100%; min-height: 0;">
+          <div style="position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden;">
+            <img id="allsky-image" src="" alt="Allsky image"
+              style="display: block; width: 100%; height: 100%; object-fit: contain;" />
+            <canvas id="allsky-overlay"
+              style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panorama Widget -->
+    <div class="grid-stack-item" gs-id="panorama-container" gs-x="0" gs-y="1" gs-w="8" gs-h="6">
+      <div class="grid-stack-item-content">
+        <div id="panorama-container" style="display: flex; flex-direction: column; height: 100%; min-height: 0;">
+          <div style="position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden;">
+            <img id="panorama" src="" alt="Horizon View"
+              style="display: block; width: 100%; height: 100%; object-fit: contain;" />
+            <canvas id="panorama-overlay" style="position: absolute; top: 0; left: 0; pointer-events: none;"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Countdown Widget -->
+    <div class="grid-stack-item" gs-id="countdown-widget" gs-x="0" gs-y="7" gs-w="8" gs-h="1">
+      <div class="grid-stack-item-content">
+        <div class="metadata-section">
+          <h2>Image acquisition</h2>
+          <div id="countdown">Next update in <span id="timer">10</span> s</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Histogram Widget -->
+    <div class="grid-stack-item" gs-id="histogram-widget" gs-x="8" gs-y="1" gs-w="4" gs-h="2">
+      <div class="grid-stack-item-content">
+        <div id="histogram-container">
+          <h2>Histogram</h2>
+          <canvas id="histogram" width="512" height="100"></canvas>
+          <div id="histogram-stats"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Data Widget -->
+    <div class="grid-stack-item" gs-id="image-data" gs-x="8" gs-y="3" gs-w="4" gs-h="2">
+      <div class="grid-stack-item-content">
+        <div id="image-data">Loading image data...</div>
+      </div>
+    </div>
+
+    <!-- Location Widget -->
+    <div class="grid-stack-item" gs-id="location" gs-x="8" gs-y="5" gs-w="4" gs-h="1">
+      <div class="grid-stack-item-content">
+        <div id="location">Loading location...</div>
+      </div>
+    </div>
+
+    <!-- Sun and Moon Widget -->
+    <div class="grid-stack-item" gs-id="sunandmoon" gs-x="8" gs-y="6" gs-w="4" gs-h="3">
+      <div class="grid-stack-item-content">
+        <div id="sunandmoon">Loading sun and moon...</div>
+        <canvas id="chartSunMoonAltitude"></canvas>
+      </div>
+    </div>
+
+    <!-- Weather Widget -->
+    <div class="grid-stack-item" gs-id="weather" gs-x="8" gs-y="5" gs-w="4" gs-h="2">
+      <div class="grid-stack-item-content">
+        <div id="weather">Loading weather...</div>
+      </div>
+    </div>
+
+    <!-- Aurora Widget -->
+    <div class="grid-stack-item" gs-id="aurora" gs-x="8" gs-y="7" gs-w="4" gs-h="2">
+      <div class="grid-stack-item-content">
+        <div id="aurora">Loading aurora...</div>
+      </div>
+    </div>
+
+    <!-- Storage Widget -->
+    <div class="grid-stack-item" gs-id="storage" gs-x="8" gs-y="9" gs-w="4" gs-h="2">
+      <div class="grid-stack-item-content">
+        <div id="storage">
+          <div class="metadata-section">
+            <h2>Storage</h2>
+            <div id="storage-content">Loading storage information...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HDR Exposures Widget -->
+    <div class="grid-stack-item" gs-id="exposure-gallery" gs-x="8" gs-y="0" gs-w="4" gs-h="2">
+      <div class="grid-stack-item-content">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 0.25rem;">
+          <h2>HDR exposures</h2>
+        </div>
+        <div id="exposure-gallery" class="exposure-gallery"></div>
+      </div>
+    </div>
+
+    <!-- Statistics Charts Section -->
+    <!-- Exposure Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-exposure" gs-x="0" gs-y="8" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartExposure"></canvas>
+      </div>
+    </div>
+
+    <!-- Gain Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-gain" gs-x="6" gs-y="8" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartGain"></canvas>
+      </div>
+    </div>
+
+    <!-- Noise Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-noise" gs-x="0" gs-y="11" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartNoise"></canvas>
+      </div>
+    </div>
+
+    <!-- SQM Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-sqm" gs-x="6" gs-y="11" gs-w="3" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartSQM"></canvas>
+      </div>
+    </div>
+
+    <!-- Stars Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-stars" gs-x="9" gs-y="11" gs-w="3" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartStars"></canvas>
+      </div>
+    </div>
+
+    <!-- HDR Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-hdr" gs-x="0" gs-y="14" gs-w="4" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartHDR"></canvas>
+      </div>
+    </div>
+
+    <!-- Focus Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-focus" gs-x="4" gs-y="14" gs-w="4" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartFocus"></canvas>
+      </div>
+    </div>
+
+    <!-- Brightness Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-brightness" gs-x="8" gs-y="14" gs-w="4" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartBrightness"></canvas>
+      </div>
+    </div>
+
+    <!-- Mean Brightness RGB Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-mean-brightness-rgb" gs-x="0" gs-y="17" gs-w="12" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartMeanBrightnessRGB"></canvas>
+      </div>
+    </div>
+
+    <!-- Weather Charts Section -->
+    <!-- Temperature Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-temp" gs-x="0" gs-y="20" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartTemp"></canvas>
+      </div>
+    </div>
+
+    <!-- Humidity Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-humidity" gs-x="6" gs-y="20" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartHumidity"></canvas>
+      </div>
+    </div>
+
+    <!-- Pressure Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-pressure" gs-x="0" gs-y="23" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartPressure"></canvas>
+      </div>
+    </div>
+
+    <!-- Dew Point Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-dew-point" gs-x="6" gs-y="23" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartDewPoint"></canvas>
+      </div>
+    </div>
+
+    <!-- Clouds Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-clouds" gs-x="0" gs-y="26" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartClouds"></canvas>
+      </div>
+    </div>
+
+    <!-- Global Cloud Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-global-cloud" gs-x="6" gs-y="26" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartGlobalCloud"></canvas>
+      </div>
+    </div>
+
+    <!-- Visibility Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-visibility" gs-x="0" gs-y="29" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartVisibility"></canvas>
+      </div>
+    </div>
+
+    <!-- Jetstream Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-jetstream" gs-x="6" gs-y="29" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartJetstream"></canvas>
+      </div>
+    </div>
+
+    <!-- Wind Speed Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-wind-speed" gs-x="0" gs-y="32" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartWindSpeed"></canvas>
+      </div>
+    </div>
+
+    <!-- Wind Direction Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-wind-dir" gs-x="6" gs-y="32" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartWindDir"></canvas>
+      </div>
+    </div>
+
+    <!-- Aurora Charts Section -->
+    <!-- Aurora Probability Chart Widget (Combined) -->
+    <div class="grid-stack-item" gs-id="chart-probability-combined" gs-x="0" gs-y="35" gs-w="12" gs-h="4">
+      <div class="grid-stack-item-content">
+        <canvas id="chartProbabilityCombined"></canvas>
+      </div>
+    </div>
+
+    <!-- Kp Index Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-kp-index" gs-x="0" gs-y="39" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartKpIndex"></canvas>
+      </div>
+    </div>
+
+    <!-- Bt (Magnetic Field Total) Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-bt" gs-x="6" gs-y="39" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartBt"></canvas>
+      </div>
+    </div>
+
+    <!-- Bz (Magnetic Field Z-Component) Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-bz" gs-x="0" gs-y="42" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartBz"></canvas>
+      </div>
+    </div>
+
+    <!-- Solar Wind Density Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-density" gs-x="6" gs-y="42" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartDensity"></canvas>
+      </div>
+    </div>
+
+    <!-- Solar Wind Speed Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-speed" gs-x="0" gs-y="45" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartSpeed"></canvas>
+      </div>
+    </div>
+
+    <!-- Solar Wind Temperature Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-temperature" gs-x="6" gs-y="45" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartTemperature"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <footer id="footer">
+    <div class="copyright">Copyright (c) 2025 Sven Kreiensen</div>
+    <button id="widget-config-btn" title="Widget Configuration" onclick="showWidgetConfig()">Widgets</button>
+    <button id="export-layout-btn" title="Export current layout" onclick="exportCurrentLayout()">Export</button>
+    <button id="toggle-grid-btn" title="Enable/disable moving and resizing widgets"
+      onclick="toggleGridInteraction()">Locked</button>
+    <button id="reset-layout-btn" title="Reset layout to default" onclick="resetGridLayout()">Reset layout</button>
+  </footer>
+
+  <script>
+    // Charts object for statistics
+    const charts = {};
+
+    // Widget configuration
+    const widgetConfig = {
+      // Basic widgets
+      'subheader': { name: 'Controls', category: 'basic', default: true },
+      'image-container': { name: 'Main Image', category: 'basic', default: true },
+      'histogram-widget': { name: 'Histogram', category: 'basic', default: true },
+      'exposure-gallery': { name: 'HDR Gallery', category: 'basic', default: true },
+      'image-data': { name: 'Image Data', category: 'basic', default: true },
+      'location': { name: 'Location', category: 'basic', default: true },
+      'sunandmoon': { name: 'Sun & Moon', category: 'basic', default: true },
+      'weather': { name: 'Weather Info', category: 'basic', default: true },
+      'aurora': { name: 'Aurora Info', category: 'basic', default: true },
+      'storage': { name: 'Storage', category: 'basic', default: true },
+      'countdown-widget': { name: 'Countdown', category: 'basic', default: true },
+
+      // Statistics charts
+      'chart-exposure': { name: 'Exposure Chart', category: 'statistics', default: true },
+      'chart-gain': { name: 'Gain Chart', category: 'statistics', default: true },
+      'chart-noise': { name: 'Noise Chart', category: 'statistics', default: true },
+      'chart-sqm': { name: 'SQM Chart', category: 'statistics', default: true },
+      'chart-stars': { name: 'Stars Chart', category: 'statistics', default: true },
+      'chart-focus': { name: 'Focus Chart', category: 'statistics', default: true },
+      'chart-hdr': { name: 'HDR Chart', category: 'statistics', default: true },
+      'chart-brightness': { name: 'Brightness Chart', category: 'statistics', default: true },
+      'chart-mean-brightness-rgb': { name: 'RGB Chart', category: 'statistics', default: true },
+
+      // Weather charts
+      'chart-temp': { name: 'Temperature', category: 'weather', default: false },
+      'chart-humidity': { name: 'Humidity', category: 'weather', default: false },
+      'chart-pressure': { name: 'Pressure', category: 'weather', default: false },
+      'chart-dew-point': { name: 'Dew Point', category: 'weather', default: false },
+      'chart-clouds': { name: 'Clouds', category: 'weather', default: false },
+      'chart-global-cloud': { name: 'Global Cloud', category: 'weather', default: false },
+      'chart-visibility': { name: 'Visibility', category: 'weather', default: false },
+      'chart-jetstream': { name: 'Jetstream', category: 'weather', default: false },
+      'chart-wind-speed': { name: 'Wind Speed', category: 'weather', default: false },
+      'chart-wind-dir': { name: 'Wind Direction', category: 'weather', default: false },
+
+      // Aurora charts
+      'chart-probability-combined': { name: 'Aurora Probability', category: 'aurora', default: false },
+      'chart-kp-index': { name: 'Kp Index', category: 'aurora', default: false },
+      'chart-bt': { name: 'Bt Field', category: 'aurora', default: false },
+      'chart-bz': { name: 'Bz Field', category: 'aurora', default: false },
+      'chart-density': { name: 'Solar Wind Density', category: 'aurora', default: false },
+      'chart-speed': { name: 'Solar Wind Speed', category: 'aurora', default: false },
+      'chart-temperature': { name: 'Solar Wind Temp', category: 'aurora', default: false },
+    };
+
+    // Load widget configuration from localStorage
+    function loadWidgetConfig() {
+      const saved = localStorage.getItem('allsky360.widgetConfig');
+      console.log('Attempting to load widget config from localStorage:', saved);
+
+      if (saved) {
+        try {
+          const config = JSON.parse(saved);
+          console.log('Loaded widget config from localStorage:', config);
+          // First, ensure all current widgets are initialized with their defaults
+          Object.keys(widgetConfig).forEach(id => {
+            widgetConfig[id].enabled = widgetConfig[id].default;
+          });
+          // Then apply saved config (only for widgets that exist in saved config)
+          Object.keys(config).forEach(id => {
+            if (widgetConfig[id] !== undefined) {
+              widgetConfig[id].enabled = config[id];
+            }
+          });
+        } catch (e) {
+          console.warn('Failed to load widget config, using defaults:', e);
+          Object.keys(widgetConfig).forEach(id => {
+            widgetConfig[id].enabled = widgetConfig[id].default;
+          });
+        }
+      } else {
+        console.log('No saved widget config found, using defaults');
+        Object.keys(widgetConfig).forEach(id => {
+          widgetConfig[id].enabled = widgetConfig[id].default;
+        });
+      }
+
+      console.log('Final widget config after loading:', widgetConfig);
+    }
+
+    // Save widget configuration to localStorage
+    function saveWidgetConfig() {
+      const config = {};
+      Object.keys(widgetConfig).forEach(id => {
+        config[id] = widgetConfig[id].enabled;
+      });
+      try {
+        localStorage.setItem('allsky360.widgetConfig', JSON.stringify(config));
+        console.log('Widget config saved to localStorage:', config);
+      } catch (e) {
+        console.error('Failed to save widget config to localStorage:', e);
+      }
+    }
+
+    // Show/hide widgets based on configuration
+    function applyWidgetConfig() {
+      console.log('Applying widget config:', widgetConfig);
+      let foundWidgets = 0;
+      let hiddenWidgets = 0;
+      let shownWidgets = 0;
+
+      Object.keys(widgetConfig).forEach(id => {
+        const element = document.querySelector(`[gs-id="${id}"]`);
+        if (element) {
+          foundWidgets++;
+          if (widgetConfig[id].enabled) {
+            element.style.display = '';
+            shownWidgets++;
+            console.log(`Showing widget: ${id}`);
+          } else {
+            element.style.display = 'none';
+            hiddenWidgets++;
+            console.log(`Hiding widget: ${id}`);
+          }
+        } else {
+          console.warn(`Widget element not found: ${id}`);
+        }
+      });
+
+      console.log(`Widget config applied: ${foundWidgets} found, ${shownWidgets} shown, ${hiddenWidgets} hidden`);
+    }
+
+    // Show widget configuration modal
+    function showWidgetConfig() {
+      const modal = document.createElement('div');
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      `;
+
+      const content = document.createElement('div');
+      content.style.cssText = `
+        background: #1a1a1a;
+        border: 1px solid #444;
+        border-radius: 8px;
+        padding: 20px;
+        max-width: 600px;
+        max-height: 80vh;
+        overflow-y: auto;
+        color: white;
+      `;
+
+      content.className = 'widget-config-modal';
+      content.innerHTML = `
+        <h3>Widget configuration</h3>
+        <p>Select which widgets to display:</p>
+        <div class="widget-config-spacing">
+        </div>
+        <div id="widget-categories"></div>
+        <div class="widget-config-buttons">
+          <button class="widget-config-button" onclick="selectAllWidgets()">Select All</button>
+          <button class="widget-config-button" onclick="resetWidgetConfig()">Standard</button>
+          <button class="widget-config-button" onclick="closeWidgetConfig()">Abbrechen</button>
+          <button class="widget-config-button-primary" onclick="saveAndCloseWidgetConfig()">Speichern</button>
+        </div>
+      `;
+
+      modal.appendChild(content);
+      document.body.appendChild(modal);
+
+      // Group widgets by category
+      const categories = {};
+      Object.keys(widgetConfig).forEach(id => {
+        const config = widgetConfig[id];
+        if (!categories[config.category]) {
+          categories[config.category] = [];
+        }
+        categories[config.category].push({ id, ...config });
+      });
+
+      // Create category sections
+      const categoryNames = {
+        'basic': 'Basic',
+        'statistics': 'Statistics',
+        'weather': 'Weather',
+        'aurora': 'Aurora'
+      };
+
+      const categoriesDiv = document.getElementById('widget-categories');
+      Object.keys(categories).forEach(category => {
+        const categoryDiv = document.createElement('div');
+        categoryDiv.style.marginBottom = '20px';
+
+        const categoryHeader = document.createElement('h4');
+        categoryHeader.textContent = categoryNames[category] || category;
+        categoryHeader.style.color = '#4CAF50';
+        categoryHeader.style.marginBottom = '10px';
+
+        const categoryContent = document.createElement('div');
+        categoryContent.style.display = 'grid';
+        categoryContent.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
+        categoryContent.style.gap = '8px';
+
+        categories[category].forEach(widget => {
+          const widgetDiv = document.createElement('div');
+          widgetDiv.style.display = 'flex';
+          widgetDiv.style.alignItems = 'center';
+          widgetDiv.style.padding = '4px';
+
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.id = `widget-${widget.id}`;
+          // Use current value from widgetConfig, not from the widget object copy
+          checkbox.checked = widgetConfig[widget.id].enabled;
+          checkbox.style.marginRight = '8px';
+
+          const label = document.createElement('label');
+          label.htmlFor = `widget-${widget.id}`;
+          label.textContent = widget.name;
+          label.style.cursor = 'pointer';
+          label.style.color = widget.enabled ? 'white' : '#888';
+
+          checkbox.addEventListener('change', () => {
+            widgetConfig[widget.id].enabled = checkbox.checked;
+            label.style.color = checkbox.checked ? 'white' : '#888';
+            console.log(`Widget ${widget.id} changed to: ${checkbox.checked}`);
+          });
+
+          widgetDiv.appendChild(checkbox);
+          widgetDiv.appendChild(label);
+          categoryContent.appendChild(widgetDiv);
+        });
+
+        categoryDiv.appendChild(categoryHeader);
+        categoryDiv.appendChild(categoryContent);
+        categoriesDiv.appendChild(categoryDiv);
+      });
+
+      // Store modal reference for cleanup
+      window.currentWidgetModal = modal;
+    }
+
+    // Close widget configuration modal
+    function closeWidgetConfig() {
+      if (window.currentWidgetModal) {
+        document.body.removeChild(window.currentWidgetModal);
+        window.currentWidgetModal = null;
+      }
+    }
+
+    // Save widget configuration and close modal
+    function saveAndCloseWidgetConfig() {
+      // Update widgetConfig with current checkbox states
+      Object.keys(widgetConfig).forEach(id => {
+        const checkbox = document.getElementById(`widget-${id}`);
+        if (checkbox) {
+          widgetConfig[id].enabled = checkbox.checked;
+        }
+      });
+
+      console.log('Saving widget config:', widgetConfig);
+      saveWidgetConfig();
+      applyWidgetConfig();
+      closeWidgetConfig();
+    }
+
+    // Select all widgets
+    function selectAllWidgets() {
+      Object.keys(widgetConfig).forEach(id => {
+        const checkbox = document.getElementById(`widget-${id}`);
+        if (checkbox) {
+          checkbox.checked = true;
+          widgetConfig[id].enabled = true;
+          const label = checkbox.nextElementSibling;
+          if (label) {
+            label.style.color = 'white';
+          }
+        }
+      });
+    }
+
+    // Reset widget configuration to defaults
+    function resetWidgetConfig() {
+      Object.keys(widgetConfig).forEach(id => {
+        widgetConfig[id].enabled = widgetConfig[id].default;
+      });
+
+      // Update checkboxes
+      Object.keys(widgetConfig).forEach(id => {
+        const checkbox = document.getElementById(`widget-${id}`);
+        if (checkbox) {
+          checkbox.checked = widgetConfig[id].enabled;
+          const label = checkbox.nextElementSibling;
+          if (label) {
+            label.style.color = widgetConfig[id].enabled ? 'white' : '#888';
+          }
+        }
+      });
+      console.log('Widget config reset to defaults:', widgetConfig);
+    }
+
+    // Sun times for background
+    let sunTimes = {
+      startOfDay: new Date(),
+      dawnStart: new Date(),
+      dawnEnd: new Date(),
+      duskStart: new Date(),
+      duskEnd: new Date(),
+      nextDawnStart: new Date()
+    };
+
+    // Background sun plugin for charts
+    const backgroundSunPlugin = {
+      id: 'backgroundSun',
+      beforeDraw: (chart) => {
+        const { ctx, chartArea, scales } = chart;
+        const { x } = scales;
+        const periods = chart.options.plugins.backgroundSun?.periods || [];
+
+        if (!chartArea || !periods.length)
+          return;
+
+        periods.forEach(period => {
+          const startX = x.getPixelForValue(period.start);
+          const endX = x.getPixelForValue(period.end);
+
+          if (startX < chartArea.right && endX > chartArea.left) {
+            ctx.save();
+            ctx.fillStyle = period.color;
+            ctx.fillRect(
+              Math.max(startX, chartArea.left),
+              chartArea.top,
+              Math.min(endX, chartArea.right) - Math.max(startX, chartArea.left),
+              chartArea.bottom - chartArea.top
+            );
+            ctx.restore();
+          }
+        });
+      }
+    };
+
+    function createChart(ctxId, label, datasets, type = "line", showLegend = false, logScale = false, yAxisMin = null, yAxisMax = null) {
+      const canvas = document.getElementById(ctxId);
+      if (!canvas) {
+        console.warn(`Canvas element with id '${ctxId}' not found`);
+        return null;
+      }
+      const ctx = canvas.getContext('2d');
+      return new Chart(ctx, {
+        type,
+        data: {
+          labels: [],
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              type: 'time', time: {
+                unit: 'minute', tooltipFormat: 'HH:mm',
+                displayFormats: { hour: 'HH:mm', minute: 'HH:mm' }
+              },
+              ticks: { color: 'white' },
+              grid: { color: '#444' }
+            },
+            y: {
+              type: logScale ? 'logarithmic' : 'linear',
+              min: yAxisMin !== null ? yAxisMin : (logScale ? 0.00001 : undefined),
+              max: yAxisMax !== null ? yAxisMax : undefined,
+              beginAtZero: yAxisMin === null && yAxisMax === null,
+              ticks: {
+                color: 'white',
+                callback: function (v) {
+                  if (logScale) {
+                    return v.toFixed(6);
+                  } else {
+                    return v.toString();
+                  }
+                }
+              },
+              grid: { color: '#444' }
+            }
+          },
+          plugins: {
+            title: {
+              display: true,
+              text: label,
+              color: "#ffffff"
+            },
+            legend: { display: showLegend, labels: { color: 'white' } },
+            backgroundSun: {
+              periods: [
+                { start: sunTimes.startOfDay, end: sunTimes.dawnStart, color: 'rgba(0, 0, 100, 0.4)' },
+                { start: sunTimes.dawnStart, end: sunTimes.dawnEnd, color: 'rgba(128,128,128,0.4)' },
+                { start: sunTimes.dawnEnd, end: sunTimes.duskStart, color: 'rgba(160, 190, 255, 0.4)' },
+                { start: sunTimes.duskStart, end: sunTimes.duskEnd, color: 'rgba(128,128,128,0.4)' },
+                { start: sunTimes.duskEnd, end: sunTimes.nextDawnStart, color: 'rgba(0, 0, 100, 0.4)' }
+              ]
+            }
+          }
+        }
+      });
+    }
+
+    function updateCharts(data) {
+      const timestamps = data.map(p => new Date(p.timestamp * 1000));
+
+      if (charts.chartExposure) {
+        charts.chartExposure.data.labels = timestamps;
+        charts.chartExposure.data.datasets[0].data = data.map(p => p.exposure);
+      }
+
+      if (charts.chartGain) {
+        charts.chartGain.data.labels = timestamps;
+        charts.chartGain.data.datasets[0].data = data.map(p => p.gain);
+      }
+
+      if (charts.chartNoise) {
+        charts.chartNoise.data.labels = timestamps;
+        charts.chartNoise.data.datasets[0].data = data.map(p => p.noise);
+      }
+
+      if (charts.chartSQM) {
+        charts.chartSQM.data.labels = timestamps;
+        charts.chartSQM.data.datasets[0].data = data.map(p => p.sqm);
+      }
+
+      if (charts.chartStars) {
+        charts.chartStars.data.labels = timestamps;
+        charts.chartStars.data.datasets[0].data = data.map(p => p.stars);
+      }
+
+      if (charts.chartFocus) {
+        charts.chartFocus.data.labels = timestamps;
+        charts.chartFocus.data.datasets[0].data = data.map(p => p.focus);
+      }
+
+      if (charts.chartHDR) {
+        charts.chartHDR.data.labels = timestamps;
+        charts.chartHDR.data.datasets[0].data = data.map(p => p.hdr);
+      }
+
+      if (charts.chartBrightness) {
+        charts.chartBrightness.data.labels = timestamps;
+        charts.chartBrightness.data.datasets[0].data = data.map(p => p.brightness);
+      }
+
+      if (charts.chartMeanBrightnessRGB) {
+        charts.chartMeanBrightnessRGB.data.labels = timestamps;
+        charts.chartMeanBrightnessRGB.data.datasets[0].data = data.map(p => p.mean_r);
+        charts.chartMeanBrightnessRGB.data.datasets[1].data = data.map(p => p.mean_g);
+        charts.chartMeanBrightnessRGB.data.datasets[2].data = data.map(p => p.mean_b);
+      }
+
+      // Only update charts that exist
+      Object.values(charts).forEach(chart => {
+        if (chart) chart.update();
+      });
+    }
+
+    function updateMeteoCharts(data) {
+      const ts = data.map(d => new Date(d.timestamp * 1000));
+
+      if (charts.chartTemp) {
+        charts.chartTemp.data.labels = ts;
+        charts.chartTemp.data.datasets[0].data = data.map(d => d.temperature);
+      }
+
+      if (charts.chartHumidity) {
+        charts.chartHumidity.data.labels = ts;
+        charts.chartHumidity.data.datasets[0].data = data.map(d => d.humidity);
+      }
+
+      if (charts.chartPressure) {
+        charts.chartPressure.data.labels = ts;
+        charts.chartPressure.data.datasets[0].data = data.map(d => d.pressure_msl);
+        charts.chartPressure.data.datasets[1].data = data.map(d => d.surface_pressure);
+      }
+
+      if (charts.chartDewPoint) {
+        charts.chartDewPoint.data.labels = ts;
+        charts.chartDewPoint.data.datasets[0].data = data.map(d => d.dew_point);
+      }
+
+      if (charts.chartClouds) {
+        charts.chartClouds.data.labels = ts;
+        charts.chartClouds.data.datasets[0].data = data.map(d => d.cloud_low);
+        charts.chartClouds.data.datasets[1].data = data.map(d => d.cloud_mid);
+        charts.chartClouds.data.datasets[2].data = data.map(d => d.cloud_high);
+      }
+
+      if (charts.chartGlobalCloud) {
+        charts.chartGlobalCloud.data.labels = ts;
+        charts.chartGlobalCloud.data.datasets[0].data = data.map(d => d.cloud_cover);
+      }
+
+      if (charts.chartVisibility) {
+        charts.chartVisibility.data.labels = ts;
+        charts.chartVisibility.data.datasets[0].data = data.map(d => d.visibility / 1000);
+      }
+
+      if (charts.chartJetstream) {
+        charts.chartJetstream.data.labels = ts;
+        charts.chartJetstream.data.datasets[0].data = data.map(d => d.wind_speed_300hPa);
+      }
+
+      if (charts.chartWindSpeed) {
+        charts.chartWindSpeed.data.labels = ts;
+        charts.chartWindSpeed.data.datasets[0].data = data.map(d => d.wind_speed_10m);
+      }
+
+      if (charts.chartWindDir) {
+        charts.chartWindDir.data.labels = ts;
+        charts.chartWindDir.data.datasets[0].data = data.map(d => d.wind_dir_10m);
+      }
+
+      // Only update charts that exist
+      Object.values(charts).forEach(chart => {
+        if (chart) chart.update();
+      });
+    }
+
+    function updateAuroraCharts(data) {
+      const ts = data.map(d => new Date(d.timestamp * 1000));
+
+      // Aurora Probability Combined Chart
+      if (charts.chartProbabilityCombined) {
+        charts.chartProbabilityCombined.data.labels = ts;
+        charts.chartProbabilityCombined.data.datasets[0].data = data.map(d => d.probability_percent);
+        charts.chartProbabilityCombined.data.datasets[1].data = data.map(d => d.probability_max);
+        charts.chartProbabilityCombined.data.datasets[2].data = data.map(d => d.probability_avg);
+      }
+
+      // Kp Index
+      if (charts.chartKpIndex) {
+        charts.chartKpIndex.data.labels = ts;
+        charts.chartKpIndex.data.datasets[0].data = data.map(d => d.kp_index);
+      }
+
+      // Magnetic Field Components
+      if (charts.chartBt) {
+        charts.chartBt.data.labels = ts;
+        charts.chartBt.data.datasets[0].data = data.map(d => d.bt);
+      }
+
+      if (charts.chartBz) {
+        charts.chartBz.data.labels = ts;
+        charts.chartBz.data.datasets[0].data = data.map(d => d.bz);
+      }
+
+      // Solar Wind Parameters
+      if (charts.chartDensity) {
+        charts.chartDensity.data.labels = ts;
+        charts.chartDensity.data.datasets[0].data = data.map(d => d.density);
+      }
+
+      if (charts.chartSpeed) {
+        charts.chartSpeed.data.labels = ts;
+        charts.chartSpeed.data.datasets[0].data = data.map(d => d.speed);
+      }
+
+      if (charts.chartTemperature) {
+        charts.chartTemperature.data.labels = ts;
+        charts.chartTemperature.data.datasets[0].data = data.map(d => d.temperature);
+      }
+
+      // Only update charts that exist
+      Object.values(charts).forEach(chart => {
+        if (chart) chart.update();
+      });
+    }
+
+    function clearAllCharts() {
+      Object.values(charts).forEach(chart => {
+        if (chart) {
+          chart.data.labels = [];
+          chart.data.datasets.forEach(ds => ds.data = []);
+          chart.update();
+        }
+      });
+    }
+
+    async function loadMeasurements() {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const res = await fetch(`/api/image?date=${today}`);
+
+        if (res.status === 404) {
+          console.warn("No data for this date. Clearing charts.");
+          clearAllCharts();
+          return;
+        }
+
+        if (!res.ok) throw new Error("Fetch error");
+
+        const json = await res.json();
+        if (Array.isArray(json)) {
+          updateCharts(json);
+        } else {
+          clearAllCharts();
+        }
+      } catch (err) {
+        console.error("Failed to load measurement data:", err);
+        clearAllCharts();
+      }
+    }
+
+    async function loadMeteoData() {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const res = await fetch(`/api/meteo?date=${today}`);
+
+        if (res.status === 404) {
+          console.warn("No meteo data for this date. Clearing meteo charts.");
+          return;
+        }
+
+        if (!res.ok) throw new Error("Fetch error");
+
+        const json = await res.json();
+        if (Array.isArray(json)) {
+          updateMeteoCharts(json);
+        }
+      } catch (err) {
+        console.error("Failed to load meteo data:", err);
+      }
+    }
+
+    async function loadAuroraData() {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const res = await fetch(`/api/aurora?date=${today}`);
+
+        if (res.status === 404) {
+          console.warn("No aurora data for this date. Clearing aurora charts.");
+          return;
+        }
+
+        if (!res.ok) throw new Error("Fetch error");
+
+        const json = await res.json();
+        if (Array.isArray(json)) {
+          updateAuroraCharts(json);
+        }
+      } catch (err) {
+        console.error("Failed to load aurora data:", err);
+      }
+    }
+
+    async function loadStorageData() {
+      try {
+        const res = await fetch(`/api/storage`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        updateStorageWidget(data);
+      } catch (e) {
+        console.warn("⚠️ Storage data not found:", e);
+        const storageEl = document.getElementById('storage-content');
+        if (storageEl) {
+          storageEl.innerHTML = '<div style="color: #888;">Storage information not available</div>';
+        }
+      }
+    }
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    function updateStorageWidget(storageData) {
+      const storageEl = document.getElementById('storage-content');
+      if (!storageEl) return;
+
+      if (!storageData || (!storageData.images && !storageData.videos)) {
+        storageEl.innerHTML = '<div style="color: #888;">Storage information not available</div>';
+        return;
+      }
+
+      let html = '';
+
+      // Images storage
+      if (storageData.images && !storageData.images.error) {
+        const imagesFreePercent = storageData.images.freePercent || 0;
+        const imagesColor = imagesFreePercent > 20 ? '#4caf50' : imagesFreePercent > 10 ? '#ff9800' : '#f44336';
+        html += `
+          <div style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
+              <span><strong>Images:</strong></span>
+              <span>${imagesFreePercent.toFixed(1)}% free</span>
+            </div>
+            <div style="background: #333; border-radius: 4px; height: 20px; overflow: hidden; position: relative;">
+              <div style="background: ${imagesColor}; height: 100%; width: ${imagesFreePercent}%; transition: width 0.3s ease;"></div>
+              <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
+                ${formatBytes(storageData.images.freeBytes)} / ${formatBytes(storageData.images.totalBytes)}
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (storageData.images && storageData.images.error) {
+        html += `<div style="margin-bottom: 1rem; color: #f44336;">Images: ${storageData.images.error}</div>`;
+      }
+
+      // Videos storage
+      if (storageData.videos && !storageData.videos.error) {
+        const videosFreePercent = storageData.videos.freePercent || 0;
+        const videosColor = videosFreePercent > 20 ? '#4caf50' : videosFreePercent > 10 ? '#ff9800' : '#f44336';
+        html += `
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
+              <span><strong>Videos:</strong></span>
+              <span>${videosFreePercent.toFixed(1)}% free</span>
+            </div>
+            <div style="background: #333; border-radius: 4px; height: 20px; overflow: hidden; position: relative;">
+              <div style="background: ${videosColor}; height: 100%; width: ${videosFreePercent}%; transition: width 0.3s ease;"></div>
+              <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
+                ${formatBytes(storageData.videos.freeBytes)} / ${formatBytes(storageData.videos.totalBytes)}
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (storageData.videos && storageData.videos.error) {
+        html += `<div style="color: #f44336;">Videos: ${storageData.videos.error}</div>`;
+      }
+
+      storageEl.innerHTML = html;
+    }
+
+    function updateSunTimes(date, lat, lon) {
+      if (!lat || !lon) return;
+
+      const d = new Date(date);
+      sunTimes.startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      sunTimes.dawnStart = new Date(sunTimes.startOfDay.getTime() + 6 * 60 * 60 * 1000); // 6:00
+      sunTimes.dawnEnd = new Date(sunTimes.startOfDay.getTime() + 8 * 60 * 60 * 1000);   // 8:00
+      sunTimes.duskStart = new Date(sunTimes.startOfDay.getTime() + 18 * 60 * 60 * 1000); // 18:00
+      sunTimes.duskEnd = new Date(sunTimes.startOfDay.getTime() + 20 * 60 * 60 * 1000);   // 20:00
+      sunTimes.nextDawnStart = new Date(sunTimes.startOfDay.getTime() + 24 * 60 * 60 * 1000); // Next day
+    }
+
+    // Initialize charts
+    function initCharts() {
+      Chart.register(backgroundSunPlugin);
+
+      charts.chartExposure = createChart("chartExposure", "Exposure (s)", [
+        { label: "Exposure (s)", data: [], borderColor: "orange", fill: false, pointRadius: 0 },
+      ], "line", false, true);
+
+      charts.chartGain = createChart("chartGain", "Gain", [
+        { label: "Gain", data: [], borderColor: "blue", fill: false, pointRadius: 0 }
+      ], "line", false, 0, 350);
+
+      charts.chartNoise = createChart("chartNoise", "Noise Level", [
+        { label: "Sigma noise", data: [], borderColor: "red", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartSQM = createChart("chartSQM", "SQM", [
+        { label: "SQM", data: [], borderColor: "green", backgroundColor: "green", fill: false, pointRadius: 0 }
+      ], "line", false, 0, 22);
+
+      charts.chartStars = createChart("chartStars", "Stars count", [
+        { label: "Star count", data: [], borderColor: "yellow", backgroundColor: "yellow", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartFocus = createChart("chartFocus", "Focus", [
+        { label: "Focus", data: [], borderColor: "orange", backgroundColor: "orange", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartHDR = createChart("chartHDR", "HDR", [
+        { label: "HDR exposures", data: [], backgroundColor: "purple", fill: false, pointRadius: 0 }
+      ], "bar", false, 0, 5);
+
+      charts.chartBrightness = createChart("chartBrightness", "Median Brightness (G)", [
+        { label: "Median (green)", data: [], borderColor: "lime", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartMeanBrightnessRGB = createChart("chartMeanBrightnessRGB", "Mean Brightness (RGB)", [
+        { label: "Mean (red)", data: [], borderColor: "red", fill: false, pointRadius: 0 },
+        { label: "Mean (green)", data: [], borderColor: "green", fill: false, pointRadius: 0 },
+        { label: "Mean (blue)", data: [], borderColor: "blue", fill: false, pointRadius: 0 }
+      ], "line", true);
+
+      // Weather Charts
+      charts.chartTemp = createChart("chartTemp", "Temperature (°C)", [
+        { label: "Temperature", data: [], borderColor: "orange", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartHumidity = createChart("chartHumidity", "Rel. humidity (%)", [
+        { label: "Humidity", data: [], borderColor: "blue", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartPressure = createChart("chartPressure", "Pressure (hPa)", [
+        { label: "MSL", data: [], borderColor: "lime", fill: false, pointRadius: 0 },
+        { label: "Surface", data: [], borderColor: "cyan", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartDewPoint = createChart("chartDewPoint", "Dew point (°C)", [
+        { label: "Dew point", data: [], borderColor: "white", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartClouds = createChart("chartClouds", "Cloud cover (%)", [
+        { label: "Low", data: [], borderColor: "gray", backgroundColor: "gray", fill: false, pointRadius: 0 },
+        { label: "Mid", data: [], borderColor: "silver", backgroundColor: "silver", fill: false, pointRadius: 0 },
+        { label: "High", data: [], borderColor: "white", backgroundColor: "white", fill: false, pointRadius: 0 }
+      ], "line", true);
+
+      charts.chartGlobalCloud = createChart("chartGlobalCloud", "Global cloud cover (%)", [
+        { label: "Cloud cover", data: [], backgroundColor: "lightblue" }
+      ], "bar", false);
+
+      charts.chartVisibility = createChart("chartVisibility", "Visibility (km)", [
+        { label: "Visibility", data: [], borderColor: "gold", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartJetstream = createChart("chartJetstream", "Jetstream @9.2km (km/h)", [
+        { label: "Jetstream", data: [], borderColor: "violet", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartWindSpeed = createChart("chartWindSpeed", "Wind speed (km/h)", [
+        { label: "Wind", data: [], borderColor: "lightgreen", fill: false, pointRadius: 0 }
+      ]);
+
+      charts.chartWindDir = createChart("chartWindDir", "Wind direction (°)", [
+        { label: "Wind Dir", data: [], borderColor: "lightcoral", fill: false, pointRadius: 0 }
+      ]);
+
+      // Aurora Charts
+      charts.chartProbabilityCombined = createChart("chartProbabilityCombined", "Aurora Probability (%)", [
+        { label: "Probability %", data: [], borderColor: "#00ff88", backgroundColor: "#00ff8820", fill: true, pointRadius: 0 },
+        { label: "Max Probability %", data: [], borderColor: "#ff6600", fill: false, pointRadius: 0 },
+        { label: "Avg Probability %", data: [], borderColor: "#ffaa00", fill: false, pointRadius: 0 }
+      ], "line", true, 0, 100);
+
+      charts.chartKpIndex = createChart("chartKpIndex", "Kp Index", [
+        { label: "Kp Index", data: [], borderColor: "#ff2288", backgroundColor: "#ff228820", fill: true, pointRadius: 0 }
+      ], "bar", false);
+
+      charts.chartBt = createChart("chartBt", "Bt (Magnetic Field Total)", [
+        { label: "Bt", data: [], borderColor: "#4488ff", fill: false, pointRadius: 0 }
+      ]);
+
+      charts.chartBz = createChart("chartBz", "Bz (Magnetic Field Z)", [
+        { label: "Bz", data: [], borderColor: "#88aaff", fill: false, pointRadius: 0 }
+      ]);
+
+      charts.chartDensity = createChart("chartDensity", "Solar Wind Density", [
+        { label: "Density", data: [], borderColor: "#aa44ff", fill: false, pointRadius: 0 }
+      ]);
+
+      charts.chartSpeed = createChart("chartSpeed", "Solar Wind Speed", [
+        { label: "Speed", data: [], borderColor: "#ff4444", fill: false, pointRadius: 0 }
+      ]);
+
+      charts.chartTemperature = createChart("chartTemperature", "Solar Wind Temperature", [
+        { label: "Temperature", data: [], borderColor: "#ffaa44", fill: false, pointRadius: 0 }
+      ]);
+
+      // Special chart for Sun/Moon Altitude
+      const sunMoonCanvas = document.getElementById("chartSunMoonAltitude");
+      if (sunMoonCanvas) {
+        const sunMoonCtx = sunMoonCanvas.getContext('2d');
+        charts.chartSunMoonAltitude = new Chart(sunMoonCtx, {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [
+              { label: "Sun Altitude", data: [], borderColor: "gold", fill: false, pointRadius: 0, spanGaps: true },
+              { label: "Moon Altitude", data: [], borderColor: "lightgray", fill: false, pointRadius: 0, spanGaps: true }
+            ]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: {
+                type: 'linear',
+                position: 'bottom',
+                title: {
+                  display: true,
+                  text: 'Hours from current time',
+                  color: 'white'
+                },
+                ticks: {
+                  color: 'white',
+                  stepSize: 2, // Show every 2 hours
+                  maxTicksLimit: 13 // Max 13 ticks (-12, -10, -8, ..., 10, 12)
+                },
+                grid: { color: '#444' }
+              },
+              y: {
+                type: 'linear',
+                title: {
+                  display: true,
+                  text: 'Altitude (°)',
+                  color: 'white'
+                },
+                min: 0,
+                ticks: { color: 'white' },
+                grid: { color: '#444' }
+              }
+            },
+            plugins: {
+              title: {
+                display: true,
+                text: "Sun/Moon Altitude (24h)",
+                color: "#ffffff"
+              },
+              legend: { display: true, labels: { color: 'white' } },
+              backgroundSun: {
+                periods: []
+              }
+            }
+          }
+        });
+      }
+
+      // Always load data for all charts, regardless of widget visibility
+      loadMeasurements();
+      loadMeteoData();
+      loadAuroraData();
+      loadStorageData();
+
+      // Reload storage data every 5 minutes
+      setInterval(loadStorageData, 5 * 60 * 1000);
+      setInterval(loadMeasurements, 60000); // 60s update
+      setInterval(loadMeteoData, 60000); // 60s update
+      setInterval(loadAuroraData, 60000); // 60s update
+    }
+
+    // Gridstack initialization and layout persistence
+    document.addEventListener('DOMContentLoaded', () => {
+      // Load widget configuration first
+      loadWidgetConfig();
+
+      const gridEl = document.getElementById('dashboard-grid');
+      const grid = GridStack.init({
+        cellHeight: 110,
+        disableOneColumnMode: false,
+        float: false,
+        resizable: { handles: 'all' },
+        column: 12,
+        minRow: 1,
+        acceptWidgets: false,
+        removable: false,
+        animate: true,
+        // Mobile-specific settings
+        oneColumnModeDomSort: true,
+        // Responsive Breakpoints
+        breakpoints: {
+          lg: 1200,
+          md: 996,
+          sm: 768,
+          xs: 480
+        },
+        columnOpts: {
+          lg: 12,
+          md: 8,
+          sm: 4,
+          xs: 1
+        }
+      }, gridEl);
+
+      // Grid interaction status
+      let gridInteractionEnabled = false;
+      const toggleBtn = document.getElementById('toggle-grid-btn');
+
+      // Widgets initially locked
+      grid.enableMove(false);
+      grid.enableResize(false);
+
+      // Toggle function for grid interaction
+      window.toggleGridInteraction = function () {
+        gridInteractionEnabled = !gridInteractionEnabled;
+
+        if (gridInteractionEnabled) {
+          // Enabled: Widgets can be moved and resized
+          grid.enableMove(true);
+          grid.enableResize(true);
+          toggleBtn.textContent = '🔓 Unlocked';
+          toggleBtn.title = 'Widgets verschieben/vergrößern deaktivieren';
+        } else {
+          // Disabled: Widgets are locked
+          grid.enableMove(false);
+          grid.enableResize(false);
+          toggleBtn.textContent = '🔒 Locked';
+          toggleBtn.title = 'Widgets verschieben/vergrößern aktivieren';
+        }
+      };
+
+      const LS_KEY = 'allsky360.dashboard.layout.v1';
+      const defaultLayout =
+        [
+          {
+            "id": "subheader",
+            "x": 0,
+            "y": 0,
+            "w": 6
+          },
+          {
+            "id": "sunandmoon",
+            "x": 6,
+            "y": 0,
+            "w": 2,
+            "h": 2
+          },
+          {
+            "id": "image-data",
+            "x": 8,
+            "y": 0,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "image-container",
+            "x": 0,
+            "y": 1,
+            "w": 6,
+            "h": 8
+          },
+          {
+            "id": "weather",
+            "x": 6,
+            "y": 2,
+            "w": 2,
+            "h": 3
+          },
+          {
+            "id": "chart-brightness",
+            "x": 8,
+            "y": 3,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "histogram-widget",
+            "x": 6,
+            "y": 5,
+            "w": 2,
+            "h": 3
+          },
+          {
+            "id": "chart-sqm",
+            "x": 8,
+            "y": 6,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "countdown-widget",
+            "x": 6,
+            "y": 8,
+            "w": 2
+          },
+          {
+            "id": "chart-temp",
+            "x": 0,
+            "y": 9,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-global-cloud",
+            "x": 4,
+            "y": 9,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-stars",
+            "x": 8,
+            "y": 9,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-storage",
+            "x": 0,
+            "y": 12,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-humidity",
+            "x": 0,
+            "y": 12,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-dew-point",
+            "x": 4,
+            "y": 12,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-exposure",
+            "x": 8,
+            "y": 12,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-clouds",
+            "x": 0,
+            "y": 15,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-wind-speed",
+            "x": 4,
+            "y": 15,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-gain",
+            "x": 8,
+            "y": 15,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-jetstream",
+            "x": 0,
+            "y": 18,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-pressure",
+            "x": 4,
+            "y": 18,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "exposure-gallery",
+            "x": 8,
+            "y": 18,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-visibility",
+            "x": 0,
+            "y": 21,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-wind-dir",
+            "x": 4,
+            "y": 21,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-noise",
+            "x": 8,
+            "y": 21,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-hdr",
+            "x": 0,
+            "y": 24,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-focus",
+            "x": 4,
+            "y": 24,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-mean-brightness-rgb",
+            "x": 8,
+            "y": 24,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "aurora",
+            "x": 0,
+            "y": 27,
+            "w": 2,
+            "h": 3
+          },
+          {
+            "id": "location",
+            "x": 2,
+            "y": 27,
+            "w": 2,
+            "h": 3
+          },
+          {
+            "id": "panorama-container",
+            "x": 4,
+            "y": 27,
+            "w": 8,
+            "h": 6
+          },
+          {
+            "id": "chart-probability-combined",
+            "x": 0,
+            "y": 30,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-kp-index",
+            "x": 0,
+            "y": 33,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-bz",
+            "x": 4,
+            "y": 33,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-bt",
+            "x": 8,
+            "y": 33,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-density",
+            "x": 0,
+            "y": 36,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-speed",
+            "x": 4,
+            "y": 36,
+            "w": 4,
+            "h": 3
+          },
+          {
+            "id": "chart-temperature",
+            "x": 8,
+            "y": 36,
+            "w": 4,
+            "h": 3
+          }
+        ];
+      /*     
+           [
+             { "id": "subheader", "x": 0, "y": 0, "w": 12, "h": 1 },
+             { "id": "image-container", "x": 0, "y": 1, "w": 8, "h": 6 },
+             { "id": "histogram-widget", "x": 8, "y": 1, "w": 2, "h": 2 },
+             { "id": "exposure-gallery", "x": 10, "y": 1, "w": 2, "h": 2 },
+             { "id": "image-data", "x": 8, "y": 3, "w": 2, "h": 2 },
+             { "id": "location", "x": 10, "y": 3, "w": 2, "h": 1 },
+             { "id": "sunandmoon", "x": 8, "y": 5, "w": 2, "h": 2 },
+             { "id": "weather", "x": 10, "y": 4, "w": 2, "h": 1 },
+             { "id": "aurora", "x": 10, "y": 5, "w": 2, "h": 2 },
+             { "id": "countdown-widget", "x": 0, "y": 7, "w": 8, "h": 1 },
+             { "id": "chart-exposure", "x": 0, "y": 8, "w": 6, "h": 3 },
+             { "id": "chart-gain", "x": 6, "y": 8, "w": 6, "h": 3 },
+             { "id": "chart-noise", "x": 0, "y": 11, "w": 6, "h": 3 },
+             { "id": "chart-sqm", "x": 6, "y": 11, "w": 3, "h": 3 },
+             { "id": "chart-stars", "x": 9, "y": 11, "w": 3, "h": 3 },
+             { "id": "chart-storage", "x": 0, "y": 12, "w": 4, "h": 3 },
+             { "id": "chart-hdr", "x": 0, "y": 14, "w": 4, "h": 3 },
+             { "id": "chart-focus", "x": 4, "y": 14, "w": 4, "h": 3 },
+             { "id": "chart-brightness", "x": 8, "y": 14, "w": 4, "h": 3 },
+             { "id": "chart-mean-brightness-rgb", "x": 0, "y": 17, "w": 12, "h": 3 },
+             { "id": "chart-temp", "x": 0, "y": 20, "w": 6, "h": 3 },
+             { "id": "chart-humidity", "x": 6, "y": 20, "w": 6, "h": 3 },
+             { "id": "chart-pressure", "x": 0, "y": 23, "w": 6, "h": 3 },
+             { "id": "chart-dew-point", "x": 6, "y": 23, "w": 6, "h": 3 },
+             { "id": "chart-clouds", "x": 0, "y": 26, "w": 6, "h": 3 },
+             { "id": "chart-global-cloud", "x": 6, "y": 26, "w": 6, "h": 3 },
+             { "id": "chart-visibility", "x": 0, "y": 29, "w": 6, "h": 3 },
+             { "id": "chart-jetstream", "x": 6, "y": 29, "w": 6, "h": 3 },
+             { "id": "chart-wind-speed", "x": 0, "y": 32, "w": 6, "h": 3 },
+             { "id": "chart-wind-dir", "x": 6, "y": 32, "w": 6, "h": 3 },
+             { "id": "chart-probability-combined", "x": 0, "y": 35, "w": 12, "h": 4 },
+             { "id": "chart-kp-index", "x": 0, "y": 39, "w": 6, "h": 3 },
+             { "id": "chart-bt", "x": 6, "y": 39, "w": 6, "h": 3 },
+             { "id": "chart-bz", "x": 0, "y": 42, "w": 6, "h": 3 },
+             { "id": "chart-density", "x": 6, "y": 42, "w": 6, "h": 3 },
+             { "id": "chart-speed", "x": 0, "y": 45, "w": 6, "h": 3 },
+             { "id": "chart-temperature", "x": 6, "y": 45, "w": 6, "h": 3 }
+           ];
+     */
+      function applyLayout(layout) {
+        const items = grid.engine.nodes; // current nodes
+        const byId = Object.fromEntries(items.map(n => [n.id || n.el.getAttribute('gs-id'), n]));
+        layout.forEach(l => {
+          const node = byId[l.id];
+          if (!node) return;
+          grid.update(node.el, { x: l.x, y: l.y, w: l.w, h: l.h });
+        });
+      }
+
+      function loadLayout() {
+        try {
+          const raw = localStorage.getItem(LS_KEY);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed)) return null;
+          return parsed;
+        } catch (e) { return null; }
+      }
+
+      function saveLayout() {
+        const data = grid.save(true).map(n => ({ id: n.id || n.el.getAttribute('gs-id'), x: n.x, y: n.y, w: n.w, h: n.h }));
+        try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch (_) { }
+      }
+
+      window.resetGridLayout = function () {
+        applyLayout(defaultLayout);
+        try { localStorage.removeItem(LS_KEY); } catch (_) { }
+      }
+
+      // Function to export current layout as defaultLayout
+      window.exportCurrentLayout = function () {
+        const currentLayout = grid.save(true).map(n => ({
+          id: n.id || n.el.getAttribute('gs-id'),
+          x: n.x,
+          y: n.y,
+          w: n.w,
+          h: n.h
+        }));
+
+        console.log('Current layout as defaultLayout array:');
+        console.log(JSON.stringify(currentLayout, null, 2));
+
+        // Also copy to clipboard if possible
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(JSON.stringify(currentLayout, null, 2))
+            .then(() => console.log('Layout copied to clipboard!'))
+            .catch(err => console.log('Could not copy to clipboard:', err));
+        }
+
+        return currentLayout;
+      }
+
+      // Mobile layout optimization
+      function optimizeForMobile() {
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+          // For mobile devices: all widgets in one column
+          grid.column(1);
+          // Sort widgets automatically
+          grid.compact();
+        } else {
+          // For Desktop: normal number of columns
+          grid.column(12);
+        }
+      }
+
+      // Responsive Handler
+      window.addEventListener('resize', () => {
+        setTimeout(optimizeForMobile, 100);
+      });
+
+      // at start: apply saved layout or default
+      const saved = loadLayout();
+      applyLayout(saved || defaultLayout);
+
+      // Mobile optimization at start
+      setTimeout(optimizeForMobile, 200);
+
+      // Apply widget configuration after grid is initialized
+      setTimeout(() => {
+        applyWidgetConfig();
+      }, 300);
+
+      grid.on('change', saveLayout);
+    });
+    const imageEl = document.getElementById("allsky-image");
+    const imageDataEl = document.getElementById("image-data");
+    const locationEl = document.getElementById("location");
+    const sunandmoonEl = document.getElementById("sunandmoon");
+    const weatherEl = document.getElementById("weather");
+    const auroraEl = document.getElementById("aurora");
+    const timerEl = document.getElementById("timer");
+    const exposureGallery = document.getElementById("exposure-gallery");
+    const panoramaEl = document.getElementById("panorama");
+
+    let showExposures = true;
+    let latestImagePath = "";
+    let latestPanoramaPath = "";
+    let refreshInterval = 10;
+    let loading = false;
+    let loadingConfig = false;
+    const exposureImgs = [];
+    let maxHdrImages = 5;
+    let lastImageLoadTime = Date.now();
+    let timerTimeout = null;
+    let mean_target = 0;
+    let mean_brightness = 0;
+    let useLogHistogram = false;
+
+    let showCardinalDirections = true;
+
+    let mouseX = null;
+    let mouseY = null;
+    let zoomFactor = 1.0;
+    let panX = 0;
+    let panY = 0;
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+
+    // Brightest stars
+    let showBrightestStars = false;
+
+    // Meteors
+    let showMeteorRadiants = false;
+
+    // Sun and Moon
+    let showSunMoon = false;
+
+    // Comets
+    let showComets = false;
+
+    // Star detector
+    let showDetectedStars = false;
+    let starPositions = [];
+
+    // Crosshair circle overlay settings
+    let crosshairRadius = 1090;              // in pixels
+    let crosshairCenterX = 1180;             // X-coordinate of Zenith
+    let crosshairCenterY = 1187;             // Y-coordinate of Zenith
+
+    let crosshairRotation = -1.5;              // Angle in Degrees (0 = South bottom)
+    let longitude = 0.0;
+    let latitude = 0.0;
+    let altitude = 0;
+
+
+    let isSouthernHemisphere = false;       // true = Southern hemisphere (labels counter-clockwise)
+    let showAzimutalGrid = false;
+    let maxVisibleElevation = 90; // in Degrees, e.g. only up to 75° instead of up to 90° (Horizon)
+    let projectionType = "linear";
+    let originalImageSrc = "";
+    let originalPanoramaSrc = "";
+
+    let showEquatorialGrid = false;
+    let imageTimestamp = 0;
+    let timezoneOffset = 0;
+
+    const img = document.getElementById("allsky-image");
+    const container = document.getElementById("image-container");
+    const panorama = document.getElementById("panorama");
+
+    // #1: Overlay redraw throttling for mouse-move on canvas
+    let overlayRafId = 0;
+    let pendingMouse = null;
+    function scheduleOverlayRedraw() {
+      // schedule a redraw at most once per frame
+      if (overlayRafId) return;
+      overlayRafId = requestAnimationFrame(() => {
+        overlayRafId = 0;
+        if (pendingMouse) {
+          const { canvasRect, clientX, clientY } = pendingMouse;
+          mouseX = clientX - canvasRect.left;
+          mouseY = clientY - canvasRect.top;
+          pendingMouse = null;
+        }
+        updateAllskyOverlay();
+      });
+    }
+
+    // #2: Pan/zoom redraw throttling for dragging in container
+    let panRafId = 0;
+    function schedulePanRedraw() {
+      if (panRafId) return;
+      panRafId = requestAnimationFrame(() => {
+        panRafId = 0;
+        updateZoomAndPan(); // calls updateAllskyOverlay() internally
+      });
+    }
+
+    container.addEventListener("mousedown", (event) => {
+      isDragging = true;
+      dragStartX = event.clientX - panX;
+      dragStartY = event.clientY - panY;
+    });
+
+    container.addEventListener("mousemove", (event) => {
+      if (isDragging) {
+        panX = event.clientX - dragStartX;
+        panY = event.clientY - dragStartY;
+        schedulePanRedraw();
+      }
+    }, { passive: true });
+
+    container.addEventListener("mouseup", () => {
+      isDragging = false;
+    });
+
+    container.addEventListener("mouseleave", () => {
+      isDragging = false;
+    });
+
+    function updateZoomAndPan() {
+      const img = document.getElementById("allsky-image");
+      img.style.transformOrigin = "center center";
+      img.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomFactor})`;
+      updateAllskyOverlay();
+    }
+
+    function zoomIn() {
+      zoomFactor *= 1.2;
+      if (zoomFactor != 1.0) {
+        showCardinalDirections = false;
+        showAzimutalGrid = false;
+        showEquatorialGrid = false;
+        showBrightestStars = false;
+        showMeteorRadiants = false;
+        showSunMoon = false;
+        showComets = false;
+        showDetectedStars = false;
+      } else {
+        showCardinalDirections = true;
+        showAzimutalGrid = azimutalGridCheckbox.checked;
+        showEquatorialGrid = equatorialGridCheckbox.checked;
+        showBrightestStars = brightestStarsGridCheckbox.checked;
+        showMeteorRadiants = meteorRadiansCheckbox.checked;
+        showSunMoon = sunMoonCheckbox.checked;
+        showComets = cometsCheckbox.checked;
+        showDetectedStars = detectedStarsCheckbox.checked;
+      }
+      updateZoomAndPan();
+    }
+
+    function zoomOut() {
+      zoomFactor /= 1.2;
+      if (zoomFactor != 1.0) {
+        showCardinalDirections = false;
+        showAzimutalGrid = false;
+        showEquatorialGrid = false;
+        showBrightestStars = false;
+        showMeteorRadiants = false;
+        showSunMoon = false;
+        showComets = false;
+        showDetectedStars = false;
+      } else {
+        showCardinalDirections = true;
+        showAzimutalGrid = azimutalGridCheckbox.checked;
+        showEquatorialGrid = equatorialGridCheckbox.checked;
+        showBrightestStars = brightestStarsGridCheckbox.checked;
+        showMeteorRadiants = meteorRadiansCheckbox.checked;
+        showSunMoon = sunMoonCheckbox.checked;
+        showComets = cometsCheckbox.checked;
+        showDetectedStars = detectedStarsCheckbox.checked;
+      }
+      updateZoomAndPan();
+    }
+
+    function resetZoomAndPan() {
+      zoomFactor = 1.0;
+      panX = 0;
+      panY = 0;
+      updateZoomAndPan();
+    }
+
+    function toggleAzimutalGridOverlay() {
+      const overlayCheckbox = document.getElementById("azimutalGridCheckbox");
+      showAzimutalGrid = overlayCheckbox.checked;
+      updateAllskyOverlay();
+      updatePanoramaOverlay();
+    }
+
+    function toggleEquatorialGridOverlay() {
+      const overlayCheckbox = document.getElementById("equatorialGridCheckbox");
+      showEquatorialGrid = overlayCheckbox.checked;
+      updateAllskyOverlay();
+    }
+
+    function toggleBrightestStarsOverlay() {
+      const checkbox = document.getElementById("brightestStarsGridCheckbox");
+      showBrightestStars = checkbox.checked;
+      updateAllskyOverlay();
+    }
+
+    function toggleMeteorRadiantsOverlay() {
+      const checkbox = document.getElementById("meteorRadiansCheckbox");
+      showMeteorRadiants = checkbox.checked;
+      updateAllskyOverlay();
+    }
+
+    function toggleSunMoonOverlay() {
+      const checkbox = document.getElementById("sunMoonCheckbox");
+      showSunMoon = checkbox.checked;
+      updateAllskyOverlay();
+    }
+
+    async function toggleCometsOverlay() {
+      const checkbox = document.getElementById("cometsCheckbox");
+      showComets = checkbox.checked;
+      
+      if (showComets) {
+        // Beim Aktivieren die Kometen abrufen
+        if (imageTimestamp > 0) {
+          const date = new Date(imageTimestamp * 1000); // imageTimestamp ist in Sekunden
+          await fetchComets(longitude, latitude, altitude, date);
+        }
+      }
+      
+      updateAllskyOverlay();
+    }
+
+    function toggleDetectedStarsOverlay() {
+      const checkbox = document.getElementById("detectedStarsCheckbox");
+      showDetectedStars = checkbox.checked;
+      updateAllskyOverlay();
+    }
+
+    function toggleHdrExposures() {
+      showExposures = !showExposures;
+      exposureGallery.style.display = showExposures ? "flex" : "none";
+      if (showExposures) updateExposureGallery();
+    }
+
+    async function loadConfig() {
+      if (loadingConfig) return;
+      loadingConfig = true;
+
+      const configData = await fetchConfig();
+      if (!configData) { loadingConfig = false; return; }
+
+      crosshairRadius = configData.image_horizon_radius;
+      crosshairCenterX = configData.image_zenith_x;
+      crosshairCenterY = configData.image_zenith_y;
+      crosshairRotation = configData.image_north_angle;
+
+      latitude = configData.latitude;
+      longitude = configData.longitude;
+      altitude = configData.altitude;
+      isSouthernHemisphere = latitude < 0.0;
+
+      loadingConfig = false;
+    }
+
+    async function loadLatestImage() {
+      if (loading)
+        return;  // Prevent parallel loading attempts
+      loading = true;
+
+      const latestImagePath = 'api/latest_image';
+      let latestImageData = null;
+      const latestPanoramaPath = 'api/latest_image';
+      let latestPanoramaData = null;
+      try {
+        const latestImageResponse = await fetch(latestImagePath, { cache: "no-cache" });
+        latestImageData = await latestImageResponse.json();
+        const todayStr = latestImageData.date;
+        const imageTimeStr = latestImageData.image;
+        const hdrTimeStr = latestImageData.hdr;
+        const imageFiletype = latestImageData.filetype;
+        const imageDateTime = `${todayStr}${imageTimeStr}`;
+        imageTimestamp = latestImageData.image_timestamp;
+
+        originalImageSrc = `images/${todayStr}/image-${imageDateTime}.${imageFiletype}`;
+
+        const latestPanoramaResponse = await fetch(latestPanoramaPath, { cache: "no-cache" });
+        originalPanoramaSrc = `images/${todayStr}/panorama-${imageDateTime}.${imageFiletype}`;
+
+        // Check if the image is already loaded (e.g. from cache)
+        const imageAlreadyLoaded = imageEl.src === originalImageSrc && imageEl.complete;
+
+        imageEl.src = originalImageSrc;
+        panoramaEl.src = originalPanoramaSrc;
+
+        // Star metadata load
+        if (showDetectedStars) {
+          const starsPath = `images/${todayStr}/stars-${imageDateTime}.json`;
+          try {
+            const starResp = await fetch(starsPath, { cache: "no-cache" });
+            const starJson = await starResp.json();
+            starPositions = starJson.stars || [];
+          } catch (e) {
+            console.warn("⚠️ Star overlay file not found:", starsPath);
+            starPositions = [];
+          }
+        }
+
+        // Image metadata load
+        const imageMetaPath = `images/${todayStr}/image-${imageDateTime}.json`;
+        let imageMeta = null;
+        try {
+          const imgMetaResp = await fetch(imageMetaPath, { cache: "no-cache" });
+          imageMeta = await imgMetaResp.json();
+        } catch (e) {
+          console.warn("⚠️ Image metadata not found:", imageMetaPath);
+        }
+
+        // Weather metadata load
+        const weatherMetaPath = `latest_meteo_data.json`;
+        let weatherMeta = null;
+        try {
+          const weatherResp = await fetch(weatherMetaPath, { cache: "no-cache" });
+          weatherMeta = await weatherResp.json();
+        } catch (e) {
+          console.warn("⚠️ Meteo metadata not found:", weatherMetaPath);
+        }
+
+        // Aurora metadata load
+        const auroraMetaPath = `latest_aurora_data.json`;
+        let auroraMeta = null;
+        try {
+          const auroraResp = await fetch(auroraMetaPath, { cache: "no-cache" });
+          auroraMeta = await auroraResp.json();
+        } catch (e) {
+          console.warn("⚠️ Aurora metadata not found:", auroraMetaPath);
+        }
+
+        // Function to process the loaded image
+        const handleImageLoaded = () => {
+          updateAllskyOverlay();
+          loading = false;
+          lastImageLoadTime = Date.now(); // Reset timer only when image is really loaded
+
+          // Delay histogram update and execute asynchronously, so it doesn't block the timer
+          // Use setTimeout instead of requestIdleCallback to avoid blocking
+          setTimeout(() => {
+            updateHistogramWithRetry(imageEl, 3);
+          }, 100); // Short delay to prevent timer from blocking
+        };
+
+        // If image is already loaded (e.g. from cache), process immediately
+        if (imageAlreadyLoaded) {
+          handleImageLoaded();
+        } else {
+          imageEl.onload = handleImageLoaded;
+        }
+
+        imageEl.onerror = () => {
+          console.error("❌ Image load error:", latestImagePath);
+          loading = false;
+        };
+
+        panoramaEl.onload = () => {
+          updatePanoramaOverlay();
+          loading = false;
+        };
+
+        panoramaEl.onerror = () => {
+          console.error("❌ Image load error:", latestPanoramaPath);
+          loading = false;
+        };
+
+        // If no image metadata is available, no further display
+        if (!imageMeta) {
+          if (imageDataEl) imageDataEl.innerHTML = "";
+          if (locationEl) locationEl.innerHTML = "";
+          if (sunandmoonEl) sunandmoonEl.innerHTML = "";
+          if (weatherEl) weatherEl.innerHTML = "";
+          if (auroraEl) auroraEl.innerHTML = "";
+          loading = false;  // Important: reset loading
+          // Timer still start/restart, so that later automatically tries again
+          refreshInterval = 10;  // Use standard interval
+          lastImageLoadTime = Date.now();
+          timerEl.textContent = refreshInterval;
+          restartTimer();  // Start timer even if no metadata is available
+          return;
+        }
+
+        maxHdrImages = imageMeta.hdr;
+        mean_target = imageMeta.target_brightness;
+        mean_brightness = imageMeta.mean_brightness;
+        imageTimestamp = imageMeta.timestamp;
+        timezoneOffset = imageMeta.timezone_offset;
+
+        refreshInterval = (typeof imageMeta.capture_interval === "number" && imageMeta.capture_interval > 0)
+          ? Math.round(imageMeta.capture_interval)
+          : 10;
+
+        timerEl.textContent = refreshInterval;
+        restartTimer();
+        // lastImageLoadTime wird in handleImageLoaded() gesetzt, wenn Bild wirklich geladen ist
+
+        let imageDataHtml = `
+      <div class="metadata-section">
+        <h2>Image data</h2>
+        <div style="display: flex; justify-content: space-between;">Timestamp: <span>${formatTimestamp(imageMeta.timestamp, imageMeta.timezone_offset)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Timezone offset (s): <span>${imageMeta.timezone_offset}</span></div>
+        <div style="display: flex; justify-content: space-between;">Exposure t0 (s): <span>${imageMeta.exposure_t0.toFixed(5)}</span></div>`;
+        if (imageMeta.hdr > 1) {
+          imageDataHtml += `
+        <div style="display: flex; justify-content: space-between;">Exposure t1 (s): <span>${imageMeta.exposure_t1.toFixed(5)}</span></div>`;
+        }
+        if (imageMeta.hdr > 2) {
+          imageDataHtml += `
+        <div style="display: flex; justify-content: space-between;">Exposure t2 (s): <span>${imageMeta.exposure_t2.toFixed(5)}</span></div>`;
+        }
+        if (imageMeta.hdr > 3) {
+          imageDataHtml += `
+        <div style="display: flex; justify-content: space-between;">Exposure t3 (s): <span>${imageMeta.exposure_t3.toFixed(5)}</span></div>`;
+        }
+        if (imageMeta.hdr > 4) {
+          imageDataHtml += `
+        <div style="display: flex; justify-content: space-between;">Exposure t4 (s): <span>${imageMeta.exposure_t4.toFixed(5)}</span></div>`;
+        }
+        imageDataHtml += `
+        <div style="display: flex; justify-content: space-between;">Gain: <span>${imageMeta.gain.toFixed(1)}</span></div>`;
+        if (imageMeta.night_mode) {
+          imageDataHtml += `
+        <div style="display: flex; justify-content: space-between;">Background noise t0: <span>${imageMeta.sigma_noise_t0.toFixed(8)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Background noise t1: <span>${imageMeta.sigma_noise_t1.toFixed(8)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Background noise t2: <span>${imageMeta.sigma_noise_t2.toFixed(8)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Background noise t3: <span>${imageMeta.sigma_noise_t3.toFixed(8)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Background noise t4: <span>${imageMeta.sigma_noise_t4.toFixed(8)}</span></div>`;
+        }
+        if (imageMeta.width) {
+          imageDataHtml += `
+        <div style="display: flex; justify-content: space-between;">Width (px): <span>${imageMeta.width}</span></div>`;
+        }
+        if (imageMeta.height) {
+          imageDataHtml += `
+        <div style="display: flex; justify-content: space-between;">Height (px): <span>${imageMeta.height}</span></div>`;
+        }
+        imageDataHtml += `
+        <div style="display: flex; justify-content: space-between;">Sensor temperature (°C): <span>${imageMeta.sensor_temperature.toFixed(1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Brightness: <span>${imageMeta.mean_brightness.toFixed(2)} -> ${imageMeta.target_brightness.toFixed(2)}</span></div>`;
+
+        if (imageMeta.focus) {
+          imageDataHtml += `
+        <div style="display: flex; justify-content: space-between;">Focus: <span>${imageMeta.focus.toFixed(2)}</span></div>`;
+        }
+
+        if (imageMeta.night_mode) {
+          imageDataHtml += `
+    	    <div style="display: flex; justify-content: space-between;">Star count: <span>${imageMeta.stars}</span></div>
+    	    <div style="display: flex; justify-content: space-between;">SQM (mag/arcs^2): <span>${imageMeta.sqm.toFixed(1)}</span></div>`;
+        }
+        imageDataHtml += `
+        <div style="display: flex; justify-content: space-between;">Capture interval (s): <span>${imageMeta.capture_interval}</span></div>
+        <div style="display: flex; justify-content: space-between;">Night mode: <span>${getSymbol(imageMeta.night_mode)}</span></div>
+        <div style="display: flex; justify-content: space-between;">HDR: <span>${imageMeta.hdr}</span></div>
+      </div>`;
+        let sunandmoonHtml = `
+      <div class="metadata-section">
+        <h2>Sun and Moon</h2>`;
+
+        // Calculate moon rise and set times
+        const moonTimes = getMoonRiseAndSet(imageTimestamp, latitude, longitude, timezoneOffset);
+        const moonRiseStr = moonTimes.moonRise ? formatTimeString(moonTimes.moonRise, timezoneOffset) : "N/A";
+        const moonSetStr = moonTimes.moonSet ? formatTimeString(moonTimes.moonSet, timezoneOffset) : "N/A";
+
+        const moonTimeUntil = getTimeUntilMoonRiseSet(moonTimes.moonRise, moonTimes.moonSet, imageTimestamp, timezoneOffset);
+        const timeUntilMoonRiseStr = moonTimeUntil.timeUntilRise || "N/A";
+        const timeUntilMoonSetStr = moonTimeUntil.timeUntilSet || "N/A";
+
+        // Calculate sun rise and set times
+        const sunTimes = getSunRiseAndSet(imageTimestamp, latitude, longitude, timezoneOffset);
+        const sunRiseStr = sunTimes.sunRise ? formatTimeString(sunTimes.sunRise, timezoneOffset) : "N/A";
+        const sunSetStr = sunTimes.sunSet ? formatTimeString(sunTimes.sunSet, timezoneOffset) : "N/A";
+
+        const sunTimeUntil = getTimeUntilSunRiseSet(sunTimes.sunRise, sunTimes.sunSet, imageTimestamp, timezoneOffset);
+        const timeUntilSunRiseStr = sunTimeUntil.timeUntilRise || "N/A";
+        const timeUntilSunSetStr = sunTimeUntil.timeUntilSet || "N/A";
+
+        sunandmoonHtml += `
+        <div style="display: flex; justify-content: space-between;">Sun altitude (°): <span>${imageMeta.sun_altitude.toFixed(1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Sun rise: <span>${sunRiseStr}</span></div>
+        <div style="display: flex; justify-content: space-between;">Sun set: <span>${sunSetStr}</span></div>
+        <div style="display: flex; justify-content: space-between;">Time to sun rise: <span>${timeUntilSunRiseStr}</span></div>
+        <div style="display: flex; justify-content: space-between;">Time to sun set: <span>${timeUntilSunSetStr}</span></div>
+        <div style="display: flex; justify-content: space-between;">Moon phase (%): <span>${imageMeta.moon_phase_percentage.toFixed(1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Moon altitude (°): <span>${imageMeta.moon_altitude.toFixed(1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Moon rise: <span>${moonRiseStr}</span></div>
+        <div style="display: flex; justify-content: space-between;">Moon set: <span>${moonSetStr}</span></div>
+        <div style="display: flex; justify-content: space-between;">Time to moon rise: <span>${timeUntilMoonRiseStr}</span></div>
+        <div style="display: flex; justify-content: space-between;">Time to moon set: <span>${timeUntilMoonSetStr}</span></div>
+      </div>`;
+
+        let locationHtml = `
+      <div class="metadata-section">
+        <h2>Location</h2>
+        <div style="display: flex; justify-content: space-between;">Longitude: <span>${longitude.toFixed(4)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Latitude: <span>${latitude.toFixed(4)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Altitude: <span>${altitude}m</span></div>
+        <div style="margin-top: 0.5rem;"><a href="https://maps.google.com/?q=${latitude},${longitude}" target="_blank" style="color: #4af; text-decoration: underline;">→ Go to Google Maps</a></div>
+      </div>`;
+
+        let weatherHtml = '';
+        if (weatherMeta) {
+          weatherHtml = `
+      <div class="metadata-section">
+        <h2>Weather</h2>
+        <div style="display: flex; justify-content: space-between;">Temperature (°C): <span>${weatherMeta.temperature.toFixed(1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Humidity (%): <span>${weatherMeta.humidity.toFixed(1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Dew point (°C): <span>${weatherMeta.dew_point.toFixed(1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Pressure MSL (hPa): <span>${weatherMeta.pressure_msl.toFixed(1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Surface pressure (hPa): <span>${weatherMeta.surface_pressure.toFixed(1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Cloud low (%): <span>${weatherMeta.cloud_low.toFixed(1)} <span style="display:inline-block; width: 1.5em; height: 1em; background-color: ${cloudCoverToRGB(weatherMeta.cloud_low)};"></span></span></div>
+        <div style="display: flex; justify-content: space-between;">Cloud mid (%): <span>${weatherMeta.cloud_mid.toFixed(1)} <span style="display:inline-block; width: 1.5em; height: 1em; background-color: ${cloudCoverToRGB(weatherMeta.cloud_mid)};"></span></span></div>
+        <div style="display: flex; justify-content: space-between;">Cloud high (%): <span>${weatherMeta.cloud_high.toFixed(1)} <span style="display:inline-block; width: 1.5em; height: 1em; background-color: ${cloudCoverToRGB(weatherMeta.cloud_high)};"></span></span></div>
+        <div style="display: flex; justify-content: space-between;">Visibility (km): <span>${weatherMeta.visibility.toFixed(0) * 0.001}</span></div>
+        <div style="display: flex; justify-content: space-between;">Wind speed 10 m (km/h): <span>${(weatherMeta.wind_speed_10m).toFixed(1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Wind direction 10 m (°): <span>${weatherMeta.wind_dir_10m.toFixed(0)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Jetstream @9.2km (km/h): <span>${(weatherMeta.wind_speed_300hPa).toFixed(1)} ${getSeeingLabel(weatherMeta.wind_speed_300hPa)}</span></div>
+      </div>`;
+        }
+
+        let auroraHtml = '';
+        if (auroraMeta) {
+          auroraHtml = `
+      <div class="metadata-section">
+        <h2>Aurora</h2>
+        <div style="display: flex; justify-content: space-between;">Probability (%): <span>${auroraMeta.probability_percent.toFixed(1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Max Probability (%): <span>${auroraMeta.probability_max.toFixed(1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Avg Probability (%): <span>${auroraMeta.probability_avg.toFixed(1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Kp Index: <span>${auroraMeta.kp_index.toFixed(1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Bt (nT): <span>${auroraMeta.bt.toFixed(1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Bz (nT): <span>${auroraMeta.bz.toFixed(1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Solar Wind Density: <span>${auroraMeta.density}</span></div>
+        <div style="display: flex; justify-content: space-between;">Solar Wind Speed: <span>${auroraMeta.speed}</span></div>
+        <div style="display: flex; justify-content: space-between;">Solar Wind Temp: <span>${auroraMeta.temperature}K</span></div>
+      </div>`;
+        }
+
+        if (imageDataEl) imageDataEl.innerHTML = imageDataHtml;
+        if (locationEl) locationEl.innerHTML = locationHtml;
+        if (sunandmoonEl) sunandmoonEl.innerHTML = sunandmoonHtml;
+        if (weatherEl) weatherEl.innerHTML = weatherHtml;
+        if (auroraEl) auroraEl.innerHTML = auroraHtml;
+
+        updateExposureGallery();
+        updateSunMoonAltitudeChart();
+
+      } catch (err) {
+        console.error("⚠️ Unexpected load error:", err);
+        loading = false;
+      }
+    }
+
+    function updateExposureGallery() {
+      // Remove extra images
+      while (exposureImgs.length > maxHdrImages) {
+        const img = exposureImgs.pop();
+        exposureGallery.removeChild(img);
+      }
+
+      // Add new images
+      while (exposureImgs.length < maxHdrImages) {
+        const img = document.createElement("img");
+        img.alt = `Exposure t${exposureImgs.length}`;
+        exposureGallery.appendChild(img);
+        exposureImgs.push(img);
+      }
+
+      // Load current images
+      for (let i = 0; i < maxHdrImages; i++) {
+        exposureImgs[i].src = `images/latest_image_t${i}.jpg`;
+      }
+    }
+
+    function updateSunMoonAltitudeChart() {
+      if (!charts.chartSunMoonAltitude || !imageTimestamp || !latitude || !longitude) {
+        return;
+      }
+
+      const hours = [];
+      const sunAltitudes = [];
+      const moonAltitudes = [];
+
+      // Generate data for -12 to +12 hours (every 30 minutes)
+      for (let offset = -12 * 3600; offset <= 12 * 3600; offset += 1800) {
+        const t = imageTimestamp + offset;
+
+        // Calculate hour offset (as number for linear scale)
+        const hourOffset = offset / 3600;
+        hours.push(hourOffset);
+
+        // Calculate sun altitude
+        const sun = getSunRaDec(t);
+        const sunAlt = raDecToAzAlt(sun.ra, sun.dec, latitude, longitude, t);
+        // Only show altitude above horizon (altitude > 0)
+        sunAltitudes.push(sunAlt.altitude > 0 ? sunAlt.altitude : null);
+
+        // Calculate moon altitude
+        const moon = getMoonRaDec(t);
+        const moonAlt = raDecToAzAlt(moon.ra, moon.dec, latitude, longitude, t);
+        // Only show altitude above horizon (altitude > 0)
+        moonAltitudes.push(moonAlt.altitude > 0 ? moonAlt.altitude : null);
+      }
+
+      // Find maximum altitude value
+      let maxAltitude = 0;
+      for (let i = 0; i < sunAltitudes.length; i++) {
+        if (sunAltitudes[i] !== null && sunAltitudes[i] > maxAltitude) {
+          maxAltitude = sunAltitudes[i];
+        }
+        if (moonAltitudes[i] !== null && moonAltitudes[i] > maxAltitude) {
+          maxAltitude = moonAltitudes[i];
+        }
+      }
+
+      // Update chart
+      charts.chartSunMoonAltitude.data.labels = hours;
+      charts.chartSunMoonAltitude.data.datasets[0].data = sunAltitudes;
+      charts.chartSunMoonAltitude.data.datasets[1].data = moonAltitudes;
+
+      // Calculate sun rise and set times for background overlay
+      const sunTimesForBg = getSunRiseAndSet(imageTimestamp, latitude, longitude, timezoneOffset);
+      const backgroundPeriods = [];
+
+      if (sunTimesForBg.sunRise && sunTimesForBg.sunSet) {
+        // Convert absolute times to hour offsets from imageTimestamp
+        const timeToSunRise = (sunTimesForBg.sunRise + timezoneOffset - (imageTimestamp + timezoneOffset)) / 3600;
+        const timeToSunSet = (sunTimesForBg.sunSet + timezoneOffset - (imageTimestamp + timezoneOffset)) / 3600;
+
+        // Define periods for the 24h window (-12 to +12 hours)
+        const windowStart = -12;
+        const windowEnd = 12;
+
+        // Night before (from -12h to sunRise)
+        if (timeToSunRise > windowStart) {
+          const sunRiseHour = Math.max(windowStart, timeToSunRise);
+          backgroundPeriods.push({
+            start: windowStart,
+            end: sunRiseHour,
+            color: 'rgba(0, 0, 100, 0.4)' // Night
+          });
+        }
+
+        // Daytime (from sunRise to sunSet)
+        if (timeToSunRise < windowEnd && timeToSunSet > windowStart) {
+          const startHour = Math.max(windowStart, timeToSunRise);
+          const endHour = Math.min(windowEnd, timeToSunSet);
+          if (endHour > startHour) {
+            backgroundPeriods.push({
+              start: startHour,
+              end: endHour,
+              color: 'rgba(160, 190, 255, 0.4)' // Daytime
+            });
+          }
+        }
+
+        // Night after (from sunSet to +12h)
+        if (timeToSunSet < windowEnd) {
+          const sunSetHour = Math.min(windowEnd, timeToSunSet);
+          backgroundPeriods.push({
+            start: sunSetHour,
+            end: windowEnd,
+            color: 'rgba(0, 0, 100, 0.4)' // Night
+          });
+        }
+      }
+
+      // Update background periods
+      if (charts.chartSunMoonAltitude.options.plugins.backgroundSun) {
+        charts.chartSunMoonAltitude.options.plugins.backgroundSun.periods = backgroundPeriods;
+      }
+
+      // Dynamically adjust Y-axis max
+      charts.chartSunMoonAltitude.options.scales.y.max = Math.ceil(maxAltitude + 5); // Add 5° for visual padding
+
+      charts.chartSunMoonAltitude.update();
+    }
+
+    function tick() {
+      const now = Date.now();
+      const elapsedSeconds = Math.floor((now - lastImageLoadTime) / 1000);
+
+      const remaining = Math.max(refreshInterval - elapsedSeconds, 0);
+      timerEl.textContent = remaining;
+
+      if (remaining <= 0 && !loading) {
+        loadLatestImage();
+        // lastImageLoadTime is set in handleImageLoaded() when image is really loaded
+      }
+
+      // Request next tick
+      timerTimeout = setTimeout(tick, 1000);
+    }
+
+    function restartTimer() {
+      if (timerTimeout !== null) {
+        clearTimeout(timerTimeout);
+      }
+      lastImageLoadTime = Date.now();
+      tick();
+    }
+
+    function updateAllskyOverlay() {
+      const canvas = document.getElementById("allsky-overlay");
+      const img = document.getElementById("allsky-image");
+
+      canvas.width = img.clientWidth;
+      canvas.height = img.clientHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const scaleX = img.clientWidth / img.naturalWidth;
+      const scaleY = img.clientHeight / img.naturalHeight;
+
+      const centerX = (crosshairCenterX) * scaleX * zoomFactor + panX;
+      const centerY = (crosshairCenterY) * scaleY * zoomFactor + panY;
+      const radius = crosshairRadius * scaleX * zoomFactor;
+
+      if (showCardinalDirections) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 0, 0, 0.8)";
+        ctx.lineWidth = 1;
+
+        // Circle
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        ctx.stroke();
+
+        // Direction markers
+        const directions = ["N", "NW", "W", "SW", "S", "SE", "E", "NE"];
+        const total = directions.length;
+
+        for (let i = 0; i < total; i++) {
+          const idx = isSouthernHemisphere ? total - 1 - i : i;
+          const angleDeg = crosshairRotation + (360 / total) * i;
+          const angleRad = angleDeg * Math.PI / 180;
+
+          const x = centerX + Math.sin(angleRad) * radius;
+          const y = centerY - Math.cos(angleRad) * radius;
+
+          // Marker
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, 2 * Math.PI);
+          ctx.fillStyle = "red";
+          ctx.fill();
+
+          // Label (not for 0° and 90°)
+          const tx = centerX + Math.sin(angleRad) * (radius + 14);
+          const ty = centerY - Math.cos(angleRad) * (radius + 14);
+          ctx.fillStyle = "red";
+          ctx.font = "12px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(directions[idx], tx, ty);
+        }
+
+        // Marker for Zenith (Center)
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 2, 0, 2 * Math.PI);
+        ctx.fillStyle = "red";
+        ctx.fill();
+
+        ctx.fillStyle = "red";
+        ctx.font = "12px sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        ctx.fillText("Zenith", centerX + 6, centerY + 6);
+
+        ctx.restore();
+      }
+
+
+      if (showEquatorialGrid) {
+        const lat = latitude;
+        const lon = longitude;
+        const timestamp = imageTimestamp;
+
+        ctx.save();
+        ctx.strokeStyle = "rgba(0,255,0,0.4)";
+        ctx.lineWidth = 1;
+        ctx.fillStyle = "lime";
+        ctx.font = "10px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        // Declination circles (-60° to +60° in 30° steps)
+        for (let dec = -60; dec <= 60; dec += 15) {
+          let points = [];
+          for (let ra = 0; ra < 360; ra += 5) {
+            const { azimuth, altitude } = raDecToAzAlt(ra, dec, lat, lon, timestamp);
+            if (altitude >= 0 && altitude <= 90) {
+              const { x, y } = azAltToImageXY(azimuth, altitude);
+              points.push({ x, y });
+            }
+          }
+          if (points.length > 1) {
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+              ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.stroke();
+          }
+        }
+
+        // Right Ascension lines (each hour = 15°)
+        for (let ra = 0; ra < 360; ra += 15) {
+          let points = [];
+          for (let dec = -80; dec <= 80; dec += 5) {
+            const { azimuth, altitude } = raDecToAzAlt(ra, dec, lat, lon, timestamp);
+            if (altitude >= 0 && altitude <= 90) {
+              const { x, y } = azAltToImageXY(azimuth, altitude);
+              points.push({ x, y });
+            }
+          }
+          if (points.length > 1) {
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+              ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.stroke();
+
+            // Label at Declination = 0°
+            const { x, y } = points[Math.floor(points.length / 2)];
+            const raHour = (ra / 15) % 24;
+            ctx.fillText(`${raHour}h`, x, y);
+          }
+        }
+      }
+
+      if (showBrightestStars) {
+        // Stars POI
+        for (const poi of brightestStarsPoi) {
+          const { azimuth, altitude } = raDecToAzAlt(poi.ra, poi.dec, latitude, longitude, imageTimestamp);
+          if (altitude >= 0) {
+            const { x, y } = azAltToImageXY(azimuth, altitude);
+            ctx.beginPath();
+            ctx.arc(x, y, 3, 0, 2 * Math.PI);
+            ctx.fillStyle = poi.color || "white";
+            ctx.fill();
+            ctx.fillText(poi.name, x + 20, y + 10);
+          }
+        }
+
+        ctx.restore();
+      }
+
+      if (showAzimutalGrid) {
+        // Azimuthal lines (15°, 30°, 45°, 60°, 75°)
+        ctx.strokeStyle = "rgba(255, 0, 0, 0.3)";
+        ctx.lineWidth = 1;
+        const zenithX = centerX;
+        const zenithY = centerY;
+        const baseRadius = crosshairRadius * scaleX; // for scaling X and Y equally
+
+        ctx.font = "10px sans-serif";
+        ctx.fillStyle = "rgba(255, 0, 0, 0.6)";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+
+        [15, 30, 45, 60, 75].forEach((elevation) => {
+          let r = baseRadius * (90 - elevation) / 90;
+          if (projectionType === "sinus") {
+            r = baseRadius * Math.sin((90 - elevation) * Math.PI / 180);
+          }
+
+          // Draw circle
+          ctx.beginPath();
+          ctx.arc(zenithX, zenithY, r, 0, 2 * Math.PI);
+          ctx.stroke();
+
+          // Label at Azimuth = 90° (East)
+          const labelX = zenithX + r + 4; // 4px distance
+          const labelY = zenithY;
+          ctx.fillText(`${elevation}°`, labelX, labelY - 1); // smaller vertical offset
+        });
+
+        // Azimuth directions (N, NE, E, SE, S, SW, W, NW)
+        for (let i = 0; i < 8; i++) {
+          let angle = i * 45 + crosshairRotation;
+          const rad = angle * Math.PI / 180;
+
+          const x = zenithX + baseRadius * Math.cos(rad);
+          const y = zenithY + baseRadius * Math.sin(rad);
+
+          // Draw line
+          ctx.beginPath();
+          ctx.moveTo(zenithX, zenithY);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+        }
+      }
+
+      if (showMeteorRadiants) {
+        // imageTimestamp is in UTC (Unix timestamp in seconds)
+        const now = new Date(imageTimestamp * 1000); // Convert to milliseconds for Date object
+
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 165, 0, 0.9)";
+        ctx.fillStyle = "orange";
+        ctx.font = "10px sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+
+        for (const code in meteorShowers) {
+          const shower = meteorShowers[code];
+          if (!isShowerActive(shower, now))
+            continue;
+
+          const { ra, dec } = getRadiantPosition(shower);
+          // Use imageTimestamp directly in UTC for astronomic calculations
+          const { azimuth, altitude } = raDecToAzAlt(ra, dec, latitude, longitude, imageTimestamp);
+          if (altitude <= 0) continue;
+
+          const { x, y } = azAltToImageXY(azimuth, altitude);
+
+          // Radiant as circle
+          ctx.beginPath();
+          ctx.arc(x, y, 6, 0, 2 * Math.PI);
+          ctx.stroke();
+
+          ctx.fillText(shower.name, x + 8, y);
+        }
+
+        ctx.restore();
+      }
+
+      if (showSunMoon) {
+        const sun = getSunRaDec(imageTimestamp);
+        const moon = getMoonRaDec(imageTimestamp);
+
+        //console.log("Lokale Zeit:", new Date(imageTimestamp * 1000).toString());
+        //console.log("UTC Zeit:", new Date(utcTimestamp * 1000).toUTCString());
+        //console.log("Offset (Minuten):", new Date().getTimezoneOffset());
+        //console.log(
+        //  `Sonne RA: ${formatRaHMS(sun.ra)}, Dec: ${formatDecDMS(sun.dec)}`
+        //);
+        // Sun yellow, Moon white; radius can be made a bit larger
+        drawEquatorialPOI(ctx, "Sun", sun.ra, sun.dec, latitude, longitude, "gold", 12);
+        drawEquatorialPOI(ctx, "Moon", moon.ra, moon.dec, latitude, longitude, "white", 12);
+      }
+
+      if (showComets && cometsPoi && cometsPoi.length > 0) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(0, 255, 255, 0.9)";
+        ctx.fillStyle = "cyan";
+        ctx.font = "10px sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+
+        for (const comet of cometsPoi) {
+          const { azimuth, altitude } = raDecToAzAlt(comet.ra, comet.dec, latitude, longitude, imageTimestamp);
+          if (altitude <= 0) continue; // Nur Kometen über dem Horizont anzeigen
+
+          const { x, y } = azAltToImageXY(azimuth, altitude);
+
+          // Komet als Kreis
+          ctx.beginPath();
+          ctx.arc(x, y, 6, 0, 2 * Math.PI);
+          ctx.stroke();
+          ctx.fill();
+
+          // Kometenname anzeigen
+          ctx.fillText(comet.name, x + 8, y);
+        }
+
+        ctx.restore();
+      }
+
+      // Draw star overlay
+      if (showDetectedStars && starPositions.length > 0) {
+        const scaleX = img.clientWidth / img.naturalWidth;
+        const scaleY = img.clientHeight / img.naturalHeight;
+
+        ctx.fillStyle = "cyan";
+        for (const star of starPositions) {
+          const sx = (star.x) * scaleX * zoomFactor + panX;
+          const sy = (star.y) * scaleY * zoomFactor + panY;
+          ctx.beginPath();
+          ctx.arc(sx, sy, 2, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+
+        ctx.restore();
+      }
+
+      // Show mouse coordinates
+      if (mouseX !== null && mouseY !== null) {
+        const scaleX = img.clientWidth / img.naturalWidth;
+        const scaleY = img.clientHeight / img.naturalHeight;
+
+        // Image pixel coordinates (only display) – optionally more precise with pan/zoom:
+        const imageX = (mouseX - panX) / (scaleX * zoomFactor);
+        const imageY = (mouseY - panY) / (scaleY * zoomFactor);
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.font = "12px sans-serif";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "top";
+        ctx.fillText(`X: ${Math.round(imageX)}, Y: ${Math.round(imageY)}`, canvas.width - 10, 10);
+
+        // --- Az/El from SCREEN coordinates (as drawn!) ---
+        const dxScreen = mouseX - centerX;
+        const dyScreen = mouseY - centerY;
+        const rScreen = Math.hypot(dxScreen, dyScreen);
+
+        const radiusScreen = radius; // = crosshairRadius * scaleX * zoomFactor (calculated above)
+        if (rScreen <= radiusScreen) {
+          const dNorm = rScreen / radiusScreen;
+
+          // Elevation from projection
+          let elevation;
+          if (projectionType === "sinus") {
+            elevation = 90 - Math.asin(Math.min(1, Math.max(0, dNorm))) * (180 / Math.PI);
+          } else {
+            elevation = 90 - dNorm * 90;
+          }
+
+          // Azimuth (0° = top/North), including image rotation
+          let azimuthDisp = Math.atan2(dxScreen, -dyScreen) * (180 / Math.PI);
+          azimuthDisp = (azimuthDisp - crosshairRotation + 360) % 360;
+
+          // If the overlay is mirrored horizontally, for RA/Dec reflect back
+          const MIRROR = true; // set to false if you don't mirror
+          const azimuthTrue = MIRROR ? (360 - azimuthDisp) % 360 : azimuthDisp;
+
+          // Output Az/El
+          ctx.fillText(`Az: ${azimuthDisp.toFixed(1)}°, El: ${elevation.toFixed(1)}°`, canvas.width - 10, 28);
+
+          // RA/Dec from Az/El (time/location)
+          const { raDeg, decDeg } = azAltToRaDec(latitude, longitude, azimuthTrue, elevation, imageTimestamp);
+          ctx.fillText(`RA: ${formatRaHMS(raDeg)}, Dec: ${formatDecDMS(decDeg)}`, canvas.width - 10, 44);
+        }
+      }
+
+
+    }
+
+    const allskyCanvas = document.getElementById("allsky-overlay");
+
+    allskyCanvas.addEventListener("mousemove", (event) => {
+      const rect = allskyCanvas.getBoundingClientRect();
+      pendingMouse = { canvasRect: rect, clientX: event.clientX, clientY: event.clientY };
+      scheduleOverlayRedraw();
+    }, { passive: true });
+
+    allskyCanvas.addEventListener("mouseleave", () => {
+      mouseX = null;
+      mouseY = null;
+      scheduleOverlayRedraw();
+    }, { passive: true });
+
+    // Retry-Mechanismus für Histogramm-Update mit Debugging
+    function updateHistogramWithRetry(img, maxRetries = 3) {
+      const debugInfo = {
+        attempt: 0,
+        success: false,
+        errors: []
+      };
+
+      function tryUpdate(retryCount) {
+        debugInfo.attempt = retryCount;
+        console.log(`[Histogram Debug] Attempt ${retryCount}/${maxRetries}`, {
+          image: {
+            exists: !!img,
+            complete: img?.complete,
+            naturalWidth: img?.naturalWidth,
+            naturalHeight: img?.naturalHeight,
+            clientWidth: img?.clientWidth,
+            clientHeight: img?.clientHeight
+          },
+          canvas: {
+            exists: !!document.getElementById("histogram"),
+            visible: document.getElementById("histogram")?.offsetParent !== null,
+            width: document.getElementById("histogram")?.width,
+            height: document.getElementById("histogram")?.height
+          },
+          function: {
+            exists: typeof updateRGBHistogram === 'function'
+          }
+        });
+
+        const histCanvas = document.getElementById("histogram");
+
+        if (!img) {
+          debugInfo.errors.push("imageEl is null/undefined");
+          if (retryCount < maxRetries) {
+            setTimeout(() => tryUpdate(retryCount + 1), 100);
+          } else {
+            console.error("[Histogram Debug] All attempts failed:", debugInfo);
+          }
+          return;
+        }
+
+        if (!img.complete) {
+          debugInfo.errors.push(`Image not fully loaded (complete=${img.complete})`);
+          if (retryCount < maxRetries) {
+            setTimeout(() => tryUpdate(retryCount + 1), 200);
+          } else {
+            console.error("[Histogram Debug] All attempts failed:", debugInfo);
+          }
+          return;
+        }
+
+        if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+          debugInfo.errors.push(`Image has no size (${img.naturalWidth}x${img.naturalHeight})`);
+          if (retryCount < maxRetries) {
+            setTimeout(() => tryUpdate(retryCount + 1), 200);
+          } else {
+            console.error("[Histogram Debug] All attempts failed:", debugInfo);
+          }
+          return;
+        }
+
+        if (!histCanvas) {
+          debugInfo.errors.push("Histogram-Canvas not found");
+          if (retryCount < maxRetries) {
+            setTimeout(() => tryUpdate(retryCount + 1), 100);
+          } else {
+            console.error("[Histogram Debug] All attempts failed:", debugInfo);
+          }
+          return;
+        }
+
+        if (typeof updateRGBHistogram !== 'function') {
+          debugInfo.errors.push("updateRGBHistogram function not available");
+          console.error("[Histogram Debug] updateRGBHistogram is not a function!");
+          return;
+        }
+
+        // Try to update histogram
+        try {
+          const success = updateRGBHistogram(img, histCanvas);
+          if (success) {
+            debugInfo.success = true;
+            console.log("[Histogram Debug] Successfully updated", debugInfo);
+          } else {
+            debugInfo.errors.push("updateRGBHistogram returned false");
+            if (retryCount < maxRetries) {
+              setTimeout(() => tryUpdate(retryCount + 1), 200);
+            } else {
+              console.error("[Histogram Debug] All attempts failed:", debugInfo);
+            }
+          }
+        } catch (error) {
+          debugInfo.errors.push(`Error calling updateRGBHistogram: ${error.message}`);
+          console.error("[Histogram Debug] Error calling updateRGBHistogram:", error);
+          if (retryCount < maxRetries) {
+            setTimeout(() => tryUpdate(retryCount + 1), 200);
+          } else {
+            console.error("[Histogram Debug] All attempts failed:", debugInfo);
+          }
+        }
+      }
+
+      tryUpdate(1);
+    }
+
+    function updatePanoramaOverlay() {
+      const canvas = document.getElementById("panorama-overlay");
+      const img = document.getElementById("panorama");
+
+      if (!img || !img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
+        return;
+      }
+
+      // Get the actual displayed size of the image element (with object-fit: contain)
+      const imgRect = img.getBoundingClientRect();
+      const containerRect = img.parentElement.getBoundingClientRect();
+
+      // Calculate actual image dimensions within the container (object-fit: contain)
+      // This ensures the canvas matches the displayed image exactly
+      const imgAspectRatio = img.naturalWidth / img.naturalHeight;
+      const containerAspectRatio = containerRect.width / containerRect.height;
+
+      let actualWidth, actualHeight;
+      if (imgAspectRatio > containerAspectRatio) {
+        // Image is wider than container - width fills container
+        actualWidth = containerRect.width;
+        actualHeight = containerRect.width / imgAspectRatio;
+      } else {
+        // Image is taller than container - height fills container
+        actualWidth = containerRect.height * imgAspectRatio;
+        actualHeight = containerRect.height;
+      }
+
+      // Set canvas size to match displayed image exactly
+      canvas.width = actualWidth;
+      canvas.height = actualHeight;
+
+      // Position canvas exactly over the image
+      // The image is centered with object-fit: contain, so calculate offset from container
+      const offsetX = (containerRect.width - actualWidth) / 2;
+      const offsetY = (containerRect.height - actualHeight) / 2;
+      canvas.style.left = `${offsetX}px`;
+      canvas.style.top = `${offsetY}px`;
+      canvas.style.width = `${actualWidth}px`;
+      canvas.style.height = `${actualHeight}px`;
+
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+
+      // Azimuth scale for panorama mode
+      ctx.fillStyle = "red";
+      ctx.strokeStyle = "red";
+      ctx.lineWidth = 1;
+      ctx.font = "12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+
+      const directions = [
+        { label: "N", deg: 0 },
+        { label: "NE", deg: 45 },
+        { label: "E", deg: 90 },
+        { label: "SE", deg: 135 },
+        { label: "S", deg: 180 },
+        { label: "SW", deg: 225 },
+        { label: "W", deg: 270 },
+        { label: "NW", deg: 315 },
+        { label: "N", deg: 360 }
+      ];
+
+      const width = canvas.width;
+      const height = canvas.height;
+
+      // Horizontal directions with marks
+      directions.forEach(dir => {
+        const x = (dir.deg / 360) * width;
+        ctx.beginPath();
+        ctx.moveTo(x, height - 12);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+        ctx.fillText(dir.label, x, height - 24);
+      });
+
+      // Vertical scale (right): 0° bottom, 90° top (no label at 0° and 90°)
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      for (let i = 0; i <= 90; i += 15) {
+        const y = height - (i / 90) * height;
+        ctx.beginPath();
+        ctx.moveTo(width - 8, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+        if (i !== 0 && i !== 90) {
+          ctx.fillText(`${i}°`, width - 10, y);
+        }
+      }
+
+      // Vertical scale (left): 0° bottom, 90° top (no label at 0° and 90°)
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      for (let i = 0; i <= 90; i += 15) {
+        const y = height - (i / 90) * height;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(8, y);
+        ctx.stroke();
+        if (i !== 0 && i !== 90) {
+          ctx.fillText(`${i}°`, 10, y);
+        }
+      }
+
+      // Azimuthal grid (Elevation circles and azimuth lines)
+      if (showAzimutalGrid) {
+        ctx.strokeStyle = "rgba(255, 0, 0, 0.3)";
+        ctx.lineWidth = 1;
+
+        // Horizontal lines for different elevations (15°, 30°, 45°, 60°, 75°)
+        [15, 30, 45, 60, 75].forEach((elevation) => {
+          const y = height - (elevation / 90) * height;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(width, y);
+          ctx.stroke();
+        });
+
+        // Vertical lines for azimuth (N, NE, E, SE, S, SW, W, NW)
+        for (let i = 0; i <= 8; i++) {
+          const deg = i * 45;
+          const x = (deg / 360) * width;
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, height);
+          ctx.stroke();
+        }
+      }
+
+      // Display mouse coordinates (only for info, not critical for panorama)
+      if (mouseX !== null && mouseY !== null) {
+        // Note: mouseX/Y are relative to the main image canvas, not the panorama canvas
+        // For now, we skip coordinate display in panorama as it requires separate mouse tracking
+        // ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        // ctx.font = "12px sans-serif";
+        // ctx.textAlign = "right";
+        // ctx.textBaseline = "top";
+        // const text = `X: ${Math.round(mouseX)}, Y: ${Math.round(mouseY)}`;
+        // ctx.fillText(text, canvas.width - 10, 10);
+      }
+
+    }
+
+    // Respond to window resize → adjust overlay
+    window.addEventListener("resize", () => {
+      updateAllskyOverlay();
+      updatePanoramaOverlay();
+      // Update histogram canvas size
+      const histCanvas = document.getElementById("histogram");
+      if (imageEl && histCanvas && imageEl.complete && typeof updateRGBHistogram === 'function') {
+        updateHistogramWithRetry(imageEl, 2);
+      }
+    });
+
+
+    // Initial load
+    loadConfig();
+    loadLatestImage();
+    restartTimer();
+    initCharts();
+  </script>
+
+</body>
+
+</html>

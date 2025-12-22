@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Allsky360 Videos</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  
+  <link rel="manifest" href="manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Allsky360 Videos">
+  <meta name="theme-color" content="#111111" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="stylesheet" href="style.css">
+  <script src="js/allsky-common.js"></script>
+</head>
+
+<body>
+  <div id="header">
+    <div class="title-icon">
+      <img src="allsky360_256x256.png" alt="Allsky Icon" width="32" height="32" />
+      <h1>Allsky360 Videos</h1>
+    </div>
+    <!-- Hamburger Menu Button -->
+    <button id="hamburger-menu-btn" class="hamburger-menu-btn" onclick="toggleHamburgerMenu()">
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+    </button>
+    
+    <!-- Navigation Menu -->
+    <nav id="nav-menu" class="nav-menu">
+      <ul class="nav-list">
+        <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+        <li><a href="archive.html" class="nav-link">Archive</a></li>
+        <li><a href="videos.html" class="nav-link">Videos</a></li>
+        <li><a href="graphs.html" class="nav-link">Graphs</a></li>
+        <li><a href="meteo.html" class="nav-link">Weather</a></li>
+        <li><a href="aurora.html" class="nav-link">Aurora</a></li>
+        <li><a href="config.html" class="nav-link">Config</a></li>
+        <li><a href="calibration.html" class="nav-link">Calibration</a></li>
+        <li><a href="processing.html" class="nav-link">Processing</a></li>
+      </ul>
+    </nav>
+  </div>
+  <div id="subheader">
+    <div class="settings-group">
+      <label style="align-items: center; gap: 0.3rem;">
+        Select date:
+        <input type="date" id="datePicker">
+      </label>
+      <label style="align-items: center; gap: 0.3rem;">
+        Select time:
+        <input type="time" id="timePicker" step="1">
+      </label>
+      <label style="align-items: center; gap: 0.3rem;">
+        Time range:
+        <select id="timeRangeSelect">
+          <option value="6">Last 6 hours</option>
+          <option value="12">Last 12 hours</option>
+          <option value="24">Last 24 hours</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div id="container">
+    <div id="video-list-container" style="flex: 1; min-width: 300px; max-height: 80vh; overflow-y: auto; padding: 1rem; background: #1a1a1a; border-radius: 4px;">
+      <div id="video-list">
+        <!-- Videos will appear here -->
+      </div>
+    </div>
+    <div id="video-player-container" style="flex: 1; min-width: 300px; padding: 1rem; align-items: center; justify-content: center; background: #1a1a1a; border-radius: 4px;">      <video id="video-player" controls style="max-width: 100%; max-height: 70vh; background: #000; border-radius: 4px;">
+        Your browser does not support the video tag.
+      </video>
+      <div id="video-info" style="margin-top: 1rem; text-align: center; color: #aaa; font-size: 0.9rem;"></div>
+    </div>
+  </div>
+
+  <script>
+    let allVideos = [];
+    let firstLoad = true;
+
+    // Convert Date object to YYYYMMDDhhmmss format (UTC)
+    function formatDateTimeString(date) {
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(date.getUTCDate()).padStart(2, '0');
+      const hour = String(date.getUTCHours()).padStart(2, '0');
+      const minute = String(date.getUTCMinutes()).padStart(2, '0');
+      const second = String(date.getUTCSeconds()).padStart(2, '0');
+      return `${year}${month}${day}${hour}${minute}${second}`;
+    }
+
+    // Extract date from video filename (e.g., "20240101/video-20240101120000.mp4" -> "20240101")
+    function extractDateFromVideoPath(videoPath) {
+      const match = videoPath.match(/^(\d{8})\//);
+      return match ? match[1] : null;
+    }
+
+    // Extract timestamp from video filename (e.g., "20240101/video-20240101120000.mp4" -> "20240101120000")
+    function extractTimestampFromVideoPath(videoPath) {
+      const match = videoPath.match(/video-(\d{14})\.mp4/);
+      return match ? match[1] : null;
+    }
+
+    // Convert YYYYMMDDhhmmss to Date object
+    function parseDateTimeString(dateTimeStr) {
+      if (!dateTimeStr || !/^\d{14}$/.test(dateTimeStr)) {
+        return null;
+      }
+      
+      const year = parseInt(dateTimeStr.substring(0, 4), 10);
+      const month = parseInt(dateTimeStr.substring(4, 6), 10) - 1;
+      const day = parseInt(dateTimeStr.substring(6, 8), 10);
+      const hour = parseInt(dateTimeStr.substring(8, 10), 10);
+      const minute = parseInt(dateTimeStr.substring(10, 12), 10);
+      const second = parseInt(dateTimeStr.substring(12, 14), 10);
+      
+      return new Date(Date.UTC(year, month, day, hour, minute, second));
+    }
+
+    // Load videos from API
+    async function loadVideos() {
+      try {
+        const response = await fetch('/api/videos');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const videos = await response.json();
+        allVideos = videos;
+        
+        // Log for debugging
+        console.log(`Loaded ${videos.length} videos from API`);
+        
+        filterAndDisplayVideos();
+      } catch (err) {
+        console.error("Error loading videos:", err);
+        const videoList = document.getElementById("video-list");
+        videoList.innerHTML = `<div style="color: #f44; padding: 1rem;">Error loading videos: ${err.message}</div>`;
+      }
+    }
+
+    // Filter videos based on date, time, and time range
+    function filterAndDisplayVideos() {
+      // If no videos loaded yet, show message
+      if (!allVideos || allVideos.length === 0) {
+        document.getElementById("video-list").innerHTML = "<div style='padding: 1rem; color: #aaa;'>Loading videos...</div>";
+        return;
+      }
+
+      const dateInput = document.getElementById("datePicker").value;
+      const timeInput = document.getElementById("timePicker").value;
+      const timeRange = parseInt(document.getElementById("timeRangeSelect").value);
+
+      // If no date/time selected, show all videos
+      if (!dateInput || !timeInput) {
+        const sortedVideos = [...allVideos].sort((a, b) => {
+          const timestampA = extractTimestampFromVideoPath(a);
+          const timestampB = extractTimestampFromVideoPath(b);
+          if (!timestampA || !timestampB) return b.localeCompare(a); // Sort by filename if no timestamp
+          return timestampB.localeCompare(timestampA); // Descending order
+        });
+        displayVideos(sortedVideos);
+        return;
+      }
+
+      // Parse date and time
+      const [year, month, day] = dateInput.split('-').map(Number);
+      const timeParts = timeInput.split(':');
+      const hours = parseInt(timeParts[0] || 0, 10);
+      const minutes = parseInt(timeParts[1] || 0, 10);
+      const seconds = parseInt(timeParts[2] || 0, 10);
+      
+      const endDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
+      
+      // Calculate start date (end - timeRange hours)
+      const startDate = new Date(endDate);
+      startDate.setUTCHours(startDate.getUTCHours() - timeRange);
+
+      const endStr = formatDateTimeString(endDate);
+      const startStr = formatDateTimeString(startDate);
+
+      // Filter videos that fall within the time range
+      const filteredVideos = allVideos.filter(videoPath => {
+        const timestampStr = extractTimestampFromVideoPath(videoPath);
+        if (!timestampStr) {
+          // If no timestamp found, include it anyway (show all videos that can't be filtered)
+          return true;
+        }
+        
+        const videoDate = parseDateTimeString(timestampStr);
+        if (!videoDate) {
+          // If timestamp can't be parsed, include it anyway
+          return true;
+        }
+        
+        const videoStr = formatDateTimeString(videoDate);
+        return videoStr >= startStr && videoStr <= endStr;
+      });
+
+      // On first load, if no videos match the filter, show all videos
+      if (firstLoad && filteredVideos.length === 0 && allVideos.length > 0) {
+        firstLoad = false;
+        const sortedVideos = [...allVideos].sort((a, b) => {
+          const timestampA = extractTimestampFromVideoPath(a);
+          const timestampB = extractTimestampFromVideoPath(b);
+          if (!timestampA || !timestampB) return b.localeCompare(a);
+          return timestampB.localeCompare(timestampA);
+        });
+        displayVideos(sortedVideos);
+        return;
+      }
+
+      firstLoad = false;
+
+      // Sort videos by timestamp (newest first)
+      filteredVideos.sort((a, b) => {
+        const timestampA = extractTimestampFromVideoPath(a);
+        const timestampB = extractTimestampFromVideoPath(b);
+        if (!timestampA || !timestampB) {
+          // If no timestamp, sort by filename
+          return b.localeCompare(a);
+        }
+        return timestampB.localeCompare(timestampA); // Descending order
+      });
+
+      displayVideos(filteredVideos);
+    }
+
+    // Display videos in the list
+    function displayVideos(videos) {
+      const videoList = document.getElementById("video-list");
+      
+      if (videos.length === 0) {
+        videoList.innerHTML = "<div style='padding: 1rem; color: #aaa;'>No videos found for the selected criteria.</div>";
+        return;
+      }
+
+      videoList.innerHTML = "";
+
+      videos.forEach(videoPath => {
+        const timestampStr = extractTimestampFromVideoPath(videoPath);
+        let displayName;
+
+        if (timestampStr) {
+          const videoDate = parseDateTimeString(timestampStr);
+          if (videoDate) {
+            // Format display name from timestamp
+            const dateStr = timestampStr.substring(0, 8);
+            const timeStr = timestampStr.substring(8, 14);
+            displayName = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)} ${timeStr.substring(0, 2)}:${timeStr.substring(2, 4)}:${timeStr.substring(4, 6)}`;
+          } else {
+            // Use filename if timestamp can't be parsed
+            displayName = videoPath;
+          }
+        } else {
+          // Use filename if no timestamp found
+          displayName = videoPath;
+        }
+
+        const videoItem = document.createElement("div");
+        videoItem.style.cssText = "padding: 0.75rem; margin: 0.5rem 0; background: #222; border: 1px solid #444; border-radius: 4px; cursor: pointer; transition: background 0.2s, border-color 0.2s; color: #fff; display: flex; align-items: center; gap: 1rem;";
+        
+        // Create thumbnail image (replace .mp4 with .jpg)
+        const thumbnailPath = videoPath.replace(/\.mp4$/i, '.png');
+        const thumbnailUrl = `/videos/${thumbnailPath}`;
+        
+        const thumbnailImg = document.createElement("img");
+        thumbnailImg.src = thumbnailUrl;
+        thumbnailImg.alt = displayName;
+        thumbnailImg.style.cssText = "width: 150px; height: auto; object-fit: cover; border-radius: 4px; flex-shrink: 0;";
+        thumbnailImg.onerror = function() {
+          // If thumbnail doesn't exist, hide the image
+          this.style.display = 'none';
+        };
+        
+        const videoText = document.createElement("div");
+        videoText.textContent = displayName;
+        videoText.style.cssText = "flex: 1;";
+        
+        videoItem.appendChild(thumbnailImg);
+        videoItem.appendChild(videoText);
+        
+        videoItem.addEventListener("mouseenter", () => {
+          videoItem.style.background = "#333";
+          videoItem.style.borderColor = "#666";
+        });
+        
+        videoItem.addEventListener("mouseleave", () => {
+          videoItem.style.background = "#222";
+          videoItem.style.borderColor = "#444";
+        });
+
+        videoItem.addEventListener("click", () => {
+          playVideo(videoPath, displayName);
+        });
+
+        videoList.appendChild(videoItem);
+      });
+    }
+
+    // Play video in the player
+    function playVideo(videoPath, displayName) {
+      const videoPlayer = document.getElementById("video-player");
+      const videoInfo = document.getElementById("video-info");
+      
+      // Construct full path to video - API returns only filename, full URL is /videos/<filename>
+      const fullPath = `/videos/${videoPath}`;
+      
+      videoPlayer.src = fullPath;
+      videoInfo.textContent = displayName;
+      
+      // Load and play
+      videoPlayer.load();
+      videoPlayer.play().catch(err => {
+        console.error("Error playing video:", err);
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const datePicker = document.getElementById("datePicker");
+      const timePicker = document.getElementById("timePicker");
+      const timeRangeSelect = document.getElementById("timeRangeSelect");
+
+      // Set default values
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+      const currentTime = now.toTimeString().slice(0, 8);
+      datePicker.value = today;
+      timePicker.value = currentTime;
+
+      // Add event listeners
+      datePicker.addEventListener("change", filterAndDisplayVideos);
+      timePicker.addEventListener("change", filterAndDisplayVideos);
+      timeRangeSelect.addEventListener("change", filterAndDisplayVideos);
+
+      // Load videos initially
+      loadVideos();
+    });
+  </script>
+
+  <footer id="footer">
+    <div class="copyright">Copyright (c) 2025 Sven Kreiensen</div>
+  </footer>
+</body>
+
+</html>
+

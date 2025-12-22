@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Allsky360 LCD 1280x400</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="stylesheet" href="style.css">
+  <script src="js/allsky-common.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #000 !important;
+      color: #ffffff !important;
+      display: flex;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #container {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      height: 400px;
+      padding: 0;
+    }
+
+    #panorama-container {
+      flex: 1;
+      height: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      position: relative;
+    }
+
+    #panorama {
+      height: 400px;
+      width: auto;
+      object-fit: contain;
+      display: block;
+    }
+
+    #timer-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="container">
+    <div id="panorama-container">
+      <img id="panorama" src="" alt="Panorama View" />
+      <canvas id="timer-overlay"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const panoramaEl = document.getElementById("panorama");
+    const timerOverlay = document.getElementById("timer-overlay");
+
+    let refreshInterval = 10;
+    let loading = false;
+    let lastImageLoadTime = Date.now();
+    let timerTimeout = null;
+    let currentRemaining = 10;
+    let imageTimestamp = 0;
+    let timezoneOffset = 0;
+    let meanBrightness = 0;
+    let sqm = 0;
+    let stars = 0;
+
+    async function loadLatestPanorama() {
+      if (loading)
+        return;
+      loading = true;
+
+      const latestPanoramaPath = 'api/latest_image';
+      try {
+        const latestPanoramaResponse = await fetch(latestPanoramaPath, { cache: "no-cache" });
+        const latestPanoramaData = await latestPanoramaResponse.json();
+        const todayStr = latestPanoramaData.date;
+        const imageTimeStr = latestPanoramaData.image;
+        const imageFiletype = latestPanoramaData.filetype;
+        const imageDateTime = `${todayStr}${imageTimeStr}`;
+
+        const panoramaSrc = `images/${todayStr}/panorama-${imageDateTime}.${imageFiletype}`;
+        panoramaEl.src = panoramaSrc;
+
+        panoramaEl.onload = () => {
+          loading = false;
+          updateTimerOverlay();
+        };
+
+        panoramaEl.onerror = () => {
+          console.error("❌ Panorama image load error:", panoramaSrc);
+          loading = false;
+        };
+
+        // Bild-Metadaten laden für Refresh-Intervall
+        const imageMetaPath = `images/${todayStr}/image-${imageDateTime}.json`;
+        try {
+          const imgMetaResp = await fetch(imageMetaPath, { cache: "no-cache" });
+          const imageMeta = await imgMetaResp.json();
+
+          if (imageMeta) {
+            refreshInterval = (typeof imageMeta.capture_interval === "number" && imageMeta.capture_interval > 0)
+              ? Math.round(imageMeta.capture_interval)
+              : 10;
+            
+            imageTimestamp = imageMeta.timestamp || 0;
+            timezoneOffset = imageMeta.timezone_offset || 0;
+            meanBrightness = imageMeta.mean_brightness || 0;
+            sqm = imageMeta.sqm || 0;
+            stars = imageMeta.stars || 0;
+
+            lastImageLoadTime = Date.now();
+            currentRemaining = refreshInterval;
+            updateTimerOverlay();
+            restartTimer();
+          }
+        } catch (e) {
+          console.warn("⚠️ Image metadata not found:", imageMetaPath);
+          // Fallback: Standard-Intervall verwenden
+          lastImageLoadTime = Date.now();
+          currentRemaining = refreshInterval;
+          updateTimerOverlay();
+          restartTimer();
+        }
+      } catch (error) {
+        console.error("❌ Error loading panorama:", error);
+        loading = false;
+      }
+    }
+
+    function updateTimerOverlay() {
+      const imgRect = panoramaEl.getBoundingClientRect();
+      const containerRect = panoramaEl.parentElement.getBoundingClientRect();
+      
+      // Canvas-Größe auf Container-Größe setzen
+      timerOverlay.width = containerRect.width;
+      timerOverlay.height = containerRect.height;
+      timerOverlay.style.width = `${containerRect.width}px`;
+      timerOverlay.style.height = `${containerRect.height}px`;
+      
+      const ctx = timerOverlay.getContext("2d");
+      ctx.clearRect(0, 0, timerOverlay.width, timerOverlay.height);
+      
+      // Azimutales Grid zeichnen (nur wenn Bild geladen ist)
+      if (panoramaEl.complete && panoramaEl.naturalWidth > 0 && panoramaEl.naturalHeight > 0) {
+        // Verwende die tatsächliche Bildposition und -größe
+        const imgAspectRatio = panoramaEl.naturalWidth / panoramaEl.naturalHeight;
+        const containerAspectRatio = containerRect.width / containerRect.height;
+        
+        let imgDisplayWidth, imgDisplayHeight, imgOffsetX, imgOffsetY;
+        
+        if (imgAspectRatio > containerAspectRatio) {
+          // Bild ist breiter als Container - Breite füllt Container
+          imgDisplayWidth = containerRect.width;
+          imgDisplayHeight = containerRect.width / imgAspectRatio;
+        } else {
+          // Bild ist höher als Container - Höhe füllt Container
+          imgDisplayWidth = containerRect.height * imgAspectRatio;
+          imgDisplayHeight = containerRect.height;
+        }
+        
+        // Bild ist linksbündig (object-fit: contain mit justify-content: flex-start)
+        imgOffsetX = 0;
+        imgOffsetY = (containerRect.height - imgDisplayHeight) / 2;
+        
+        // Azimutales Grid zeichnen
+        ctx.strokeStyle = "rgba(255, 0, 0, 0.3)";
+        ctx.lineWidth = 1;
+        
+        // Horizontale Linien für verschiedene Elevationen (15°, 30°, 45°, 60°, 75°)
+        [15, 30, 45, 60, 75].forEach((elevation) => {
+          const y = imgOffsetY + imgDisplayHeight - (elevation / 90) * imgDisplayHeight;
+          ctx.beginPath();
+          ctx.moveTo(imgOffsetX, y);
+          ctx.lineTo(imgOffsetX + imgDisplayWidth, y);
+          ctx.stroke();
+        });
+        
+        // Vertikale Linien für Azimute (N, NE, E, SE, S, SW, W, NW)
+        for (let i = 0; i <= 8; i++) {
+          const deg = i * 45;
+          const x = imgOffsetX + (deg / 360) * imgDisplayWidth;
+          ctx.beginPath();
+          ctx.moveTo(x, imgOffsetY);
+          ctx.lineTo(x, imgOffsetY + imgDisplayHeight);
+          ctx.stroke();
+        }
+      }
+      
+      const padding = 10;
+      const lineHeight = 28;
+      const fontSize = 20;
+      let yPos = padding;
+      
+      // Timer-Text
+      const timerText = `Next update in ${currentRemaining} s`;
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.textAlign = "right";
+      ctx.textBaseline = "top";
+      
+      let textMetrics = ctx.measureText(timerText);
+      let maxWidth = textMetrics.width;
+      
+      // Timestamp-Text
+      let timestampText = "";
+      if (imageTimestamp > 0) {
+        timestampText = formatTimestamp(imageTimestamp, timezoneOffset);
+        textMetrics = ctx.measureText(timestampText);
+        maxWidth = Math.max(maxWidth, textMetrics.width);
+      }
+      
+      // Brightness-Text
+      let brightnessText = "";
+      if (meanBrightness > 0) {
+        brightnessText = `Brightness: ${meanBrightness.toFixed(2)}`;
+        textMetrics = ctx.measureText(brightnessText);
+        maxWidth = Math.max(maxWidth, textMetrics.width);
+      }
+      
+      // SQM-Text
+      let sqmText = "";
+      if (sqm > 0) {
+        sqmText = `SQM: ${sqm.toFixed(1)} mag/arcs²`;
+        textMetrics = ctx.measureText(sqmText);
+        maxWidth = Math.max(maxWidth, textMetrics.width);
+      }
+      
+      // Stars count-Text
+      let starsText = "";
+      if (stars > 0) {
+        starsText = `Stars: ${stars}`;
+        textMetrics = ctx.measureText(starsText);
+        maxWidth = Math.max(maxWidth, textMetrics.width);
+      }
+      
+      // Hintergrund für alle Texte
+      const bgX = containerRect.width - maxWidth - padding * 2;
+      const bgY = padding;
+      const bgWidth = maxWidth + padding * 2;
+      const bgHeight = (timestampText ? lineHeight : 0) + (brightnessText ? lineHeight : 0) + (sqmText ? lineHeight : 0) + (starsText ? lineHeight : 0) + lineHeight + padding;
+      
+      ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+      ctx.fillRect(bgX, bgY, bgWidth, bgHeight);
+      
+      // Texte zeichnen
+      ctx.fillStyle = "#ffffff";
+      
+      // Timestamp (oben)
+      if (timestampText) {
+        ctx.fillText(timestampText, containerRect.width - padding, yPos);
+        yPos += lineHeight;
+      }
+      
+      // Brightness
+      if (brightnessText) {
+        ctx.fillText(brightnessText, containerRect.width - padding, yPos);
+        yPos += lineHeight;
+      }
+      
+      // SQM
+      if (sqmText) {
+        ctx.fillText(sqmText, containerRect.width - padding, yPos);
+        yPos += lineHeight;
+      }
+      
+      // Stars count
+      if (starsText) {
+        ctx.fillText(starsText, containerRect.width - padding, yPos);
+        yPos += lineHeight;
+      }
+      
+      // Timer (unten)
+      ctx.fillText(timerText, containerRect.width - padding, yPos);
+    }
+
+    function tick() {
+      const now = Date.now();
+      const elapsedSeconds = Math.floor((now - lastImageLoadTime) / 1000);
+
+      currentRemaining = Math.max(refreshInterval - elapsedSeconds, 0);
+      updateTimerOverlay();
+
+      if (currentRemaining <= 0 && !loading) {
+        loadLatestPanorama();
+        lastImageLoadTime = Date.now();
+      }
+
+      timerTimeout = setTimeout(tick, 1000);
+    }
+
+    function restartTimer() {
+      if (timerTimeout !== null) {
+        clearTimeout(timerTimeout);
+      }
+      lastImageLoadTime = Date.now();
+      tick();
+    }
+
+    // Overlay bei Fenstergrößenänderung aktualisieren
+    window.addEventListener('resize', () => {
+      updateTimerOverlay();
+    });
+    
+    // Timer sofort starten
+    restartTimer();
+    
+    // Initiales Laden
+    loadLatestPanorama();
+  </script>
+</body>
+
+</html>
+

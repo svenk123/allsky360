@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Allsky360 Processing Pipeline</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+
+  <link rel="manifest" href="manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Allsky360 Viewer">
+  <meta name="theme-color" content="#111111" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="stylesheet" href="style.css">
+  <script src="js/allsky-common.js"></script>
+</head>
+
+<body>
+  <div id="header">
+    <div class="title-icon">
+      <img src="allsky360_256x256.png" alt="Allsky Icon" width="32" height="32" />
+      <h1>Allsky360 Processing</h1>
+    </div>
+
+    <!-- Hamburger Menu Button -->
+    <button id="hamburger-menu-btn" class="hamburger-menu-btn" onclick="toggleHamburgerMenu()">
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+    </button>
+
+    <!-- Navigation Menu -->
+    <nav id="nav-menu" class="nav-menu">
+      <ul class="nav-list">
+        <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+        <li><a href="archive.html" class="nav-link">Archive</a></li>
+        <li><a href="videos.html" class="nav-link">Videos</a></li>
+        <li><a href="graphs.html" class="nav-link">Graphs</a></li>
+        <li><a href="meteo.html" class="nav-link">Weather</a></li>
+        <li><a href="aurora.html" class="nav-link">Aurora</a></li>
+        <li><a href="config.html" class="nav-link">Config</a></li>
+        <li><a href="calibration.html" class="nav-link">Calibration</a></li>
+        <li><a href="processing.html" class="nav-link">Processing</a></li>
+      </ul>
+    </nav>
+  </div>
+
+  </div>
+
+  <div id="container">
+    <!-- HDR multiscale fusion -->
+    <div class="processing-row">
+      <div class="processing-section">
+        <h2>Step 1: HDR multiscale fusion</h2>
+        <div class="image-wrapper">
+          <img id="pipeline-01" src="" alt="HDR multiscale fusion" style="width: 100%; height: auto; border-radius: 0.3rem;" />
+          <div class="loading-indicator" id="loading-01">Loading...</div>
+        </div>
+      </div>
+      <div class="metadata-section">
+        <h2>HDR multiscale fusion</h2>
+        <div class="config-params" id="config-01">
+          <!-- Configuration parameters will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ACDNR filter -->
+    <div class="processing-row">
+      <div class="processing-section">
+        <h2>Step 2: ACDNR filter</h2>
+        <div class="image-wrapper">
+          <img id="pipeline-acdnr" src="" alt="ACDNR filter" style="width: 100%; height: auto; border-radius: 0.3rem;" />
+          <div class="loading-indicator" id="loading-acdnr">Loading...</div>
+        </div>
+      </div>
+      <div class="metadata-section">
+        <h2>ACDNR filter</h2>
+        <div class="config-params" id="config-acdnr">
+          <!-- Configuration parameters will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Adjust blackpoint -->
+    <div class="processing-row">
+      <div class="processing-section">
+        <h2>Step 3: Adjust blackpoint</h2>
+        <div class="image-wrapper">
+          <img id="pipeline-move-blackpoint" src="" alt="Adjust blackpoint" style="width: 100%; height: auto; border-radius: 0.3rem;" />
+          <div class="loading-indicator" id="loading-move-blackpoint">Loading...</div>
+        </div>
+      </div>
+      <div class="metadata-section">
+        <h2>Adjust blackpoint</h2>
+        <div class="config-params" id="config-move-blackpoint">
+          <!-- Configuration parameters will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Gamma correction -->
+    <div class="processing-row">
+      <div class="processing-section">
+        <h2>Step 4: Gamma correction</h2>
+        <div class="image-wrapper">
+          <img id="pipeline-gamma" src="" alt="Gamma correction" style="width: 100%; height: auto; border-radius: 0.3rem;" />
+          <div class="loading-indicator" id="loading-gamma">Loading...</div>
+        </div>
+      </div>
+      <div class="metadata-section">
+        <h2>Gamma correction</h2>
+        <div class="config-params" id="config-gamma">
+          <!-- Configuration parameters will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Saturation -->
+    <div class="processing-row">
+      <div class="processing-section">
+        <h2>Step 5: Saturation</h2>
+        <div class="image-wrapper">
+          <img id="pipeline-saturation" src="" alt="Saturation" style="width: 100%; height: auto; border-radius: 0.3rem;" />
+          <div class="loading-indicator" id="loading-saturation">Loading...</div>
+        </div>
+      </div>
+      <div class="metadata-section">
+        <h2>Saturation</h2>
+        <div class="config-params" id="config-saturation">
+          <!-- Configuration parameters will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Dehaze filter -->
+    <div class="processing-row">
+      <div class="processing-section">
+        <h2>Step 6: Dehaze filter</h2>
+        <div class="image-wrapper">
+          <div class="dehaze-images">
+            <img id="pipeline-dehaze" src="" alt="Dehaze filter" style="width: 100%; height: auto; border-radius: 0.3rem;" />
+          </div>
+          <div class="loading-indicator" id="loading-dehaze">Loading...</div>
+        </div>
+      </div>
+      <div class="metadata-section">
+        <h2>Dehaze filter</h2>
+        <div class="config-params" id="config-dehaze">
+          <!-- Configuration parameters will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Clarity filter -->
+    <div class="processing-row">
+      <div class="processing-section">
+        <h2>Step 7: Clarity filter</h2>
+        <div class="image-wrapper">
+          <img id="pipeline-clarity" src="" alt="Clarity filter" style="width: 100%; height: auto; border-radius: 0.3rem;" />
+          <div class="loading-indicator" id="loading-clarity">Loading...</div>
+        </div>
+      </div>
+      <div class="metadata-section">
+        <h2>Clarity filter</h2>
+        <div class="config-params" id="config-clarity">
+          <!-- Configuration parameters will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Local histogram normalization -->
+    <div class="processing-row">
+      <div class="processing-section">
+        <h2>Step 8: Local histogram normalization</h2>
+        <div class="image-wrapper">
+          <img id="pipeline-lhn" src="" alt="Local histogram normalization" style="width: 100%; height: auto; border-radius: 0.3rem;" />
+          <div class="loading-indicator" id="loading-lhn">Loading...</div>
+        </div>
+      </div>
+      <div class="metadata-section">
+        <h2>Local histogram normalization</h2>
+        <div class="config-params" id="config-lhn">
+          <!-- Configuration parameters will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- SCNR filter -->
+    <div class="processing-row">
+      <div class="processing-section">
+        <h2>Step 9: SCNR filter</h2>
+        <div class="image-wrapper">
+          <img id="pipeline-scnr" src="" alt="SCNR filter" style="width: 100%; height: auto; border-radius: 0.3rem;" />
+          <div class="loading-indicator" id="loading-scnr">Loading...</div>
+        </div>
+      </div>
+      <div class="metadata-section">
+        <h2>SCNR filter</h2>
+        <div class="config-params" id="config-scnr">
+          <!-- Configuration parameters will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Final image -->
+    <div class="processing-row">
+      <div class="processing-section">
+        <h2>Step 99: Final image</h2>
+        <div class="image-wrapper">
+          <img id="pipeline-99" src="" alt="Final image" style="width: 100%; height: auto; border-radius: 0.3rem;" />
+          <div class="loading-indicator" id="loading-99">Loading...</div>
+        </div>
+      </div>
+      <div class="metadata-section">
+        <h2>Final image</h2>
+        <div class="config-params" id="config-99">
+          <!-- Configuration parameters will be loaded here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer id="footer"></footer>
+  <div style="text-align:center; width:100%;">Copyright (c) 2025 Sven Kreiensen</div>
+
+  <style>
+    .processing-row {
+      display: flex;
+      flex-direction: row;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .processing-section {
+      flex: 7;
+      background: #222;
+      padding: 1rem;
+      border-radius: 0.5rem;
+    }
+
+    .metadata-section {
+      flex: 3;
+      background: #222;
+      padding: 1rem;
+      border-radius: 0.5rem;
+    }
+
+    .processing-section h2,
+    .metadata-section h2 {
+      font-size: 1rem;
+      border-bottom: 1px solid #444;
+      padding-bottom: 0.2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .image-wrapper {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+    }
+
+    .dehaze-images {
+      display: flex;
+      width: 100%;
+      justify-content: space-between;
+    }
+
+    .loading-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #aaa;
+      font-size: 0.9rem;
+    }
+
+    .config-params {
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: #ccc;
+    }
+
+    .config-param {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.2rem;
+    }
+
+    @media (max-width: 800px) {
+      .processing-row {
+        flex-direction: column;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+      
+      .processing-section,
+      .metadata-section {
+        flex: none;
+      }
+    }
+  </style>
+
+  <script>
+    let loadingConfig = false;
+    let configData = null;
+
+    // Variables for pipeline-01 to pipeline-09
+    let pipeline01 = {
+      name: 'HDR multiscale fusion',
+      params: [
+        { name: 'hdr', description: 'HDR enabled' },
+        { name: 'hdr_clipping_threshold', description: 'HDR Clipping Threshold' },
+        { name: 'hdr_y_max_expected', description: 'HDR Y Max Expected' },
+        { name: 'hdr_chroma_mode', description: 'HDR Chromatik-Modus' },
+        { name: 'hdr_contrast_weight_strength', description: 'HDR Kontrast-Gewichtung' },
+        { name: 'hdr_pyramid_levels_override', description: 'HDR Pyramid Levels Override' }
+      ]
+    };
+    let pipeline_acdnr = {
+      name: 'ACDNR filter',
+      params: [
+        { name: 'acdnr_filter', description: 'ACDNR aktiviert' },
+        { name: 'acdnr_filter_lum_stddev', description: 'ACDNR Luminanz-Standardabweichung' },
+        { name: 'acdnr_filter_lum_amount', description: 'ACDNR Luminanz-Menge' },
+        { name: 'acdnr_filter_lum_iterations', description: 'ACDNR Luminanz-Iterationen' },
+        { name: 'acdnr_filter_lum_kernel_size', description: 'ACDNR Luminanz-Kernel Größe' },
+        { name: 'acdnr_filter_chrom_stddev', description: 'ACDNR Chromatik-Standardabweichung' },
+        { name: 'acdnr_filter_chrom_amount', description: 'ACDNR Chromatik-Menge' },
+        { name: 'acdnr_filter_chrom_iterations', description: 'ACDNR Chromatik-Iterationen' },
+        { name: 'acdnr_filter_chrom_kernel_size', description: 'ACDNR Chromatik-Kernel Größe' }      ]
+    };
+    let pipeline_move_blackpoint = {
+      name: 'Adjust blackpoint',
+      params: [
+        { name: 'daytime_move_blackpoint', description: 'Blackpoint Daytime' },
+        { name: 'nighttime_move_blackpoint', description: 'Blackpoint Nighttime' }
+      ]
+    };
+    let pipeline_gamma = {
+      name: 'Gamma correction',
+      params: [
+        { name: 'gamma', description: 'Gamma Wert' }
+      ]
+    };
+    let pipeline_saturation = {
+      name: 'Saturation',
+      params: [
+        { name: 'saturation', description: 'Sättigung Wert' }
+      ]
+    };
+    let pipeline_dehaze = {
+      name: 'Dehaze filter',
+      params: [
+        { name: 'dehaze_amount', description: 'Dehaze Stärke' },
+        { name: 'dehaze_estimate', description: 'Dehaze Schätzung' },
+        { name: 'dehaze_gamma', description: 'Dehaze Gamma' },
+        { name: 'dehaze_saturation', description: 'Dehaze Sättigung' }
+      ]
+    };    
+    let pipeline_clarity = {
+      name: 'Clarity filter',
+      params: [
+        { name: 'clarity_filter', description: 'Clarity aktiviert' },
+        { name: 'clarity_filter_strength', description: 'Clarity Stärke' },
+        { name: 'clarity_filter_radius', description: 'Clarity Radius' },
+        { name: 'clarity_filter_midtone_width', description: 'Clarity Midtone Width' },
+        { name: 'clarity_filter_preserve_highlights', description: 'Clarity Preserve Highlights' },
+        { name: 'clarity_filter_mask_mode', description: 'Clarity Mask Mode' }
+      ]
+    };
+    let pipeline_lhn = {
+      name: 'Local histogram normalization',
+      params: [
+        { name: 'local_histogram_normalization', description: 'Local Histogram Normalization aktiviert' },
+        { name: 'local_histogram_normalization_strength', description: 'Local Histogram Normalization Stärke' },
+        { name: 'local_histogram_normalization_radius', description: 'Local Histogram Normalization Radius' }
+      ]
+    };
+    let pipeline_scnr = {
+      name: 'SCNR filter',  
+      params: [
+        { name: 'scnr_filter', description: 'SCNR aktiviert' },
+        { name: 'scnr_filter_amount', description: 'SCNR Stärke' }      ]
+    };
+    let pipeline99 = {
+      name: 'Final image',
+      params: [
+        { name: 'png_output', description: 'Ausgabeformat' },
+        { name: 'png_compression', description: 'Ausgabequalität' },
+        { name: 'jpeg_quality', description: 'Ausgabequalität' }
+      ]
+    };
+
+    // Pipeline image configuration
+    const pipelineImages = [
+      { id: 'pipeline-01', path: '/images/pipeline_801.png', loadingId: 'loading-01', configId: 'config-01' },
+      { id: 'pipeline-acdnr', path: '/images/pipeline_802.png', loadingId: 'loading-acdnr', configId: 'config-acdnr' },
+      { id: 'pipeline-move-blackpoint', path: '/images/pipeline_803.png', loadingId: 'loading-move-blackpoint', configId: 'config-move-blackpoint' },
+      { id: 'pipeline-gamma', path: '/images/pipeline_804.png', loadingId: 'loading-gamma', configId: 'config-gamma' },
+      { id: 'pipeline-saturation', path: '/images/pipeline_805.png', loadingId: 'loading-saturation', configId: 'config-saturation' },
+      { id: 'pipeline-dehaze', path: '/images/pipeline_806.png', loadingId: 'loading-dehaze', configId: 'config-dehaze' },
+      { id: 'pipeline-clarity', path: '/images/pipeline_807.png', loadingId: 'loading-clarity', configId: 'config-clarity' },
+      { id: 'pipeline-lhn', path: '/images/pipeline_808.png', loadingId: 'loading-lhn', configId: 'config-lhn' },
+      { id: 'pipeline-scnr', path: '/images/pipeline_809.png', loadingId: 'loading-scnr', configId: 'config-scnr' },
+      { id: 'pipeline-99', path: '/images/pipeline_99.png', loadingId: 'loading-99', configId: 'config-99' }
+    ];
+
+    // Array with all pipeline configurations
+    const pipelineConfigs = [
+      pipeline01, pipeline_acdnr, pipeline_move_blackpoint, pipeline_gamma, pipeline_saturation, 
+      pipeline_dehaze, pipeline_clarity, pipeline_lhn, pipeline_scnr, pipeline99
+    ];
+
+    async function loadConfig() {
+      if (loadingConfig) return;
+      loadingConfig = true;
+
+      try {
+        configData = await fetchConfig();
+        if (configData) {
+          updateConfigDisplays();
+        }
+      } catch (error) {
+        console.error('Error loading config:', error);
+      }
+
+      loadingConfig = false;
+    }
+
+    function updateConfigDisplays() {
+      if (!configData) return;
+
+      // Update config displays for each processing step
+      pipelineConfigs.forEach((pipeline, index) => {
+        // Determine the config-ID based on the index
+        let configElementId = '';
+        if (index === 0) { // pipeline01 (HDR multiscale fusion)
+          configElementId = 'config-01';
+        } else if (index === 1) { // pipeline_acdnr (ACDNR filter)
+          configElementId = 'config-acdnr';
+        } else if (index === 2) { // pipeline_move_blackpoint (Adjust blackpoint)
+          configElementId = 'config-move-blackpoint';
+        } else if (index === 3) { // pipeline_gamma (Gamma correction)
+          configElementId = 'config-gamma';
+        } else if (index === 4) { // pipeline_saturation (Saturation)
+          configElementId = 'config-saturation';
+        } else if (index === 5) { // pipeline_dehaze (Dehaze filter)
+          configElementId = 'config-dehaze';
+        } else if (index === 6) { // pipeline_clarity (Clarity filter)
+          configElementId = 'config-clarity';
+        } else if (index === 7) { // pipeline_lhn (Local histogram normalization)
+          configElementId = 'config-lhn';
+        } else if (index === 8) { // pipeline_scnr (SCNR filter)
+          configElementId = 'config-scnr';
+        } else if (index === 9) { // pipeline99 (Final image)
+          configElementId = 'config-99';
+        } else {
+          configElementId = 'config-' + (index + 1);
+        }
+        
+        const element = document.getElementById(configElementId);
+        if (element) {
+          let html = '';
+          pipeline.params.forEach(param => {
+            const value = configData[param.name];
+            let displayValue = 'N/A';
+            
+            if (value !== undefined && value !== null) {
+              //  Prüfe ob der Wert eine Zahl ist
+              if (typeof value === 'number') {
+                // If it is an integer, show it without decimal places
+                if (Number.isInteger(value)) {
+                  displayValue = value.toString();
+                } else {
+                  // Show float values with 2-4 decimal places
+                  displayValue = value.toFixed(4).replace(/\.?0+$/, '');
+                }
+              } else if (typeof value === 'boolean') {
+                displayValue = value ? 'Ja' : 'Nein';
+              } else {
+                displayValue = value.toString();
+              }
+            }
+            
+            html += `
+              <div class="config-param">
+                <span class="config-param-name">${param.description}:</span>
+                <span class="config-param-value">${displayValue}</span>
+              </div>
+            `;
+          });
+          element.innerHTML = html;
+        }
+      });
+    }
+
+    async function loadPipelineImage(imageConfig) {
+      const img = document.getElementById(imageConfig.id);
+      const loading = document.getElementById(imageConfig.loadingId);
+      
+      if (!img || !loading) return;
+
+      try {
+        loading.style.display = 'block';
+        
+        // Load image asynchronously
+        const response = await fetch(imageConfig.path, { cache: "no-cache" });
+        if (response.ok) {
+          img.src = imageConfig.path;
+          img.onload = () => {
+            loading.style.display = 'none';
+          };
+          img.onerror = () => {
+            loading.textContent = 'Error loading image';
+            loading.style.color = '#ff4444';
+          };
+        } else {
+          loading.textContent = 'Image not found';
+          loading.style.color = '#ff4444';
+        }
+      } catch (error) {
+        console.error(`Error loading image ${imageConfig.path}:`, error);
+        loading.textContent = 'Error loading image';
+        loading.style.color = '#ff4444';
+      }
+    }
+
+    async function loadAllPipelineImages() {
+      // Load all images asynchronously
+      const loadPromises = pipelineImages.map(imageConfig => loadPipelineImage(imageConfig));
+      await Promise.allSettled(loadPromises);
+    }
+
+    // Initial start
+    loadConfig();
+    loadAllPipelineImages();
+  </script>
+
+  <footer id="footer">
+    <div class="copyright">Copyright (c) 2025 Sven Kreiensen</div>
+  </footer>
+</body>
+
+</html>

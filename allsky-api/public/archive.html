@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Allsky360 Archive</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  
+  <link rel="manifest" href="manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Allsky360 Archive">
+  <meta name="theme-color" content="#111111" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="stylesheet" href="style.css">
+  <script src="js/allsky-common.js"></script>
+</head>
+
+<body>
+  <div id="header">
+    <div class="title-icon">
+      <img src="allsky360_256x256.png" alt="Allsky Icon" width="32" height="32" />
+      <h1>Allsky360 Archive</h1>
+    </div>
+    <!-- Hamburger Menu Button -->
+    <button id="hamburger-menu-btn" class="hamburger-menu-btn" onclick="toggleHamburgerMenu()">
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+    </button>
+    
+    <!-- Navigation Menu -->
+    <nav id="nav-menu" class="nav-menu">
+      <ul class="nav-list">
+        <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+        <li><a href="archive.html" class="nav-link">Archive</a></li>
+        <li><a href="videos.html" class="nav-link">Videos</a></li>
+        <li><a href="graphs.html" class="nav-link">Graphs</a></li>
+        <li><a href="meteo.html" class="nav-link">Weather</a></li>
+        <li><a href="aurora.html" class="nav-link">Aurora</a></li>
+        <li><a href="config.html" class="nav-link">Config</a></li>
+        <li><a href="calibration.html" class="nav-link">Calibration</a></li>
+        <li><a href="processing.html" class="nav-link">Processing</a></li>
+      </ul>
+    </nav>
+  </div>
+  <div id="subheader">
+    <div class="settings-group">
+      <label style="align-items: center; gap: 0.3rem;">
+        Select date:
+        <input type="date" id="datePicker">
+      </label>
+      <label style="align-items: center; gap: 0.3rem;">
+        Select time:
+        <input type="time" id="timePicker" step="1">
+      </label>
+      <label style="align-items: center; gap: 0.3rem;">
+        Time range:
+        <select id="timeRangeSelect">
+          <option value="6">Last 6 hours</option>
+          <option value="12">Last 12 hours</option>
+          <option value="24">Last 24 hours</option>
+        </select>
+      </label>
+      <label style="align-items: center; gap: 0.3rem;">
+        Order:
+        <select id="orderSelect">
+          <option value="descending">Descending</option>
+          <option value="ascending">Ascending</option>
+        </select>
+      </label>
+      <label style="align-items: center; gap: 0.3rem;">
+        Image Type:
+        <select id="imageType">
+          <option value="image">Image</option>
+          <option value="video">Video</option>
+        </select>
+      </label>
+    </div>
+  </div>
+  <div id="subheader-additional">
+    <div class="settings-group">
+      <label style="font-weight: bold; margin-right: 1rem;">Additional filters:</label>
+      <label style="align-items: center; gap: 0.3rem;">
+        Capture mode:
+        <select id="nightModeSelect">
+          <option value="">Night and Day</option>
+          <option value="1">Night</option>
+          <option value="0">Day</option>
+        </select>
+      </label>
+      <label style="align-items: center; gap: 0.3rem;">
+        Moon altitude (°):
+        <input type="number" id="moonAltitudeMin" placeholder="Min" step="0.1" style="width: 80px;">
+        <input type="number" id="moonAltitudeMax" placeholder="Max" step="0.1" style="width: 80px;">
+      </label>
+      <label style="align-items: center; gap: 0.3rem;">
+        SQM:
+        <input type="number" id="sqmMin" placeholder="Min" step="0.1" style="width: 80px;">
+        <input type="number" id="sqmMax" placeholder="Max" step="0.1" style="width: 80px;">
+      </label>
+      <label style="align-items: center; gap: 0.3rem;">
+        Stars:
+        <input type="number" id="starsMin" placeholder="Min" step="1" style="width: 80px;">
+        <input type="number" id="starsMax" placeholder="Max" step="1" style="width: 80px;">
+      </label>
+    </div>
+  </div>
+
+  <div id="container">
+    <div id="image-container">
+      <div id="gallery" class="exposure-gallery">
+        <!-- Thumbnails will appear here -->
+      </div>
+    </div>
+    <div id="metadata">Select a date and time to view archived images.</div>
+  </div>
+
+  <script>
+    let loadingConfig = false;
+    let longitude = 0.0;
+    let latitude = 0.0;
+    let altitude = 0;
+
+    async function loadConfig() {
+      if (loadingConfig) return;  // Verhindert parallele Ladeversuche
+      loadingConfig = true;
+
+      const configPath = `api/config`;
+      let configData = null;
+      try {
+        const configResp = await fetch(configPath, { cache: "no-cache" });
+        configData = await configResp.json();
+      } catch (e) {
+        console.warn("⚠️ config not found:", configPath);
+        loadingConfig = false;
+      }
+
+      latitude = configData.latitude;
+      longitude = configData.longitude;
+      altitude = configData.altitude;
+      loadingConfig = false;
+    }
+
+    // Convert Date object to YYYYMMDDhhmmss format (UTC)
+    function formatDateTimeString(date) {
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(date.getUTCDate()).padStart(2, '0');
+      const hour = String(date.getUTCHours()).padStart(2, '0');
+      const minute = String(date.getUTCMinutes()).padStart(2, '0');
+      const second = String(date.getUTCSeconds()).padStart(2, '0');
+      return `${year}${month}${day}${hour}${minute}${second}`;
+    }
+
+    // Convert Unix timestamp to YYYYMMDDhhmmss format
+    function timestampToDateTimeString(timestamp) {
+      const date = new Date(timestamp * 1000);
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(date.getUTCDate()).padStart(2, '0');
+      const hour = String(date.getUTCHours()).padStart(2, '0');
+      const minute = String(date.getUTCMinutes()).padStart(2, '0');
+      const second = String(date.getUTCSeconds()).padStart(2, '0');
+      return `${year}${month}${day}${hour}${minute}${second}`;
+    }
+
+    async function loadThumbnails() {
+      const dateInput = document.getElementById("datePicker").value;
+      const timeInput = document.getElementById("timePicker").value;
+      const timeRange = parseInt(document.getElementById("timeRangeSelect").value);
+      const order = document.getElementById("orderSelect").value;
+      const imageType = document.getElementById("imageType").value;
+      const nightMode = document.getElementById("nightModeSelect").value;
+      const moonAltitudeMin = document.getElementById("moonAltitudeMin").value;
+      const moonAltitudeMax = document.getElementById("moonAltitudeMax").value;
+      const sqmMin = document.getElementById("sqmMin").value;
+      const sqmMax = document.getElementById("sqmMax").value;
+      const starsMin = document.getElementById("starsMin").value;
+      const starsMax = document.getElementById("starsMax").value;
+
+      if (!dateInput || !timeInput) {
+        document.getElementById("metadata").textContent = "Please select a valid date and time.";
+        return;
+      }
+
+      // Parse date and time
+      const [year, month, day] = dateInput.split('-').map(Number);
+      const timeParts = timeInput.split(':');
+      const hours = parseInt(timeParts[0] || 0, 10);
+      const minutes = parseInt(timeParts[1] || 0, 10);
+      const seconds = parseInt(timeParts[2] || 0, 10);
+      
+      const endDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
+      
+      // Calculate start date (end - timeRange hours)
+      const startDate = new Date(endDate);
+      startDate.setUTCHours(startDate.getUTCHours() - timeRange);
+
+      // Format as YYYYMMDDhhmmss
+      const endStr = formatDateTimeString(endDate);
+      const startStr = formatDateTimeString(startDate);
+
+      // Build API URL with filters
+      let apiUrl = `/api/history?start=${startStr}&end=${endStr}`;
+      
+      if (nightMode !== '') {
+        apiUrl += `&night_mode=${nightMode}`;
+      }
+
+      if (sqmMin !== '') {
+        apiUrl += `&sqm_min=${sqmMin}`;
+      }
+
+      if (sqmMax !== '') {
+        apiUrl += `&sqm_max=${sqmMax}`;
+      }
+
+      if (starsMin !== '') {
+        apiUrl += `&stars_min=${starsMin}`;
+      }
+
+      if (starsMax !== '') {
+        apiUrl += `&stars_max=${starsMax}`;
+      }
+
+      // Note: moon_altitude filter is not yet implemented in the API
+      // as it requires the column in the database. This is prepared for future use.
+      // if (moonAltitudeMin !== '') {
+      //   apiUrl += `&moon_altitude_min=${moonAltitudeMin}`;
+      // }
+      // if (moonAltitudeMax !== '') {
+      //   apiUrl += `&moon_altitude_max=${moonAltitudeMax}`;
+      // }
+
+      const gallery = document.getElementById("gallery");
+      const metadata = document.getElementById("metadata");
+
+      metadata.textContent = "Loading thumbnails...";
+      gallery.innerHTML = "";
+
+      try {
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const results = await response.json();
+        
+        if (!Array.isArray(results) || results.length === 0) {
+          metadata.textContent = "No images found for the selected criteria.";
+          return;
+        }
+
+        // Sort results by timestamp
+        let sortedResults = [...results];
+        if (order === 'descending') {
+          sortedResults.reverse();
+        }
+
+        // Filter by moon altitude if specified (client-side for now)
+        let filteredResults = sortedResults;
+        if (moonAltitudeMin !== '' || moonAltitudeMax !== '') {
+          // We need to fetch metadata for each timestamp to filter by moon_altitude
+          // This is a workaround until moon_altitude is in the database
+          const minAlt = moonAltitudeMin !== '' ? parseFloat(moonAltitudeMin) : -90;
+          const maxAlt = moonAltitudeMax !== '' ? parseFloat(moonAltitudeMax) : 90;
+          
+          metadata.textContent = `Loading thumbnails... (filtering by moon altitude: ${filteredResults.length} images)`;
+          
+          // Fetch metadata in parallel for better performance
+          const metadataPromises = sortedResults.map(async (result) => {
+            const timestamp = result.timestamp;
+            const timestampStr = timestampToDateTimeString(timestamp);
+            const yyyymmdd = timestampStr.substring(0, 8);
+            const metaUrl = imageType === 'video' 
+              ? `videos/${yyyymmdd}/video-${timestampStr}.json`
+              : `images/${yyyymmdd}/image-${timestampStr}.json`;
+            
+            try {
+              const metaResp = await fetch(metaUrl);
+              if (metaResp.ok) {
+                const meta = await metaResp.json();
+                if (meta.moon_altitude !== undefined) {
+                  if (meta.moon_altitude >= minAlt && meta.moon_altitude <= maxAlt) {
+                    return { ...result, include: true };
+                  } else {
+                    return { ...result, include: false };
+                  }
+                } else {
+                  // If moon_altitude is not available, include it anyway
+                  return { ...result, include: true };
+                }
+              } else {
+                // If metadata not found, include it anyway
+                return { ...result, include: true };
+              }
+            } catch (e) {
+              // If error fetching metadata, include it anyway
+              return { ...result, include: true };
+            }
+          });
+          
+          const filterResults = await Promise.all(metadataPromises);
+          filteredResults = filterResults.filter(r => r.include);
+        }
+
+        if (filteredResults.length === 0) {
+          metadata.textContent = "No images found matching the moon altitude criteria.";
+          return;
+        }
+
+        let currentHour = null;
+
+        filteredResults.forEach(result => {
+          const timestamp = result.timestamp;
+          const timezoneOffset = result.timezone_offset || 0;
+          const timestampStr = timestampToDateTimeString(timestamp);
+          const yyyymmdd = timestampStr.substring(0, 8);
+          
+          // Calculate local hour with timezone offset
+          const localTimestamp = timestamp + timezoneOffset;
+          const localDate = new Date(localTimestamp * 1000);
+          const localHour = String(localDate.getUTCHours()).padStart(2, '0');
+          
+          if (localHour !== currentHour) {
+            currentHour = localHour;
+            const separator = document.createElement("div");
+            separator.style.width = "100%";
+            separator.style.borderTop = "1px solid #444";
+            separator.style.margin = "0.5rem 0";
+            separator.style.paddingTop = "0.2rem";
+            separator.textContent = `${localHour}:00`;
+            separator.style.color = "#888";
+            separator.style.fontSize = "0.8rem";
+            gallery.appendChild(separator);
+          }
+
+          const imgPath = imageType === 'video' 
+            ? `videos/${yyyymmdd}/thumbnails/video-${timestampStr}.jpg`
+            : `images/${yyyymmdd}/thumbnails/image-${timestampStr}.jpg`;
+          const img = document.createElement("img");
+          img.src = imgPath;
+          img.alt = `Image ${timestampStr}`;
+          img.title = timestampStr;
+          img.style.width = "100px";
+
+          img.addEventListener("mouseenter", async () => {
+            const metaUrl = imageType === 'video' 
+              ? `videos/${yyyymmdd}/video-${timestampStr}.json`
+              : `images/${yyyymmdd}/image-${timestampStr}.json`;
+
+            let html = "";
+
+            try {
+              const resp = await fetch(metaUrl);
+              if (resp.ok) {
+                const m = await resp.json();
+                html += `
+              <div class="metadata-section">
+                <h2>Image data</h2>
+                <b>Timestamp:</b> ${formatTimestamp(m.timestamp)}<br>
+                <b>Exposure t0 (s):</b> ${m.exposure_t0.toFixed(5)}<br>
+                <b>Exposure t1 (s):</b> ${m.exposure_t1.toFixed(5)}<br>
+                <b>Exposure t2 (s):</b> ${m.exposure_t2.toFixed(5)}<br>
+                <b>Exposure t3 (s):</b> ${m.exposure_t3.toFixed(5)}<br>
+                <b>Exposure t4 (s):</b> ${m.exposure_t4.toFixed(5)}<br>
+                <b>Gain:</b> ${m.gain.toFixed(1)}<br>
+                <b>Sensor temperature (°C):</b> ${m.sensor_temperature.toFixed(1)}<br>
+                <b>Brightness:</b> ${m.mean_brightness.toFixed(2)} -> ${m.target_brightness.toFixed(2)}<br>
+                <b>Capture interval (s):</b> ${m.capture_interval}<br>
+                <b>Night mode:</b> ${m.night_mode}<br>
+                <b>HDR:</b> ${m.hdr}<br>
+              </div>
+              <div class="metadata-section">
+                <h2>Environment</h2>
+                <b>Moon phase (%):</b> ${m.moon_phase_percentage.toFixed(1)}<br>
+                <b>Moon altitude (°):</b> ${m.moon_altitude.toFixed(1)}<br>
+                <b>Sun altitude (°):</b> ${m.sun_altitude.toFixed(1)}<br>
+              </div>`;
+              }
+            } catch (e) {
+              // silently fail
+            }
+
+            metadata.innerHTML = html;
+          });
+
+          img.addEventListener("mouseleave", () => {
+            metadata.textContent = '';
+          });
+
+          img.addEventListener("click", () => {
+            const originalPath = imageType === 'video' 
+              ? `videos/night_${yyyymmdd}.mp4`
+              : `images/${yyyymmdd}/${imageType}-${timestampStr}.jpg`;
+            window.open(originalPath, "_blank");
+          });
+
+          gallery.appendChild(img);
+        });
+
+        metadata.textContent = '';
+      } catch (err) {
+        console.error("Error loading thumbnails:", err);
+        metadata.textContent = "Error loading data. Please check your selection.";
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const datePicker = document.getElementById("datePicker");
+      const timePicker = document.getElementById("timePicker");
+      const timeRangeSelect = document.getElementById("timeRangeSelect");
+      const orderSelect = document.getElementById("orderSelect");
+      const imageType = document.getElementById("imageType");
+      const nightModeSelect = document.getElementById("nightModeSelect");
+      const moonAltitudeMin = document.getElementById("moonAltitudeMin");
+      const moonAltitudeMax = document.getElementById("moonAltitudeMax");
+      const sqmMin = document.getElementById("sqmMin");
+      const sqmMax = document.getElementById("sqmMax");
+      const starsMin = document.getElementById("starsMin");
+      const starsMax = document.getElementById("starsMax");
+
+      // Set default values
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+      const currentTime = now.toTimeString().slice(0, 8);
+      datePicker.value = today;
+      timePicker.value = currentTime;
+
+      // Add event listeners
+      datePicker.addEventListener("change", loadThumbnails);
+      timePicker.addEventListener("change", loadThumbnails);
+      timeRangeSelect.addEventListener("change", loadThumbnails);
+      orderSelect.addEventListener("change", loadThumbnails);
+      imageType.addEventListener("change", loadThumbnails);
+      nightModeSelect.addEventListener("change", loadThumbnails);
+      moonAltitudeMin.addEventListener("change", loadThumbnails);
+      moonAltitudeMax.addEventListener("change", loadThumbnails);
+      sqmMin.addEventListener("change", loadThumbnails);
+      sqmMax.addEventListener("change", loadThumbnails);
+      starsMin.addEventListener("change", loadThumbnails);
+      starsMax.addEventListener("change", loadThumbnails);
+
+      // Initialer Start
+      loadConfig().then(() => {
+        loadThumbnails();
+      });
+    });
+  </script>
+
+  <footer id="footer">
+    <div class="copyright">Copyright (c) 2025 Sven Kreiensen</div>
+  </footer>
+</body>
+
+</html>
+

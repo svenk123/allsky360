@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Allsky360 Statistics</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Allsky360 Stats">
+  <meta name="theme-color" content="#111111" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="stylesheet" href="style.css">
+  <!-- Gridstack CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@9.2.2/dist/gridstack.min.css">
+  
+  <script src="js/allsky-common.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0/dist/chartjs-plugin-annotation.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
+  <!-- Gridstack JS (IIFE bundle: core + HTML5 drag&drop) -->
+  <script src="https://cdn.jsdelivr.net/npm/gridstack@9.2.2/dist/gridstack-all.js" defer></script>
+</head>
+
+<body>
+  <div id="header">
+    <div class="title-icon">
+      <img src="allsky360_256x256.png" alt="Allsky Icon" width="32" height="32" />
+      <h1>Allsky360 Statistics</h1>
+    </div>
+    <!-- Hamburger Menu Button -->
+    <button id="hamburger-menu-btn" class="hamburger-menu-btn" onclick="toggleHamburgerMenu()">
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+    </button>
+    
+    <!-- Navigation Menu -->
+    <nav id="nav-menu" class="nav-menu">
+      <ul class="nav-list">
+        <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+        <li><a href="archive.html" class="nav-link">Archive</a></li>
+        <li><a href="videos.html" class="nav-link">Videos</a></li>
+        <li><a href="graphs.html" class="nav-link">Graphs</a></li>
+        <li><a href="meteo.html" class="nav-link">Weather</a></li>
+        <li><a href="aurora.html" class="nav-link">Aurora</a></li>
+        <li><a href="config.html" class="nav-link">Config</a></li>
+        <li><a href="calibration.html" class="nav-link">Calibration</a></li>
+        <li><a href="processing.html" class="nav-link">Processing</a></li>
+      </ul>
+    </nav>
+  </div>
+  <div id="subheader">
+    <div class="settings-group">
+      <label style="display: flex; align-items: center; gap: 0.3rem;">
+        Select date:
+        <input type="date" id="datePicker">
+      </label>
+    </div>
+  </div>
+
+  <!-- Grid Layout -->
+  <div class="grid-stack" id="graphs-grid" style="margin: 8px;">
+
+    <!-- Exposure Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-exposure" gs-x="0" gs-y="0" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartExposure"></canvas>
+      </div>
+    </div>
+
+    <!-- Gain Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-gain" gs-x="6" gs-y="0" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartGain"></canvas>
+      </div>
+    </div>
+
+    <!-- Noise Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-noise" gs-x="0" gs-y="3" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartNoise"></canvas>
+      </div>
+    </div>
+
+    <!-- SQM Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-sqm" gs-x="6" gs-y="3" gs-w="3" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartSQM"></canvas>
+      </div>
+    </div>
+
+    <!-- Stars Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-stars" gs-x="9" gs-y="3" gs-w="3" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartStars"></canvas>
+      </div>
+    </div>
+
+    <!-- HDR Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-hdr" gs-x="0" gs-y="6" gs-w="4" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartHDR"></canvas>
+      </div>
+    </div>
+
+    <!-- Focus Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-focus" gs-x="4" gs-y="6" gs-w="4" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartFocus"></canvas>
+      </div>
+    </div>
+
+    <!-- Brightness Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-brightness" gs-x="8" gs-y="6" gs-w="4" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartBrightness"></canvas>
+      </div>
+    </div>
+
+    <!-- Mean Brightness RGB Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-mean-brightness-rgb" gs-x="0" gs-y="9" gs-w="12" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartMeanBrightnessRGB"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <footer id="footer">
+    <div style="text-align:center; width:100%;">Copyright (c) 2025 Sven Kreiensen</div>
+    <button id="toggle-grid-btn" style="position:absolute; right:120px;" title="Widgets verschieben/vergrößern aktivieren/deaktivieren" onclick="toggleGridInteraction()">🔒 Locked</button>
+    <button id="reset-layout-btn" style="position:absolute; right:0;" title="Layout auf Standard zurücksetzen" onclick="resetGridLayout()">Reset layout</button>
+  </footer>
+
+  <script>
+    let captureIntervalSec = 60; // fallback
+    let countdown = 60;
+    let configLat = null;
+    let configLon = null;
+
+    async function loadConfig() {
+      try {
+        const res = await fetch("api/config");
+        if (res.ok) {
+          const config = await res.json();
+          if (typeof config.capture_interval === 'number') {
+            captureIntervalSec = config.capture_interval;
+          }
+          if (typeof config.latitude === 'number' && typeof config.longitude === 'number') {
+            configLat = config.latitude;
+            configLon = config.longitude;
+          }
+        }
+      } catch (e) {
+        console.warn("Using default values.");
+      }
+    }
+
+    let sunTimes = {};
+
+    function getStartOfDayISO(dateString) {
+      const start = new Date(`${dateString}T00:00:00Z`);
+      return start.toISOString();
+    }
+
+    function updateSunTimes(dateStr, latitude, longitude) {
+      const date = new Date(dateStr + "T12:00:00"); // sicherstellen, dass der Tag stimmt
+
+      const todayTimes = SunCalc.getTimes(date, latitude, longitude);
+      const tomorrow = new Date(date);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowTimes = SunCalc.getTimes(tomorrow, latitude, longitude);
+
+      sunTimes = {
+        startOfDay: getStartOfDayISO(dateStr),
+        dawnStart: todayTimes.nightEnd.toISOString(),
+        dawnEnd: todayTimes.sunrise.toISOString(),
+        duskStart: todayTimes.sunset.toISOString(),
+        duskEnd: todayTimes.night.toISOString(),
+        nextDawnStart: tomorrowTimes.nightEnd.toISOString()
+      };
+
+      /*
+        console.log("Longitude: ", longitude);
+        console.log("Latitude: ", latitude);
+      */
+    }
+
+    const charts = {};
+
+    const backgroundSunPlugin = {
+      id: 'backgroundSun',
+      beforeDatasetsDraw(chart, args, options) {
+        if (!options || !options.periods) return;
+
+        const { ctx, chartArea: area, scales } = chart;
+
+        ctx.save();
+
+        for (const period of options.periods) {
+          const xMin = scales.x.getPixelForValue(new Date(period.start));
+          const xMax = scales.x.getPixelForValue(new Date(period.end));
+          ctx.fillStyle = period.color;
+          ctx.fillRect(xMin, area.top, xMax - xMin, area.bottom - area.top);
+        }
+
+        ctx.restore();
+      }
+    };
+
+    function getBackgroundSunPeriods() {
+      return [
+        { start: sunTimes.startOfDay, end: sunTimes.dawnStart, color: 'rgba(0, 0, 100, 0.4)' },
+        { start: sunTimes.dawnStart, end: sunTimes.dawnEnd, color: 'rgba(128, 128, 128, 0.4)' },
+        { start: sunTimes.dawnEnd, end: sunTimes.duskStart, color: 'rgba(160, 190, 255, 0.4)' },
+        { start: sunTimes.duskStart, end: sunTimes.duskEnd, color: 'rgba(128, 128, 128, 0.4)' },
+        { start: sunTimes.duskEnd, end: sunTimes.nextDawnStart, color: 'rgba(0, 0, 100, 0.4)' }
+      ];
+    }
+
+    function createChart(ctxId, label, datasets, type = "line", showLegend = false, logScale = false) {
+      /*
+        console.log("Start of day: ", sunTimes.startOfDay);
+        console.log("Dawn start: ", sunTimes.dawnStart);
+        console.log("Dawn end: ", sunTimes.dawnEnd);
+        console.log("Dusk start: ", sunTimes.duskStart);
+        console.log("Dusk end: ", sunTimes.duskEnd);
+        console.log("Next dawn start: ", sunTimes.nextDawnStart);
+      */
+
+      const ctx = document.getElementById(ctxId).getContext('2d');
+      return new Chart(ctx, {
+        type,
+        data: {
+          labels: [],
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              type: 'time', time: {
+                unit: 'minute', tooltipFormat: 'HH:mm',
+                displayFormats: { hour: 'HH:mm', minute: 'HH:mm' }
+              },
+              ticks: { color: 'white' },
+              grid: { color: '#444' }
+            },
+            y: {
+              type: logScale ? 'logarithmic' : 'linear',
+              min: logScale ? 0.00001 : undefined,
+              beginAtZero: true,
+              ticks: {
+                color: 'white',
+                callback: function (v) {
+                  if (logScale) {
+                    return v.toFixed(6);
+                  } else {
+                    //        return Number.isInteger(v) ? v.toString() : v.toFixed(6);
+                    return v.toString();
+                  }
+                }
+              },
+              grid: { color: '#444' }
+            }
+          },
+          plugins: {
+            title: {
+              display: true,
+              text: label,
+              color: "#ffffff"
+            },
+            legend: { display: showLegend, labels: { color: 'white' } },
+            backgroundSun: {
+              periods: [
+                { start: sunTimes.startOfDay, end: sunTimes.dawnStart, color: 'rgba(0, 0, 100, 0.4)' },
+                { start: sunTimes.dawnStart, end: sunTimes.dawnEnd, color: 'rgba(128,128,128,0.4)' },
+                { start: sunTimes.dawnEnd, end: sunTimes.duskStart, color: 'rgba(160, 190, 255, 0.4)' },
+                { start: sunTimes.duskStart, end: sunTimes.duskEnd, color: 'rgba(128,128,128,0.4)' },
+                { start: sunTimes.duskEnd, end: sunTimes.nextDawnStart, color: 'rgba(0, 0, 100, 0.4)' }
+              ]
+            }
+          }
+        }
+      });
+    }
+
+    function updateCharts(data) {
+      const timestamps = data.map(p => new Date(p.timestamp * 1000));
+
+      charts.chartExposure.data.labels = timestamps;
+      charts.chartExposure.data.datasets[0].data = data.map(p => p.exposure);
+
+      charts.chartGain.data.labels = timestamps;
+      charts.chartGain.data.datasets[0].data = data.map(p => p.gain);
+
+      charts.chartNoise.data.labels = timestamps;
+      charts.chartNoise.data.datasets[0].data = data.map(p => p.noise);
+
+      charts.chartSQM.data.labels = timestamps;
+      charts.chartSQM.data.datasets[0].data = data.map(p => p.sqm);
+
+      charts.chartStars.data.labels = timestamps;
+      charts.chartStars.data.datasets[0].data = data.map(p => p.stars);
+
+      charts.chartFocus.data.labels = timestamps;
+      charts.chartFocus.data.datasets[0].data = data.map(p => p.focus);
+
+      charts.chartHDR.data.labels = timestamps;
+      charts.chartHDR.data.datasets[0].data = data.map(p => p.hdr);
+
+      charts.chartBrightness.data.labels = timestamps;
+      charts.chartBrightness.data.datasets[0].data = data.map(p => p.brightness);
+
+      charts.chartMeanBrightnessRGB.data.labels = timestamps;
+      charts.chartMeanBrightnessRGB.data.datasets[0].data = data.map(p => p.mean_r);
+      charts.chartMeanBrightnessRGB.data.datasets[1].data = data.map(p => p.mean_g);
+      charts.chartMeanBrightnessRGB.data.datasets[2].data = data.map(p => p.mean_b);
+
+      Object.values(charts).forEach(chart => chart.update());
+    }
+
+    function clearAllCharts() {
+      Object.values(charts).forEach(chart => {
+        chart.data.labels = [];
+        chart.data.datasets.forEach(ds => ds.data = []);
+        chart.update();
+      });
+    }
+
+    async function loadMeasurements() {
+      try {
+        const date = document.getElementById("datePicker").value;
+        const res = await fetch(`/api/image?date=${date}`);
+
+        if (res.status === 404) {
+          console.warn("No data for this date. Clearing charts.");
+          clearAllCharts();
+          return;
+        }
+
+        if (!res.ok) throw new Error("Fetch error");
+
+        const json = await res.json();
+        if (Array.isArray(json)) {
+          updateCharts(json);
+        } else {
+          clearAllCharts();
+        }
+      } catch (err) {
+        console.error("Failed to load measurement data:", err);
+        clearAllCharts();
+      }
+    }
+
+    async function init() {
+      const datePicker = document.getElementById("datePicker");
+      const today = new Date().toISOString().slice(0, 10);
+      datePicker.value = today;
+
+      await loadConfig();
+
+      if (configLat && configLon) {
+        updateSunTimes(datePicker.value, configLat, configLon);
+      }
+
+      Chart.register(backgroundSunPlugin);
+
+      charts.chartExposure = createChart("chartExposure", "Exposure (s)", [
+        { label: "Exposure (s)", data: [], borderColor: "orange", fill: false, pointRadius: 0 },
+      ], "line", false, true);
+
+      charts.chartGain = createChart("chartGain", "Gain", [
+        { label: "Gain", data: [], borderColor: "blue", fill: false, pointRadius: 0 }
+      ], "line", false, 0, 350);
+
+      charts.chartNoise = createChart("chartNoise", "Noise Level", [
+        { label: "Sigma noise", data: [], borderColor: "red", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartSQM = createChart("chartSQM", "SQM", [
+        { label: "SQM", data: [], borderColor: "green", backgroundColor: "green", fill: false, pointRadius: 0 }
+      ], "line", false, 0, 22);
+
+      charts.chartStars = createChart("chartStars", "Stars count", [
+        { label: "Star count", data: [], borderColor: "yellow", backgroundColor: "yellow", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartFocus = createChart("chartFocus", "Focus", [
+        { label: "Focus", data: [], borderColor: "orange", backgroundColor: "orange", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartHDR = createChart("chartHDR", "HDR", [
+        { label: "HDR exposures", data: [], backgroundColor: "purple", fill: false, pointRadius: 0 }
+      ], "bar", false, 0, 5);
+
+      charts.chartBrightness = createChart("chartBrightness", "Median Brightness (G)", [
+        { label: "Median (green)", data: [], borderColor: "lime", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartMeanBrightnessRGB = createChart("chartMeanBrightnessRGB", "Mean Brightness (RGB)", [
+        { label: "Mean (red)", data: [], borderColor: "red", fill: false, pointRadius: 0 },
+        { label: "Mean (green)", data: [], borderColor: "green", fill: false, pointRadius: 0 },
+        { label: "Mean (blue)", data: [], borderColor: "blue", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      await loadMeasurements();
+
+      // Reload when new data is picked
+      datePicker.addEventListener("change", () => {
+        if (configLat && configLon) {
+          updateSunTimes(datePicker.value, configLat, configLon);
+
+          Object.values(charts).forEach(chart => {
+            if (chart.options.plugins.backgroundSun) {
+              chart.options.plugins.backgroundSun.periods = getBackgroundSunPeriods();
+            }
+          });
+        }
+        loadMeasurements();
+      });
+
+      setInterval(loadMeasurements, captureIntervalSec * 1000);
+    }
+
+    document.addEventListener("DOMContentLoaded", init);
+
+    // Gridstack Initialisierung und Layout-Persistenz
+    document.addEventListener('DOMContentLoaded', () => {
+      const gridEl = document.getElementById('graphs-grid');
+      const grid = GridStack.init({
+        cellHeight: 110,
+        disableOneColumnMode: false,
+        float: false,
+        resizable: { handles: 'all' }
+      }, gridEl);
+
+      // Grid-Interaktion Status
+      let gridInteractionEnabled = false;
+      const toggleBtn = document.getElementById('toggle-grid-btn');
+
+      // Widgets standardmäßig sperren
+      grid.enableMove(false);
+      grid.enableResize(false);
+
+      // Toggle-Funktion für Grid-Interaktion
+      window.toggleGridInteraction = function() {
+        gridInteractionEnabled = !gridInteractionEnabled;
+        
+        if (gridInteractionEnabled) {
+          // Aktiviert: Widgets können verschoben und vergrößert werden
+          grid.enableMove(true);
+          grid.enableResize(true);
+          toggleBtn.textContent = '🔓 Unlocked';
+          toggleBtn.title = 'Widgets verschieben/vergrößern deaktivieren';
+        } else {
+          // Deaktiviert: Widgets sind gesperrt
+          grid.enableMove(false);
+          grid.enableResize(false);
+          toggleBtn.textContent = '🔒 Locked';
+          toggleBtn.title = 'Widgets verschieben/vergrößern aktivieren';
+        }
+      };
+
+      const LS_KEY = 'allsky360.graphs.layout.v1';
+      const defaultLayout = [
+        {"id":"chart-exposure","x":0,"y":0,"w":6,"h":3},
+        {"id":"chart-gain","x":6,"y":0,"w":6,"h":3},
+        {"id":"chart-noise","x":0,"y":3,"w":6,"h":3},
+        {"id":"chart-sqm","x":6,"y":3,"w":3,"h":3},
+        {"id":"chart-stars","x":9,"y":3,"w":3,"h":3},
+        {"id":"chart-hdr","x":0,"y":6,"w":4,"h":3},
+        {"id":"chart-focus","x":4,"y":6,"w":4,"h":3},
+        {"id":"chart-brightness","x":8,"y":6,"w":4,"h":3},
+        {"id":"chart-mean-brightness-rgb","x":0,"y":9,"w":12,"h":3}
+      ];
+
+      function applyLayout(layout) {
+        const items = grid.engine.nodes; // current nodes
+        const byId = Object.fromEntries(items.map(n => [n.id || n.el.getAttribute('gs-id'), n]));
+        layout.forEach(l => {
+          const node = byId[l.id];
+          if (!node) return;
+          grid.update(node.el, { x: l.x, y: l.y, w: l.w, h: l.h });
+        });
+      }
+
+      function loadLayout() {
+        try {
+          const raw = localStorage.getItem(LS_KEY);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed)) return null;
+          return parsed;
+        } catch (e) { return null; }
+      }
+
+      function saveLayout() {
+        const data = grid.save(true).map(n => ({ id: n.id || n.el.getAttribute('gs-id'), x: n.x, y: n.y, w: n.w, h: n.h }));
+        try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch (_) {}
+      }
+
+      window.resetGridLayout = function() {
+        applyLayout(defaultLayout);
+        try { localStorage.removeItem(LS_KEY); } catch (_) {}
+      }
+
+      // beim Start: gespeichertes Layout anwenden oder Default
+      const saved = loadLayout();
+      applyLayout(saved || defaultLayout);
+
+      grid.on('change', saveLayout);
+    });
+  </script>
+</body>
+
+</html>

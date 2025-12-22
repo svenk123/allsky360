@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Allsky360 Meteo</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  
+  <link rel="manifest" href="manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Allsky360 Meteo">
+  <meta name="theme-color" content="#111111" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="stylesheet" href="style.css">
+  <!-- Gridstack CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@9.2.2/dist/gridstack.min.css">
+  
+  <script src="js/allsky-common.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <!-- Gridstack JS (IIFE bundle: core + HTML5 drag&drop) -->
+  <script src="https://cdn.jsdelivr.net/npm/gridstack@9.2.2/dist/gridstack-all.js" defer></script>
+</head>
+
+<body>
+  <div id="header">
+    <div class="title-icon">
+      <img src="allsky360_256x256.png" alt="Allsky Icon" width="32" height="32" />
+      <h1>Allsky360 Meteorological Data</h1>
+    </div>
+
+        <!-- Hamburger Menu Button -->
+    <button id="hamburger-menu-btn" class="hamburger-menu-btn" onclick="toggleHamburgerMenu()">
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+    </button>
+    
+    <!-- Navigation Menu -->
+    <nav id="nav-menu" class="nav-menu">
+      <ul class="nav-list">
+        <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+        <li><a href="archive.html" class="nav-link">Archive</a></li>
+        <li><a href="videos.html" class="nav-link">Videos</a></li>
+        <li><a href="graphs.html" class="nav-link">Graphs</a></li>
+        <li><a href="meteo.html" class="nav-link">Weather</a></li>
+        <li><a href="aurora.html" class="nav-link">Aurora</a></li>
+        <li><a href="config.html" class="nav-link">Config</a></li>
+        <li><a href="calibration.html" class="nav-link">Calibration</a></li>
+        <li><a href="processing.html" class="nav-link">Processing</a></li>
+      </ul>
+    </nav>
+  </div>
+  <div id="subheader">
+    <div class="settings-groups">
+      <label style="display: flex; align-items: center; gap: 0.3rem;">
+        Select date:
+        <input type="date" id="datePicker">
+      </label>
+    </div>
+  </div>
+  <!-- Grid Layout -->
+  <div class="grid-stack" id="meteo-grid" style="margin: 8px;">
+    <!-- Temperature Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-temp" gs-x="0" gs-y="0" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartTemp"></canvas>
+      </div>
+    </div>
+
+    <!-- Humidity Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-humidity" gs-x="6" gs-y="0" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartHumidity"></canvas>
+      </div>
+    </div>
+
+    <!-- Pressure Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-pressure" gs-x="0" gs-y="3" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartPressure"></canvas>
+      </div>
+    </div>
+
+    <!-- Dew Point Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-dew-point" gs-x="6" gs-y="3" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartDewPoint"></canvas>
+      </div>
+    </div>
+
+    <!-- Clouds Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-clouds" gs-x="0" gs-y="6" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartClouds"></canvas>
+      </div>
+    </div>
+
+    <!-- Global Cloud Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-global-cloud" gs-x="6" gs-y="6" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartGlobalCloud"></canvas>
+      </div>
+    </div>
+
+    <!-- Visibility Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-visibility" gs-x="0" gs-y="9" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartVisibility"></canvas>
+      </div>
+    </div>
+
+    <!-- Jetstream Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-jetstream" gs-x="6" gs-y="9" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartJetstream"></canvas>
+      </div>
+    </div>
+
+    <!-- Wind Speed Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-wind-speed" gs-x="0" gs-y="12" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartWindSpeed"></canvas>
+      </div>
+    </div>
+
+    <!-- Wind Direction Chart Widget -->
+    <div class="grid-stack-item" gs-id="chart-wind-dir" gs-x="6" gs-y="12" gs-w="6" gs-h="3">
+      <div class="grid-stack-item-content">
+        <canvas id="chartWindDir"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <footer id="footer">
+    <div style="text-align:center; width:100%;">Copyright (c) 2025 Sven Kreiensen</div>
+    <button id="toggle-grid-btn" style="position:absolute; right:120px;" title="Widgets verschieben/vergrößern aktivieren/deaktivieren" onclick="toggleGridInteraction()">🔒 Locked</button>
+    <button id="reset-layout-btn" style="position:absolute; right:0;" title="Layout auf Standard zurücksetzen" onclick="resetGridLayout()">Reset layout</button>
+  </footer>
+
+  <script>
+    const charts = {};
+
+    function createChart(id, label, datasets, type = "line", showLegend = false) {
+      return new Chart(document.getElementById(id), {
+        type,
+        data: { labels: [], datasets },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              type: 'time',
+              time: { unit: 'minute', displayFormats: { hour: 'HH:mm', minute: 'HH:mm' }, tooltipFormat: 'HH:mm' },
+              ticks: { color: 'white' },
+              grid: { color: '#444' }
+            },
+            y: {
+              ticks: {
+                color: 'white',
+                callback: (v) => Number.isInteger(v) ? v.toString() : v.toFixed(1)
+              },
+              grid: { color: '#444' }
+            }
+          },
+          plugins: {
+            title: { display: true, text: label, color: 'white' },
+            legend: { display: showLegend, labels: { color: 'white' } }
+          }
+        }
+      });
+    }
+
+    function updateCharts(data) {
+      const ts = data.map(d => new Date(d.timestamp * 1000));
+
+      charts.chartTemp.data.labels = ts;
+      charts.chartTemp.data.datasets[0].data = data.map(d => d.temperature);
+
+      charts.chartHumidity.data.labels = ts;
+      charts.chartHumidity.data.datasets[0].data = data.map(d => d.humidity);
+
+      charts.chartPressure.data.labels = ts;
+      charts.chartPressure.data.datasets[0].data = data.map(d => d.pressure_msl);
+      charts.chartPressure.data.datasets[1].data = data.map(d => d.surface_pressure);
+
+      charts.chartDewPoint.data.labels = ts;
+      charts.chartDewPoint.data.datasets[0].data = data.map(d => d.dew_point);
+
+      charts.chartClouds.data.labels = ts;
+      charts.chartClouds.data.datasets[0].data = data.map(d => d.cloud_low);
+      charts.chartClouds.data.datasets[1].data = data.map(d => d.cloud_mid);
+      charts.chartClouds.data.datasets[2].data = data.map(d => d.cloud_high);
+
+      charts.chartGlobalCloud.data.labels = ts;
+      charts.chartGlobalCloud.data.datasets[0].data = data.map(d => d.cloud_cover);
+
+      charts.chartVisibility.data.labels = ts;
+      charts.chartVisibility.data.datasets[0].data = data.map(d => d.visibility / 1000);
+
+      charts.chartJetstream.data.labels = ts;
+      charts.chartJetstream.data.datasets[0].data = data.map(d => d.wind_speed_300hPa);
+
+      charts.chartWindSpeed.data.labels = ts;
+      charts.chartWindSpeed.data.datasets[0].data = data.map(d => d.wind_speed_10m);
+
+      charts.chartWindDir.data.labels = ts;
+      charts.chartWindDir.data.datasets[0].data = data.map(d => d.wind_dir_10m);
+
+      Object.values(charts).forEach(chart => chart.update());
+    }
+
+    function clearAllCharts() {
+      Object.values(charts).forEach(chart => {
+        chart.data.labels = [];
+        chart.data.datasets.forEach(ds => ds.data = []);
+        chart.update();
+      });
+    }
+
+    async function loadMeasurements() {
+      try {
+        const date = document.getElementById("datePicker").value;
+        const res = await fetch(`/api/meteo?date=${date}`);
+
+        if (res.status === 404) {
+          console.warn("No data for this date. Clearing charts.");
+          clearAllCharts();
+          return;
+        }
+
+        if (!res.ok) throw new Error("Fetch error");
+
+        const json = await res.json();
+        if (Array.isArray(json)) {
+          updateCharts(json);
+        } else {
+          clearAllCharts();
+        }
+      } catch (err) {
+        console.error("Failed to load measurement data:", err);
+        clearAllCharts();
+      }
+    }
+
+    function init() {
+      const datePicker = document.getElementById("datePicker");
+      datePicker.value = new Date().toISOString().slice(0, 10);
+      datePicker.addEventListener("change", loadMeasurements);
+
+      charts.chartTemp = createChart("chartTemp", "Temperature (°C)", [
+        { label: "Temperature", data: [], borderColor: "orange", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartHumidity = createChart("chartHumidity", "Rel. humidity (%)", [
+        { label: "Humidity", data: [], borderColor: "blue", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartPressure = createChart("chartPressure", "Pressure (hPa)", [
+        { label: "MSL", data: [], borderColor: "lime", fill: false, pointRadius: 0 },
+        { label: "Surface", data: [], borderColor: "cyan", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartDewPoint = createChart("chartDewPoint", "Dew point (°C)", [
+        { label: "Dew point", data: [], borderColor: "white", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartClouds = createChart("chartClouds", "Cloud cover (%)", [
+        { label: "Low", data: [], borderColor: "gray", backgroundColor: "gray", fill: false, pointRadius: 0 },
+        { label: "Mid", data: [], borderColor: "silver", backgroundColor: "silver", fill: false, pointRadius: 0 },
+        { label: "High", data: [], borderColor: "white", backgroundColor: "white", fill: false, pointRadius: 0 }
+      ], "line", true);
+
+      charts.chartGlobalCloud = createChart("chartGlobalCloud", "Global cloud cover (%)", [
+        { label: "Cloud cover", data: [], backgroundColor: "lightblue" }
+      ], "bar", false);
+
+      charts.chartVisibility = createChart("chartVisibility", "Visibility (km)", [
+        { label: "Visibility", data: [], borderColor: "gold", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartJetstream = createChart("chartJetstream", "Jetstream @9.2km (km/h)", [
+        { label: "Jetstream", data: [], borderColor: "violet", fill: false, pointRadius: 0 }
+      ], "line", false);
+
+      charts.chartWindSpeed = createChart("chartWindSpeed", "Wind speed (km/h)", [
+        { label: "Wind", data: [], borderColor: "lightgreen", fill: false, pointRadius: 0 }
+      ]);
+
+      charts.chartWindDir = createChart("chartWindDir", "Wind direction (°)", [
+        { label: "Wind Dir", data: [], borderColor: "lightcoral", fill: false, pointRadius: 0 }
+      ]);
+
+      loadMeasurements();
+      setInterval(loadMeasurements, 60000); // 60s update
+    }
+
+    document.addEventListener("DOMContentLoaded", init);
+
+    // Gridstack Initialisierung und Layout-Persistenz
+    document.addEventListener('DOMContentLoaded', () => {
+      const gridEl = document.getElementById('meteo-grid');
+      const grid = GridStack.init({
+        cellHeight: 110,
+        disableOneColumnMode: false,
+        float: false,
+        resizable: { handles: 'all' }
+      }, gridEl);
+
+      // Grid-Interaktion Status
+      let gridInteractionEnabled = false;
+      const toggleBtn = document.getElementById('toggle-grid-btn');
+
+      // Widgets standardmäßig sperren
+      grid.enableMove(false);
+      grid.enableResize(false);
+
+      // Toggle-Funktion für Grid-Interaktion
+      window.toggleGridInteraction = function() {
+        gridInteractionEnabled = !gridInteractionEnabled;
+        
+        if (gridInteractionEnabled) {
+          // Aktiviert: Widgets können verschoben und vergrößert werden
+          grid.enableMove(true);
+          grid.enableResize(true);
+          toggleBtn.textContent = '🔓 Unlocked';
+          toggleBtn.title = 'Widgets verschieben/vergrößern deaktivieren';
+        } else {
+          // Deaktiviert: Widgets sind gesperrt
+          grid.enableMove(false);
+          grid.enableResize(false);
+          toggleBtn.textContent = '🔒 Locked';
+          toggleBtn.title = 'Widgets verschieben/vergrößern aktivieren';
+        }
+      };
+
+      const LS_KEY = 'allsky360.meteo.layout.v1';
+      const defaultLayout = [
+        {"id":"chart-temp","x":0,"y":0,"w":6,"h":3},
+        {"id":"chart-humidity","x":6,"y":0,"w":6,"h":3},
+        {"id":"chart-pressure","x":0,"y":3,"w":6,"h":3},
+        {"id":"chart-dew-point","x":6,"y":3,"w":6,"h":3},
+        {"id":"chart-clouds","x":0,"y":6,"w":6,"h":3},
+        {"id":"chart-global-cloud","x":6,"y":6,"w":6,"h":3},
+        {"id":"chart-visibility","x":0,"y":9,"w":6,"h":3},
+        {"id":"chart-jetstream","x":6,"y":9,"w":6,"h":3},
+        {"id":"chart-wind-speed","x":0,"y":12,"w":6,"h":3},
+        {"id":"chart-wind-dir","x":6,"y":12,"w":6,"h":3}
+      ];
+
+      function applyLayout(layout) {
+        const items = grid.engine.nodes; // current nodes
+        const byId = Object.fromEntries(items.map(n => [n.id || n.el.getAttribute('gs-id'), n]));
+        layout.forEach(l => {
+          const node = byId[l.id];
+          if (!node) return;
+          grid.update(node.el, { x: l.x, y: l.y, w: l.w, h: l.h });
+        });
+      }
+
+      function loadLayout() {
+        try {
+          const raw = localStorage.getItem(LS_KEY);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed)) return null;
+          return parsed;
+        } catch (e) { return null; }
+      }
+
+      function saveLayout() {
+        const data = grid.save(true).map(n => ({ id: n.id || n.el.getAttribute('gs-id'), x: n.x, y: n.y, w: n.w, h: n.h }));
+        try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch (_) {}
+      }
+
+      window.resetGridLayout = function() {
+        applyLayout(defaultLayout);
+        try { localStorage.removeItem(LS_KEY); } catch (_) {}
+      }
+
+      // beim Start: gespeichertes Layout anwenden oder Default
+      const saved = loadLayout();
+      applyLayout(saved || defaultLayout);
+
+      grid.on('change', saveLayout);
+    });
+  </script>
+  <footer id="footer">
+    <div class="copyright">Copyright (c) 2025 Sven Kreiensen</div>
+  </footer>
+</body>
+
+</html>

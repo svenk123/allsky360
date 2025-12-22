@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Allsky360 Configuration</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+
+  <link rel="manifest" href="manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Allsky360 Viewer">
+  <meta name="theme-color" content="#111111" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <link rel="stylesheet" href="style.css">
+  <script src="js/allsky-common.js"></script>
+</head>
+
+<body>
+  <div id="header">
+    <div class="title-icon">
+      <img src="allsky360_256x256.png" alt="Allsky Icon" width="32" height="32" />
+      <h1>Allsky360 Config</h1>
+    </div>
+
+    <!-- Hamburger Menu Button -->
+    <button id="hamburger-menu-btn" class="hamburger-menu-btn" onclick="toggleHamburgerMenu()">
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+    </button>
+    
+    <!-- Navigation Menu -->
+    <nav id="nav-menu" class="nav-menu">
+      <ul class="nav-list">
+        <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+        <li><a href="archive.html" class="nav-link">Archive</a></li>
+        <li><a href="videos.html" class="nav-link">Videos</a></li>
+        <li><a href="graphs.html" class="nav-link">Graphs</a></li>
+        <li><a href="meteo.html" class="nav-link">Weather</a></li>
+        <li><a href="aurora.html" class="nav-link">Aurora</a></li>
+        <li><a href="config.html" class="nav-link">Config</a></li>
+        <li><a href="calibration.html" class="nav-link">Calibration</a></li>
+        <li><a href="processing.html" class="nav-link">Processing</a></li>
+      </ul>
+    </nav>
+  </div>
+
+  <div id="services-container">
+    <div id="service-metadata">
+      <h2>System Services</h2>
+      <div class="services-grid">
+        <div class="service-row">
+          <span class="service-name">allsky360-aurora.service</span>
+          <button onclick="controlService('allsky360-aurora.service', 'start')">Start</button>
+          <button onclick="controlService('allsky360-aurora.service', 'stop')">Stop</button>
+          <span id="status-allsky360-aurora.service" class="service-status"></span>
+        </div>
+        <div class="service-row">
+          <span class="service-name">allsky360-meteo.service</span>
+          <button onclick="controlService('allsky360-meteo.service', 'start')">Start</button>
+          <button onclick="controlService('allsky360-meteo.service', 'stop')">Stop</button>
+          <span id="status-allsky360-meteo.service" class="service-status"></span>
+        </div>
+        <div class="service-row">
+          <span class="service-name">allsky360-camera.service</span>
+          <button onclick="controlService('allsky360-camera.service', 'start')">Start</button>
+          <button onclick="controlService('allsky360-camera.service', 'stop')">Stop</button>
+          <span id="status-allsky360-camera.service" class="service-status"></span>
+        </div>
+        <div class="service-row">
+          <span class="service-name">allsky360-location.service</span>
+          <button onclick="controlService('allsky360-location.service', 'start')">Start</button>
+          <button onclick="controlService('allsky360-location.service', 'stop')">Stop</button>
+          <span id="status-allsky360-location.service" class="service-status"></span>
+        </div>
+      </div>
+      <div id="services-message" class="services-message"></div>
+    </div>
+  </div>
+
+  <div id="container">
+    <div id="config-list-container">
+      <h2>Configuration Parameters</h2>
+      <div id="config-container">Loading configuration...</div>
+    </div>
+    <div id="config-metadata">Click on a parameter to see its description here.</div>
+  </div>
+
+  <script>
+    let helpData = {};
+
+    async function loadAllsky360Config() {
+      try {
+        const [configResponse, helpResponse] = await Promise.all([
+          fetch('api/config'),
+          fetch('config_help.json')
+        ]);
+
+        const config = await configResponse.json();
+        helpData = await helpResponse.json();
+
+        const container = document.getElementById('config-container');
+        container.innerHTML = '';
+
+        let selectedKey = null;
+        Object.entries(config).forEach(([key, value]) => {
+          const div = document.createElement('div');
+          div.className = 'config-item';
+          div.innerHTML = `<span class="config-key">${key}</span>: <span class="config-value">${value}</span>`;
+          div.addEventListener('click', () => {
+            // Remove previous selection
+            if (selectedKey) {
+              document.querySelector('.config-item.selected')?.classList.remove('selected');
+            }
+            selectedKey = key;
+            div.classList.add('selected');
+            showDescription(key);
+          });
+          container.appendChild(div);
+        });
+      } catch (err) {
+        document.getElementById('config-container').innerText = 'Failed to load configuration.';
+        console.error(err);
+      }
+    }
+
+    function showDescription(key) {
+      const entry = helpData[key];
+      if (!entry) {
+        document.getElementById('config-metadata').innerHTML = '<p>Sorry, no description available.</p>';
+        return;
+      }
+
+      let html = `<h3>${key}</h3><ul>`;
+      if (entry.description) html += `<li><strong>Description:</strong> ${entry.description}</li>`;
+      if (entry.unit) html += `<li><strong>Unit:</strong> ${entry.unit}</li>`;
+      if (entry.range) html += `<li><strong>Range:</strong> ${entry.range}</li>`;
+      if (entry.default) html += `<li><strong>Default:</strong> ${entry.default}</li>`;
+      if (entry.recommendations) {
+        html += `<li><strong>Recommendations:</strong><ul>`;
+        entry.recommendations.forEach(r => {
+          html += `<li>${r}</li>`;
+        });
+        html += `</ul></li>`;
+      }
+      html += `</ul>`;
+
+      document.getElementById('config-metadata').innerHTML = html;
+    }
+
+    async function controlService(service, action) {
+      const msg = document.getElementById('services-message');
+      msg.textContent = `Führe ${action} für ${service} aus ...`;
+      try {
+        const res = await fetch(`api/services/${action}?service=${encodeURIComponent(service)}`);
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+          msg.textContent = `${action} für ${service}: OK`;
+        } else {
+          msg.textContent = `${action} für ${service} fehlgeschlagen: ${data.error || 'Unbekannter Fehler'}`;
+        }
+        // Optional: Kurz den Status anzeigen, wenn vom Backend enthalten
+        const statusEl = document.getElementById(`status-${service}`);
+        if (statusEl && data.output) {
+          statusEl.textContent = data.output.split('\n')[0];
+        }
+      } catch (e) {
+        msg.textContent = `${action} für ${service} fehlgeschlagen: ${e.message}`;
+      }
+    }
+
+    loadAllsky360Config();
+  </script>
+
+  <style>
+    #services-container {
+      margin-bottom: 2rem;
+    }
+
+    #service-metadata {
+      background: #222;
+      padding: 1rem;
+      border-radius: 0.5rem;
+    }
+
+    #service-metadata h2 {
+      margin-bottom: 1rem;
+      color: #fff;
+      font-size: 1.5rem;
+    }
+
+    #config-list-container {
+      flex: 2;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #config-list-container h2 {
+      margin-bottom: 1rem;
+      color: #fff;
+      font-size: 1.5rem;
+    }
+
+    #config-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-height: calc(100vh - 400px);
+      overflow-y: auto;
+    }
+
+    .config-item {
+      background: #222;
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      border: 2px solid transparent;
+    }
+
+    .config-item:hover {
+      background: #333;
+    }
+
+    .config-item.selected {
+      border-color: #4CAF50;
+      background: #2a4a2a;
+    }
+
+    .config-key {
+      color: #4CAF50;
+      font-weight: bold;
+      display: inline-block;
+      min-width: 280px;
+    }
+
+    .config-value {
+      color: #ccc;
+    }
+
+    #config-metadata h3 {
+      color: #4CAF50;
+      margin-bottom: 0.5rem;
+      font-size: 1.2rem;
+    }
+
+    #config-metadata ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    #config-metadata li {
+      margin-bottom: 0.5rem;
+    }
+
+    #config-metadata strong {
+      color: #fff;
+    }
+  </style>
+  <footer id="footer">
+    <div class="copyright">Copyright (c) 2025 Sven Kreiensen</div>
+  </footer>
+</body>
+
+</html>
