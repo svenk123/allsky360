@@ -1,0 +1,12 @@
+[Unit]
+Description=INDIGO Server
+
+[Service]
+User=user1
+PAMName=login
+ExecStart=/usr/local/bin/indigo_server indigo_ccd_asi indigo_ccd_playerone  indigo_mount_lx200 
+#StandardOutput=file:/home/user1/indigo.log
+#StandardError=file:/home/user1/indigo.log
+
+[Install]
+WantedBy=multi-user.target

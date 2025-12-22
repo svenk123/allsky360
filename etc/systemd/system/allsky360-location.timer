@@ -1,0 +1,12 @@
+[Unit]
+Description=Run allsky360-location every 10 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+AccuracySec=30s
+Persistent=true
+Unit=allsky360-location.service
+
+[Install]
+WantedBy=timers.target

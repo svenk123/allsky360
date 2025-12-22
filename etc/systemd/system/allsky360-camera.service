@@ -1,0 +1,30 @@
+[Unit]
+Description=Allsky360 Camera Deamon
+After=network.target indigoserver.service
+Wants=network.target
+
+[Service]
+# Default values (can be overridden via EnvironmentFile)
+Environment=CONFIG_PATH=/home/allskyuser/config.ini
+Environment=USER_DIR=/home/allskyuser
+
+User=allskyuser
+Group=allskygroup
+
+# Optional: load overrides from env file
+#EnvironmentFile=-/etc/allsky360/env
+
+WorkingDirectory=/home/allskyuser
+ExecStart=/opt/allsky360/bin/allsky360-camera --config /home/allskyuser/config.ini -v
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStop=/bin/kill -TERM $MAINPID
+
+StandardOutput=append:/var/log/allsky360.log
+StandardError=append:/var/log/allsky360.log
+
+Restart=always
+RestartSec=90
+
+
+[Install]
+WantedBy=multi-user.target

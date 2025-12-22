@@ -1,0 +1,6 @@
+[Journal]
+Storage=persistent
+SystemMaxUse=500M
+SystemKeepFree=100M
+SystemMaxFileSize=50M
+MaxRetentionSec=7day

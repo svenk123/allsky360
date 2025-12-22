@@ -1,0 +1,30 @@
+[Unit]
+Description=Allsky360 Node.js API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Default values (can be overridden via EnvironmentFile)
+Environment=NODE_BIN=/usr/bin/node
+Environment=APP_DIR=/opt/allsky360/allsky-api
+Environment=CONFIG_PATH=/home/allskyuser/config.ini
+User=allskyuser
+Group=allskygroup
+# Optional: load overrides from env file
+EnvironmentFile=-/etc/allsky360/env
+WorkingDirectory=/opt/allsky360/allsky-api
+ExecStart=/usr/bin/node /opt/allsky360/allsky-api/index.js --config /home/allskyuser/config.ini
+Restart=always
+RestartSec=3
+# Ressourcenlimits/Sandbox (optional, anpassen wenn n.tig)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=false
+LockPersonality=true
+# Offen lassen falls API auf Port <1024 laufen soll (CAP_NET_BIND_SERVICE):
+# AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target
