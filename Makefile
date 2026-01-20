@@ -23,7 +23,7 @@ CFLAGS = -Wall -Wextra -O2 -DINDIGO_LINUX -std=gnu11
 # Cairo + FreeType + libjpeg Flags
 CAIRO_CFLAGS = $(shell pkg-config --cflags cairo)
 CAIRO_LIBS = $(shell pkg-config --libs cairo)
-JPEG_LIBS = -ljpeg
+
 
 FREETYPE_CFLAGS = $(shell pkg-config --cflags freetype2)
 FREETYPE_LIBS = $(shell pkg-config --libs freetype2)
@@ -37,6 +37,12 @@ INDIGO_ROOT = ../indigo
 INDIGO_CFLAGS = -I$(INDIGO_ROOT)/indigo_libs
 INDIGO_LIBS = -L$(INDIGO_ROOT)/build/lib -lindigo
 
+# libjpeg Flags
+#JPEG_CFLAGS := $(shell pkg-config --cflags libjpeg 2>/dev/null)
+#JPEG_LIBS   := $(shell pkg-config --libs   libjpeg 2>/dev/null)
+JPEG_CFLAGS = -I$(INDIGO_ROOT)/indigo_libs/externals/libjpeg
+JPEG_LIBS = $(INDIGO_ROOT)/build/lib/libjpeg.a
+
 # Libnova
 ASTRO_CFLAGS = -I/usr/include/libnova
 ASTRO_LIBS = -L/usr/lib -lnova
@@ -44,8 +50,8 @@ ASTRO_LIBS = -L/usr/lib -lnova
 # PNG Library
 PNG_LIBS = -lpng
 
-INCLUDE = $(CAIRO_CFLAGS) $(FREETYPE_CFLAGS) $(INDIGOI_CFLAGS) $(ASTRO_CFLAGS) -I./include
-LDFLAGS += $(CAIRO_LIBS) $(FREETYPE_LIBS) $(INDIGO_LIBS) $(ASTRO_LIBS)  $(JPEG_LIBS) $(PNG_LIBS) $(CFITSIO_LIBS) -lm
+INCLUDE = $(CAIRO_CFLAGS) $(FREETYPE_CFLAGS) $(INDIGO_CFLAGS) $(ASTRO_CFLAGS) $(JPEG_CFLAGS) -I./include
+LDFLAGS += $(CAIRO_LIBS) $(FREETYPE_LIBS) $(INDIGO_LIBS) $(ASTRO_LIBS) $(PNG_LIBS) $(CFITSIO_LIBS) $(JPEG_LIBS) -lm
 
 # OpenMP
 CFLAGS += -fopenmp
@@ -177,10 +183,15 @@ else
 deps:
 	@echo `date +%F\ %R:%S` Installing build dependencies...
 	@apt update
-	@apt -y install libjpeg9-dev libcfitsio-dev libpng-dev libcairo-dev libnova-dev libjson-c-dev
+	@apt -y install libjpeg-dev libcfitsio-dev libpng-dev libcairo-dev libnova-dev libjson-c-dev
 	@apt -y install sqlite3 libsqlite3-dev
 	@apt -y install libcurl4-openssl-dev
+# dependencies for timelapse tool
+	@apt -y install libavcodec-dev libavformat-dev libswscale-dev
+ifeq ($(USE_CUDA), 1)
 	@apt -y install cuda-nvcc-12-6 libnvjpeg-dev-12-6
+	@apt -y install cuda-cudart-dev-12-6 libnpp-dev-12-6
+endif
 	@echo "Adding NodeSource repo (Node 20 LTS)…"
 	curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 	apt-get update
@@ -270,7 +281,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cu
 endif
 
 # Build for utils
-tools: timelapse meteo aurora location list-cameras panorama mount-status
+tools: timelapse meteo aurora location list-cameras panorama
 
 timelapse:
 	@echo "Building timelapse tool"
@@ -375,17 +386,32 @@ directories:
 	@echo "Creating directory structure..."
 	$(INSTALL) -d -o $(USERNAME) -g $(GROUPNAME) -m 755 $(DATA_DIR)
 	$(INSTALL) -d -o $(USERNAME) -g $(GROUPNAME) -m 755 $(DATA_DIR)/bin
+	$(INSTALL) -d -o $(USERNAME) -g $(GROUPNAME) -m 755 $(DATA_DIR)/allsky-api
 	$(INSTALL) -d -o $(USERNAME) -g $(GROUPNAME) -m 755 $(DATA_DIR)/allsky-api/public
 	$(INSTALL) -d -o $(USERNAME) -g $(GROUPNAME) -m 755 $(DATA_DIR)/allsky-api/public/js
 	$(INSTALL) -d -o $(USERNAME) -g $(GROUPNAME) -m 775 $(HOME_DIR)/database
 	$(INSTALL) -d -o $(USERNAME) -g $(GROUPNAME) -m 775 $(HOME_DIR)/images
 	$(INSTALL) -d -o $(USERNAME) -g $(GROUPNAME) -m 775 $(HOME_DIR)/videos
-	ln -sf $(HOME_DIR)/database $(DATA_DIR)/allsky-api
+	@for file in allsky-api/*; do \
+		if [ -f $$file ]; then \
+			$(INSTALL) -m 0644 -o $(USERNAME) -g $(GROUPNAME) $$file $(DATA_DIR)/allsky-api/; \
+		fi; \
+	done
+	@for file in allsky-api/public/*; do \
+		if [ -f $$file ]; then \
+			$(INSTALL) -m 0644 -o $(USERNAME) -g $(GROUPNAME) $$file $(DATA_DIR)/allsky-api/public/; \
+		fi; \
+	done
+	@for file in allsky-api/public/js/*; do \
+		if [ -f $$file ]; then \
+			$(INSTALL) -m 0644 -o $(USERNAME) -g $(GROUPNAME) $$file $(DATA_DIR)/allsky-api/public/js/; \
+		fi; \
+	done
+
+	ln -sf $(HOME_DIR)/database $(DATA_DIR)/allsky-api/database
 	ln -sf $(HOME_DIR)/images $(DATA_DIR)/allsky-api/public/images
 	ln -sf $(HOME_DIR)/videos $(DATA_DIR)/allsky-api/public/videos
-	cp -a allsky-api/public/. $(DATA_DIR)/allsky-api/public
-	# Copy other files
-	$(INSTALL) -m 0644 -o $(USERNAME) -g $(GROUPNAME) allsky-api/index.js $(DATA_DIR)/allsky-api/index.js
+
 	# Optional: package.json etc.
 	@if [ -f allsky-api/package.json ]; then \
 		$(INSTALL) -m 0644 -o $(USERNAME) -g $(GROUPNAME) allsky-api/package.json $(DATA_DIR)/allsky-api/; \
@@ -405,6 +431,7 @@ shell-scripts:
 	$(INSTALL) -d -o $(USERNAME) -g $(GROUPNAME) -m 755 $(DATA_DIR)/scripts
 	$(INSTALL) -m 0644 -o $(USERNAME) -g $(GROUPNAME) scripts/endofnight.sh $(DATA_DIR)/scripts/
 	$(INSTALL) -m 0644 -o $(USERNAME) -g $(GROUPNAME) scripts/run_ai_processing.sh $(DATA_DIR)/scripts/
+	$(INSTALL) -m 0644 -o $(USERNAME) -g $(GROUPNAME) scripts/allsky360-ai-run.sh $(DATA_DIR)/scripts/
 	# AI scripts
 	$(INSTALL) -d -o $(USERNAME) -g $(GROUPNAME) -m 755 $(DATA_DIR)/ai/models
 	$(INSTALL) -m 0644 -o $(USERNAME) -g $(GROUPNAME) ai/trt_infer.py $(DATA_DIR)/ai/
@@ -448,6 +475,7 @@ sudoers:
 	@echo '$(USERNAME) ALL=(root) NOPASSWD: /usr/bin/systemctl start $(CAMERA_SERVICE), /usr/bin/systemctl stop $(CAMERA_SERVICE), /usr/bin/systemctl restart $(CAMERA_SERVICE), /usr/bin/systemctl is-active $(CAMERA_SERVICE), /usr/bin/systemctl show $(CAMERA_SERVICE)' >> $(SUDOERS_FILE)
 	@echo '$(USERNAME) ALL=(root) NOPASSWD: /usr/bin/systemctl start $(API_SERVICE), /usr/bin/systemctl stop $(API_SERVICE), /usr/bin/systemctl restart $(API_SERVICE), /usr/bin/systemctl is-active $(API_SERVICE), /usr/bin/systemctl show $(API_SERVICE)' >> $(SUDOERS_FILE)
 	@echo '$(USERNAME) ALL=(root) NOPASSWD: /usr/bin/systemctl start $(LOCATION_SERVICE), /usr/bin/systemctl stop $(LOCATION_SERVICE), /usr/bin/systemctl restart $(LOCATION_SERVICE), /usr/bin/systemctl is-active $(LOCATION_SERVICE), /usr/bin/systemctl show $(LOCATION_SERVICE)' >> $(SUDOERS_FILE)
+	@echo '$(USERNAME) ALL=(root) NOPASSWD: /opt/allsky360/scripts/allsky360-ai-run.sh *' >> $(SUDOERS_FILE)
 	@echo '$(USERNAME) ALL=(root) NOPASSWD: /usr/bin/systemd-run' >> $(SUDOERS_FILE)
 	@sudo chmod 440 $(SUDOERS_FILE)
 	@echo "Sudoers entries installed at $(SUDOERS_FILE)"
@@ -482,7 +510,7 @@ systemd:
 
 cron:
 	@echo "Installing cronjobs..."
-	$(INSTALL) -m 644 etc/cron/allsky360-tools.cron $(CRON_DIR)/allsky360-tools.cron
+	$(INSTALL) -m 644 etc/cron.d/allsky360-tools.cron $(CRON_DIR)/allsky360-tools.cron
 	$(SYSTEMCTL) restart cron || $(SYSTEMCTL) restart crond || true
 
 node-install:
@@ -516,6 +544,61 @@ node-install:
 		--global-name=Astronomia \
 		--outfile=public/js/astronomia.bundle.min.js
 
+# ===== YOLOv11 venv for allskyuser =====
+REQ_FILE         ?= ./requirements-yolo11.txt
+PYVER_FILE       ?= ./python-version.txt
+PYTHON_BIN       ?= /usr/bin/python3
+
+# You MUST run this target with sudo:
+#   sudo make yolov11
+yolov11:
+	@echo "[YOLO] Installing venv for user '$(USERNAME)' in '$(VENV_DIR)'"
+	@id $(USERNAME) >/dev/null 2>&1 || (echo "User $(USERNAME) does not exist"; exit 1)
+	@test -f "$(REQ_FILE)" || (echo "Missing $(REQ_FILE)"; exit 1)
+	@test -f "$(PYVER_FILE)" || (echo "Missing $(PYVER_FILE)"; exit 1)
+	@if [ "$$(id -u)" -ne 0 ]; then echo "Run as root: sudo make yolov11"; exit 1; fi
+
+	@echo "[YOLO] APT deps"
+	@apt-get update -y
+	@apt-get install -y \
+		python3-venv python3-pip jq \
+		python3-libnvinfer libnvinfer10 tensorrt-libs
+
+	@echo "[YOLO] Create venv if missing"
+	@sudo -u $(USERNAME) -H bash -lc '\
+		mkdir -p "$(HOME_DIR)/venvs"; \
+		if [ ! -d "$(HOME_DIR)/venvs/yolo11" ]; then \
+			"$(PYTHON_BIN)" -m venv "$(HOME_DIR)/venvs/yolo11"; \
+		fi; \
+		"$(HOME_DIR)/venvs/yolo11/bin/python" -m pip install -U pip setuptools wheel \
+	'
+
+	@echo "[YOLO] Install pip requirements (filter Jetson-uninstallable packages)"
+	@sudo -u $(USERNAME) -H bash -lc '\
+		tmp="$$(mktemp)"; \
+		grep -Ev "^(tensorrt|tensorrt-.*|tensorrt_cu.*|tensorrt-cu.*|onnxruntime-gpu)==" "$(REQ_FILE)" > "$$tmp"; \
+		"$(HOME_DIR)/venvs/yolo11/bin/pip" install -r "$$tmp"; \
+		rm -f "$$tmp"; \
+	'
+
+	@echo "[YOLO] Make system dist-packages (TensorRT from apt) visible in venv"
+	@sudo -u $(USERNAME) -H bash -lc '\
+		echo "/usr/lib/python3.10/dist-packages" > "$(HOME_DIR)/venvs/yolo11/lib/python3.10/site-packages/jetson_distpackages.pth" \
+	'
+
+	@echo "[YOLO] Smoke test (torch cuda + tensorrt import)"
+	@sudo -u $(USERNAME) -H bash -lc '\
+		source "$(HOME_DIR)/venvs/yolo11/bin/activate"; \
+		python - <<PY\n\
+import torch\n\
+print("torch:", torch.__version__)\n\
+print("cuda:", torch.cuda.is_available())\n\
+import tensorrt as trt\n\
+print("tensorrt:", trt.__version__)\n\
+PY \
+	'
+
+	@echo "[YOLO] Done."
 
 install:
 	@if [ "$$(id -u)" -ne 0 ]; then \
