@@ -470,12 +470,13 @@ END_OF_NIGHT_SERVICE   = allsky360-endofnight.service
 
 sudoers:
 	@echo "Installing sudoers entry for $(USERNAME)"
+	@echo 'Defaults env_keep += "ALLSKY360_*"' >> $(SUDOERS_FILE)
 	@echo '$(USERNAME) ALL=(root) NOPASSWD: /usr/bin/systemctl start $(AURORA_SERVICE), /usr/bin/systemctl stop $(AURORA_SERVICE), /usr/bin/systemctl restart $(AURORA_SERVICE), /usr/bin/systemctl is-active $(AURORA_SERVICE), /usr/bin/systemctl show $(AURORA_SERVICE)' > $(SUDOERS_FILE)
 	@echo '$(USERNAME) ALL=(root) NOPASSWD: /usr/bin/systemctl start $(METEO_SERVICE), /usr/bin/systemctl stop $(METEO_SERVICE), /usr/bin/systemctl restart $(METEO_SERVICE), /usr/bin/systemctl is-active $(METEO_SERVICE), /usr/bin/systemctl show $(METEO_SERVICE)' >> $(SUDOERS_FILE)
 	@echo '$(USERNAME) ALL=(root) NOPASSWD: /usr/bin/systemctl start $(CAMERA_SERVICE), /usr/bin/systemctl stop $(CAMERA_SERVICE), /usr/bin/systemctl restart $(CAMERA_SERVICE), /usr/bin/systemctl is-active $(CAMERA_SERVICE), /usr/bin/systemctl show $(CAMERA_SERVICE)' >> $(SUDOERS_FILE)
 	@echo '$(USERNAME) ALL=(root) NOPASSWD: /usr/bin/systemctl start $(API_SERVICE), /usr/bin/systemctl stop $(API_SERVICE), /usr/bin/systemctl restart $(API_SERVICE), /usr/bin/systemctl is-active $(API_SERVICE), /usr/bin/systemctl show $(API_SERVICE)' >> $(SUDOERS_FILE)
 	@echo '$(USERNAME) ALL=(root) NOPASSWD: /usr/bin/systemctl start $(LOCATION_SERVICE), /usr/bin/systemctl stop $(LOCATION_SERVICE), /usr/bin/systemctl restart $(LOCATION_SERVICE), /usr/bin/systemctl is-active $(LOCATION_SERVICE), /usr/bin/systemctl show $(LOCATION_SERVICE)' >> $(SUDOERS_FILE)
-	@echo '$(USERNAME) ALL=(root) NOPASSWD: /opt/allsky360/scripts/allsky360-ai-run.sh *' >> $(SUDOERS_FILE)
+	@echo '$(USERNAME) ALL=(root) NOPASSWD: /opt/allsky360/scripts/allsky360-postprocessing-run.sh *' >> $(SUDOERS_FILE)
 	@echo '$(USERNAME) ALL=(root) NOPASSWD: /usr/bin/systemd-run' >> $(SUDOERS_FILE)
 	@sudo chmod 440 $(SUDOERS_FILE)
 	@echo "Sudoers entries installed at $(SUDOERS_FILE)"
@@ -549,10 +550,14 @@ REQ_FILE         ?= ./requirements-yolo11.txt
 PYVER_FILE       ?= ./python-version.txt
 PYTHON_BIN       ?= /usr/bin/python3
 
+# Jetson CUDA Torch wheels (exact URLs)
+TORCH_WHL     ?= https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl
+TORCHVISION_WHL ?= https://github.com/ultralytics/assets/releases/download/v0.0.0/torchvision-0.20.0a0+afc54f7-cp310-cp310-linux_aarch64.whl
+
 # You MUST run this target with sudo:
 #   sudo make yolov11
 yolov11:
-	@echo "[YOLO] Installing venv for user '$(USERNAME)' in '$(VENV_DIR)'"
+	@echo "[YOLO] Installing venv for user '$(USERNAME)' in '$(HOME_DIR)/venvs/yolo11'"
 	@id $(USERNAME) >/dev/null 2>&1 || (echo "User $(USERNAME) does not exist"; exit 1)
 	@test -f "$(REQ_FILE)" || (echo "Missing $(REQ_FILE)"; exit 1)
 	@test -f "$(PYVER_FILE)" || (echo "Missing $(PYVER_FILE)"; exit 1)
@@ -561,8 +566,11 @@ yolov11:
 	@echo "[YOLO] APT deps"
 	@apt-get update -y
 	@apt-get install -y \
-		python3-venv python3-pip jq \
-		python3-libnvinfer libnvinfer10 tensorrt-libs
+  		python3-venv python3-pip jq \
+  		python3-libnvinfer libnvtoolsext1 \
+  		libopenblas-dev libnvinfer-bin tensorrt-libs \
+		python3-libnvinfer-dev libnvinfer10 libnvinfer-dev \
+		libnvonnxparsers10 libnvonnxparsers-dev libnvinfer-plugin10
 
 	@echo "[YOLO] Create venv if missing"
 	@sudo -u $(USERNAME) -H bash -lc '\
@@ -573,15 +581,25 @@ yolov11:
 		"$(HOME_DIR)/venvs/yolo11/bin/python" -m pip install -U pip setuptools wheel \
 	'
 
-	@echo "[YOLO] Install pip requirements (filter Jetson-uninstallable packages)"
+	@echo "[YOLO] Install Jetson GPU Torch + Torchvision (exact wheels)"
 	@sudo -u $(USERNAME) -H bash -lc '\
-		tmp="$$(mktemp)"; \
-		grep -Ev "^(tensorrt|tensorrt-.*|tensorrt_cu.*|tensorrt-cu.*|onnxruntime-gpu)==" "$(REQ_FILE)" > "$$tmp"; \
-		"$(HOME_DIR)/venvs/yolo11/bin/pip" install -r "$$tmp"; \
-		rm -f "$$tmp"; \
+		"$(HOME_DIR)/venvs/yolo11/bin/python" -m pip uninstall -y torch torchvision torchaudio >/dev/null 2>&1 || true; \
+		"$(HOME_DIR)/venvs/yolo11/bin/python" -m pip install --no-cache-dir "$(TORCH_WHL)"; \
+		"$(HOME_DIR)/venvs/yolo11/bin/python" -m pip install --no-cache-dir "$(TORCHVISION_WHL)" \
 	'
 
-	@echo "[YOLO] Make system dist-packages (TensorRT from apt) visible in venv"
+	@echo "[YOLO] Install minimal pip deps (Ultralytics etc.)"
+	@sudo -u $(USERNAME) -H bash -lc '\
+		"$(HOME_DIR)/venvs/yolo11/bin/python" -m pip install "numpy==1.26.4" \
+	'
+	@sudo -u $(USERNAME) -H bash -lc '\
+		"$(HOME_DIR)/venvs/yolo11/bin/python" -m pip install "opencv-python==4.10.0.84" \
+	'
+	@sudo -u $(USERNAME) -H bash -lc '\
+		"$(HOME_DIR)/venvs/yolo11/bin/python" -m pip install -r "$(REQ_FILE)" \
+	'
+
+	@echo "[YOLO] Expose apt TensorRT python module to venv via .pth"
 	@sudo -u $(USERNAME) -H bash -lc '\
 		echo "/usr/lib/python3.10/dist-packages" > "$(HOME_DIR)/venvs/yolo11/lib/python3.10/site-packages/jetson_distpackages.pth" \
 	'
@@ -589,16 +607,38 @@ yolov11:
 	@echo "[YOLO] Smoke test (torch cuda + tensorrt import)"
 	@sudo -u $(USERNAME) -H bash -lc '\
 		source "$(HOME_DIR)/venvs/yolo11/bin/activate"; \
-		python - <<PY\n\
-import torch\n\
-print("torch:", torch.__version__)\n\
-print("cuda:", torch.cuda.is_available())\n\
-import tensorrt as trt\n\
-print("tensorrt:", trt.__version__)\n\
-PY \
+		python -c "import torch; print(\"torch:\", torch.__version__); print(\"cuda:\", torch.cuda.is_available()); import tensorrt as trt; print(\"tensorrt:\", trt.__version__); a=torch.tensor([1.0,2.0], device=\"cuda\"); print(\"tensor:\", a)" \
 	'
 
 	@echo "[YOLO] Done."
+
+TEST_IMAGE  ?= /opt/allsky360/allsky-api/public/images/20260117/image-20260117085159.jpg
+TEST_MODEL  ?= /opt/allsky360/ai/models/best.pt
+TEST_OUT    ?= /tmp/ultra
+
+yolov11test:
+	@if [ "$$(id -u)" -ne 0 ]; then echo "Run: sudo make yolov11test"; exit 1; fi
+	@test -f "$(TEST_IMAGE)" || (echo "Missing image: $(TEST_IMAGE)"; exit 1)
+	@test -f "$(TEST_MODEL)" || (echo "Missing model: $(TEST_MODEL)"; exit 1)
+
+	@echo "[YOLOTEST] Prepare output dir $(TEST_OUT)"
+	@rm -rf "$(TEST_OUT)"
+	@mkdir -p "$(TEST_OUT)"
+	@chown -R $(USERNAME):$(GROUPNAME) "$(TEST_OUT)"
+	@chmod 775 "$(TEST_OUT)"
+
+	@echo "[YOLOTEST] Torch CUDA check"
+	@sudo -u $(USERNAME) -H bash -lc '\
+		source "$(HOME_DIR)/venvs/yolo11/bin/activate"; \
+		python -c "import torch; print(\"torch:\", torch.__version__); print(\"cuda:\", torch.cuda.is_available()); assert torch.cuda.is_available()" \
+	'
+
+	@echo "[YOLOTEST] Run inference (pt)"
+	@sudo -u $(USERNAME) -H bash -lc '\
+		source "$(HOME_DIR)/venvs/yolo11/bin/activate"; \
+		"$(HOME_DIR)/venvs/yolo11/bin/yolo" predict task=classify model="$(TEST_MODEL)" imgsz=640 source="$(TEST_IMAGE)" \
+		  project="$(TEST_OUT)" name=test-pt exist_ok=True \
+	'
 
 install:
 	@if [ "$$(id -u)" -ne 0 ]; then \

@@ -36,25 +36,13 @@ int indigo_raw_get_width(const unsigned char *raw_data, int *width_out);
  */
 int indigo_raw_get_height(const unsigned char *raw_data, int *height_out);
 
-/** Load a Indigo raw array as rgb16
- *
- * @param rgb16_out: the output rgb16 data.
- * @param width_out: the width of the raw data.
- * @param height_out: the height of the raw data.
- * @param raw_data: the raw data.
- * @param debayer_alg: the debayer algorithm.
- * @return: 0 on success, 1 on error.
- */
-int indigo_raw_to_rgb16(unsigned short **rgb16_out, int *width_out,
-                        int *height_out, const unsigned char *raw_data,
-                        int debayer_alg);
-
 /** Load a Indigo raw array as rgbf
  *
  * @param rgba: the output rgbf data.
  * @param width: the width of the raw data.
  * @param height: the height of the raw data.
  * @param raw_data: the raw data.
+ * @param is_monochrome: whether the image is monochrome.
  * @param debayer_alg: the debayer algorithm.
  * @param crop_width: the width of the crop.
  * @param crop_height: the height of the crop.
@@ -63,7 +51,7 @@ int indigo_raw_to_rgb16(unsigned short **rgb16_out, int *width_out,
  * @return: 0 on success, 1 on error.
  */
 int indigo_raw_to_rgbf1(float *rgba, int width, int height,
-                        const unsigned char *raw_data, int debayer_alg,
+                        const unsigned char *raw_data, int is_monochrome, int debayer_alg,
                         int crop_width, int crop_height, int crop_offset_x,
                         int crop_offset_y);
 

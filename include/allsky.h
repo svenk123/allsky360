@@ -326,10 +326,13 @@ static inline float clampf1(float x) {
 }
 
 /* Compute Rec.709 linear luminance from RGB. */
-static inline float rgb_to_luma(float r, float g, float b) {
+static inline float rgb_to_luminance_rec709(float r, float g, float b) {
   return 0.2126f * r + 0.7152f * g + 0.0722f * b;
 }
 
+static inline float rgb_to_luminance(float r, float g, float b, float r_factor, float g_factor, float b_factor) {
+  return r_factor * r + g_factor * g + b_factor * b;
+}
 
 static inline int compare_floats(const void *a, const void *b) {
   float fa = *(const float *)a;

@@ -8,7 +8,7 @@ Allsky360 is an allsky camera system for continuous sky observation. It uses GPU
 
 The system automatically captures images from your camera and processes them through a pipeline of filters and enhancements. It connects to your camera via [INDIGO](https://github.com/indigo-astronomy/indigo), which is pretty much the standard for astronomy cameras these days.
 
-The GPU acceleration is the key feature here. On a Jetson Orin NX, for example, you can process full-resolution images in seconds instead of minutes. That makes it feasible to run continuously without bogging down the system.
+The GPU acceleration is the key feature here. On a [NVidia Orin NX](https://developer.nvidia.com/embedded-computing), for example, you can process full-resolution images in seconds instead of minutes. That makes it feasible to run continuously without bogging down the system.
 
 ## Features
 
@@ -38,7 +38,7 @@ The GPU acceleration is the key feature here. On a Jetson Orin NX, for example, 
 
 ## What you need
 
-You'll need an NVIDIA GPU with CUDA support. I've been running this on a Jetson Orin NX, but any CUDA-capable GPU should work fine.
+You'll need an NVIDIA GPU with CUDA support. I've been running this on a [Jetson Orin NX](https://developer.nvidia.com/embedded-computing), but any CUDA-capable GPU should work fine.
 
 The system runs on Linux (Ubuntu or Debian). You'll also need INDIGO server running – it handles the camera communication. Most modern astronomy cameras work with INDIGO, so compatibility is usually not an issue.
 
@@ -49,6 +49,7 @@ The installation process is documented in [INSTALL.md](INSTALL.md). The main thi
 ## Documentation
 
 - [INSTALL.md](INSTALL.md) – Installation instructions
+- [CONFIGURATION.md](CONFIGURATION.md) - Setup and configuration
 - [HDR-FUSION.md](HDR-FUSION.md) – How the HDR processing works
 - [POSTPROCESSING.md](POSTPROCESSING.md) – Tips for post-processing your images
 - [TOOLS.md](TOOLS.md) – Command-line tools and utilities

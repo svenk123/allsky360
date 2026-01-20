@@ -31,7 +31,7 @@ struct HdrFrames {
   double median_r;
   double median_g;
   double median_b;
-  double brightness;
+  double median_l;
   float sigma_noise;
 };
 

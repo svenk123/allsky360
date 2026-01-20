@@ -154,9 +154,9 @@
           if (typeof config.capture_interval === 'number') {
             captureIntervalSec = config.capture_interval;
           }
-          if (typeof config.latitude === 'number' && typeof config.longitude === 'number') {
-            configLat = config.latitude;
-            configLon = config.longitude;
+          if (typeof config.location_latitude === 'number' && typeof config.location_longitude === 'number') {
+            configLat = config.location_latitude;
+            configLon = config.location_longitude;
           }
         }
       } catch (e) {

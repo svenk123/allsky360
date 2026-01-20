@@ -144,8 +144,8 @@ int main(int argc, char *argv[]) {
   }
   printf("-----------------------\n");
 
-  latitude = config.latitude;
-  longitude = config.longitude;
+  latitude = config.location_latitude;
+  longitude = config.location_longitude;
 
   if (timestamp_str) {
     timestamp = parse_timestamp(timestamp_str);

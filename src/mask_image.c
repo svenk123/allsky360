@@ -54,7 +54,7 @@ int mask_image_circle_rgbf1(float *rgba_image, int width, int height,
                 rgba_image[index + 0] = 0.0f;  // R
                 rgba_image[index + 1] = 0.0f;  // G
                 rgba_image[index + 2] = 0.0f;  // B
-                // A channel (index + 3) stays unchanged
+                rgba_image[index + 3] = 0.0f;  // A channel is luminance channel
             }
             // else: leave pixel untouched
         }

@@ -421,9 +421,9 @@ projection_type=${projectionType}`;
       maskCenterX = configData.image_center_x || crosshairCenterX;
       maskCenterY = configData.image_center_y || crosshairCenterY;
 
-      latitude = configData.latitude;
-      longitude = configData.longitude;
-      altitude = configData.altitude;
+      latitude = configData.location_latitude;
+      longitude = configData.location_longitude;
+      altitude = configData.location_altitude;
       isSouthernHemisphere = latitude < 0.0;
 
       // Eingabefelder mit den Konfigurationswerten füllen

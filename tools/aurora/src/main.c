@@ -173,8 +173,8 @@ int main(int argc, char *argv[]) {
   }
 
   if (!lat_set || !lon_set) {
-    latitude = config.latitude;
-    longitude = config.longitude;
+    latitude = config.location_latitude;
+    longitude = config.location_longitude;
   }
 
   if (timestamp_str) {

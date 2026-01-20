@@ -753,6 +753,69 @@ const server = http.createServer((req, res) => {
             res.end(JSON.stringify({ error: err.message }));
         }
 
+    // Serve image files from images directory
+    } else if (pathname.startsWith('/images/')) {
+        // Remove /images/ prefix to get the relative path
+        const imageRelativePath = pathname.substring(8); // Remove '/images/'
+        const imagesPath = IMAGE_PATH;
+        const publicImagesPath = path.join(PUBLIC_PATH, 'images');
+
+        // Candidates: images/ first, then public/images/
+        const imageFileCandidates = [
+            path.join(imagesPath, imageRelativePath),
+            path.join(publicImagesPath, imageRelativePath)
+        ];
+
+        // Determine the first existing file
+        let imageFilePath = null;
+        for (const candidate of imageFileCandidates) {
+            if (fs.existsSync(candidate)) {
+                imageFilePath = candidate;
+                break;
+            }
+        }
+
+        if (!imageFilePath) {
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            return res.end("File not found.");
+        }
+
+        // Security: Prevent directory traversal (allow only within images or public/images)
+        const resolvedPath = path.resolve(imageFilePath);
+        const resolvedImagesPath = path.resolve(imagesPath);
+        const resolvedPublicImagesPath = path.resolve(publicImagesPath);
+        if (
+            !resolvedPath.startsWith(resolvedImagesPath) &&
+            !resolvedPath.startsWith(resolvedPublicImagesPath)
+        ) {
+            res.writeHead(403, { 'Content-Type': 'text/plain' });
+            return res.end("Access denied.");
+        }
+
+        // Check if file exists and is an allowed file type
+        const ext = path.extname(imageFilePath).toLowerCase();
+        const allowedImageExtensions = ['.jpg', '.jpeg', '.png', '.json'];
+        if (!allowedImageExtensions.includes(ext) || imageFilePath.endsWith('.db')) {
+            res.writeHead(403, { 'Content-Type': 'text/plain' });
+            return res.end("Access denied.");
+        }
+
+        // Determine content type based on file extension
+        const contentType = mime.lookup(ext) || 'application/octet-stream';
+
+        fs.readFile(imageFilePath, (err, content) => {
+            if (err) {
+                res.writeHead(404, { 'Content-Type': 'text/plain' });
+                res.end("File not found.");
+            } else {
+                res.writeHead(200, {
+                    'Content-Type': contentType,
+                    'Content-Length': content.length
+                });
+                res.end(content);
+            }
+        });
+
     // Serve video files from videos directory
     } else if (pathname.startsWith('/videos/')) {
         // Remove /videos/ prefix to get the relative path

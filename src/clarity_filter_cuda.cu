@@ -33,7 +33,7 @@
 #define CLARITY_MASK_RGB_OR_ALPHA 3
 
 /* Compute Rec.709 linear luminance from RGB */
-__device__ inline float rgb_to_luma(float r, float g, float b) {
+__device__ inline float rgb_to_luminance_rec709(float r, float g, float b) {
     return 0.2126f * r + 0.7152f * g + 0.0722f * b;
 }
 
@@ -99,7 +99,7 @@ __global__ void compute_luma_and_mask_kernel(const float *rgba_image, float *lum
     int masked = is_masked(p, mask_mode);
     valid[i] = masked ? 0 : 1;
     
-    float y = rgb_to_luma(p[0], p[1], p[2]);
+    float y = rgb_to_luminance_rec709(p[0], p[1], p[2]);
     luma[i] = CLAMPF(y);
 }
 
@@ -195,7 +195,7 @@ __global__ void remap_rgb_kernel(float *rgba_image, const float *luma_new,
     if (!valid[i]) return; // Skip masked pixels
     
     float *p = rgba_image + i * CHANNELS;
-    float y_old = rgb_to_luma(p[0], p[1], p[2]);
+    float y_old = rgb_to_luminance_rec709(p[0], p[1], p[2]);
     float scale = safe_ratio(luma_new[i], y_old);
     
     if (y_old < 1e-4f) {

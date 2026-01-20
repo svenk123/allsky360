@@ -110,9 +110,9 @@ int main(int argc, const char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (!longitude_set) longitude = config.longitude;
-    if (!latitude_set) latitude = config.latitude;
-    if (!altitude_set) altitude = config.altitude;
+    if (!longitude_set) longitude = config.location_longitude;
+    if (!latitude_set) latitude = config.location_latitude;
+    if (!altitude_set) altitude = config.location_altitude;
 
     time_t now = time(NULL);
     double decl;
@@ -129,10 +129,10 @@ int main(int argc, const char *argv[]) {
     json_object *jout = json_object_new_object();
 
     json_object_object_add(jout, "longitude", json_object_new_double(longitude));
-    json_object_object_add(jout, "latitude", json_object_new_double(latitude));
+    json_object_object_add(jout, "location_latitude", json_object_new_double(latitude));
     json_object_object_add(jout, "altitude", json_object_new_double(altitude));
     json_object_object_add(jout, "magnetic_declination", json_object_new_double(decl));
-    json_object_object_add(jout, "city", json_object_new_string(config.city));
+    json_object_object_add(jout, "city", json_object_new_string(config.location_city));
 
     const char *json_str = json_object_to_json_string_ext(jout, JSON_C_TO_STRING_PRETTY);
     if (outfile) {

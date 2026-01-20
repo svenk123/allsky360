@@ -1114,6 +1114,108 @@
       return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
     }
 
+    function formatWeatherLabel(value) {
+      if (value === null || value === undefined || value === '') return 'N/A';
+      return String(value).replace(/_/g, ' ');
+    }
+
+    function formatWeatherScore(value) {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value.toFixed(1);
+      }
+      if (value === null || value === undefined || value === '') return 'N/A';
+      return String(value);
+    }
+
+    function safeFixed(value, digits, fallback = 'N/A') {
+      return (typeof value === 'number' && Number.isFinite(value)) ? value.toFixed(digits) : fallback;
+    }
+
+    function safeNumber(value, fallback = 'N/A') {
+      return (typeof value === 'number' && Number.isFinite(value)) ? value : fallback;
+    }
+
+    function getWeatherIconHtml(value) {
+      const key = value ? String(value).toLowerCase() : '';
+      const baseStyle = 'style="width: 18px; height: 18px; display: inline-block; flex: 0 0 auto;"';
+      const svg = (title, body) => (
+        `<svg viewBox="0 0 24 24" ${baseStyle} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="${title}">${body}</svg>`
+      );
+      const svgFill = (title, body) => (
+        `<svg viewBox="0 0 24 24" ${baseStyle} fill="currentColor" stroke="none" role="img" aria-label="${title}">${body}</svg>`
+      );
+
+      switch (key) {
+        case 'clear':
+        case 'day':
+          return svg('clear', `
+            <circle cx="12" cy="12" r="4"></circle>
+            <line x1="12" y1="1" x2="12" y2="4"></line>
+            <line x1="12" y1="20" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"></line>
+            <line x1="17.66" y1="17.66" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="4" y2="12"></line>
+            <line x1="20" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="6.34" y2="17.66"></line>
+            <line x1="17.66" y1="6.34" x2="19.78" y2="4.22"></line>
+          `);
+        case 'clear_glare':
+          return svg('clear glare', `
+            <circle cx="12" cy="12" r="4"></circle>
+            <line x1="12" y1="1" x2="12" y2="4"></line>
+            <line x1="12" y1="20" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"></line>
+            <line x1="17.66" y1="17.66" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="4" y2="12"></line>
+            <line x1="20" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="6.34" y2="17.66"></line>
+            <line x1="17.66" y1="6.34" x2="19.78" y2="4.22"></line>
+            <line x1="5" y1="19" x2="19" y2="5"></line>
+          `);
+        case 'night':
+          return svgFill('night', `
+            <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"></path>
+          `);
+        case 'overcast':
+          return svg('overcast', `
+            <path d="M20 17.5a4.5 4.5 0 0 0-1.1-8.9A6 6 0 0 0 6 10a3.5 3.5 0 0 0 0 7.5h14z"></path>
+          `);
+        case 'partly_cloudy':
+          return svg('partly cloudy', `
+            <circle cx="7" cy="7" r="3"></circle>
+            <line x1="7" y1="1" x2="7" y2="3"></line>
+            <line x1="2.5" y1="4.5" x2="4" y2="6"></line>
+            <line x1="10" y1="4.5" x2="8.5" y2="6"></line>
+            <path d="M20 18a4 4 0 0 0-1-7.8A5.5 5.5 0 0 0 7.5 12a3 3 0 0 0 0 6h12.5z"></path>
+          `);
+        case 'rain':
+          return svg('rain', `
+            <path d="M20 17.5a4.5 4.5 0 0 0-1.1-8.9A6 6 0 0 0 6 10a3.5 3.5 0 0 0 0 7.5h14z"></path>
+            <line x1="8" y1="19" x2="8" y2="22"></line>
+            <line x1="12" y1="19" x2="12" y2="22"></line>
+            <line x1="16" y1="19" x2="16" y2="22"></line>
+          `);
+        case 'snow':
+          return svg('snow', `
+            <path d="M20 17.5a4.5 4.5 0 0 0-1.1-8.9A6 6 0 0 0 6 10a3.5 3.5 0 0 0 0 7.5h14z"></path>
+            <line x1="8" y1="19" x2="10" y2="21"></line>
+            <line x1="10" y1="19" x2="8" y2="21"></line>
+            <line x1="12" y1="19" x2="14" y2="21"></line>
+            <line x1="14" y1="19" x2="12" y2="21"></line>
+            <line x1="16" y1="19" x2="18" y2="21"></line>
+            <line x1="18" y1="19" x2="16" y2="21"></line>
+          `);
+        case 'fog':
+          return svg('fog', `
+            <path d="M20 15.5a4.5 4.5 0 0 0-1.1-8.9A6 6 0 0 0 6 8a3.5 3.5 0 0 0 0 7.5h14z"></path>
+            <line x1="4" y1="18" x2="20" y2="18"></line>
+            <line x1="6" y1="21" x2="18" y2="21"></line>
+          `);
+        default:
+          return svg('weather', `<circle cx="12" cy="12" r="8"></circle>`);
+      }
+    }
+
     function updateStorageWidget(storageData) {
       const storageEl = document.getElementById('storage-content');
       if (!storageEl) return;
@@ -2086,9 +2188,9 @@
       crosshairCenterY = configData.image_zenith_y;
       crosshairRotation = configData.image_north_angle;
 
-      latitude = configData.latitude;
-      longitude = configData.longitude;
-      altitude = configData.altitude;
+      latitude = configData.location_latitude;
+      longitude = configData.location_longitude;
+      altitude = configData.location_altitude;
       isSouthernHemisphere = latitude < 0.0;
 
       loadingConfig = false;
@@ -2330,29 +2432,43 @@
         let locationHtml = `
       <div class="metadata-section">
         <h2>Location</h2>
-        <div style="display: flex; justify-content: space-between;">Longitude: <span>${longitude.toFixed(4)}</span></div>
-        <div style="display: flex; justify-content: space-between;">Latitude: <span>${latitude.toFixed(4)}</span></div>
-        <div style="display: flex; justify-content: space-between;">Altitude: <span>${altitude}m</span></div>
-        <div style="margin-top: 0.5rem;"><a href="https://maps.google.com/?q=${latitude},${longitude}" target="_blank" style="color: #4af; text-decoration: underline;">→ Go to Google Maps</a></div>
+        <div style="display: flex; justify-content: space-between;">Longitude: <span>${safeFixed(longitude, 4)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Latitude: <span>${safeFixed(latitude, 4)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Altitude: <span>${safeNumber(altitude)}m</span></div>
+        <div style="margin-top: 0.5rem;"><a href="https://maps.google.com/?q=${safeNumber(latitude)},${safeNumber(longitude)}" target="_blank" style="color: #4af; text-decoration: underline;">→ Go to Google Maps</a></div>
       </div>`;
 
         let weatherHtml = '';
-        if (weatherMeta) {
+        const hasWeatherClass = imageMeta && (imageMeta.weather !== undefined || imageMeta.weather_score !== undefined);
+        if (weatherMeta || hasWeatherClass) {
+          let weatherLines = '';
+          if (hasWeatherClass) {
+            const weatherLabel = formatWeatherLabel(imageMeta.weather);
+            const weatherScore = formatWeatherScore(imageMeta.weather_score);
+            const weatherIcon = getWeatherIconHtml(imageMeta.weather);
+            weatherLines += `
+        <div style="display: flex; justify-content: space-between;">Weather: <span style="display: flex; align-items: center; gap: 0.4rem;">${weatherIcon}<span>${weatherLabel}</span></span></div>
+        <div style="display: flex; justify-content: space-between;">Weather score: <span>${weatherScore}</span></div>`;
+          }
+          if (weatherMeta) {
+            weatherLines += `
+        <div style="display: flex; justify-content: space-between;">Temperature (°C): <span>${safeFixed(weatherMeta.temperature, 1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Humidity (%): <span>${safeFixed(weatherMeta.humidity, 1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Dew point (°C): <span>${safeFixed(weatherMeta.dew_point, 1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Pressure MSL (hPa): <span>${safeFixed(weatherMeta.pressure_msl, 1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Surface pressure (hPa): <span>${safeFixed(weatherMeta.surface_pressure, 1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Cloud low (%): <span>${safeFixed(weatherMeta.cloud_low, 1)} <span style="display:inline-block; width: 1.5em; height: 1em; background-color: ${cloudCoverToRGB(safeNumber(weatherMeta.cloud_low, 0))};"></span></span></div>
+        <div style="display: flex; justify-content: space-between;">Cloud mid (%): <span>${safeFixed(weatherMeta.cloud_mid, 1)} <span style="display:inline-block; width: 1.5em; height: 1em; background-color: ${cloudCoverToRGB(safeNumber(weatherMeta.cloud_mid, 0))};"></span></span></div>
+        <div style="display: flex; justify-content: space-between;">Cloud high (%): <span>${safeFixed(weatherMeta.cloud_high, 1)} <span style="display:inline-block; width: 1.5em; height: 1em; background-color: ${cloudCoverToRGB(safeNumber(weatherMeta.cloud_high, 0))};"></span></span></div>
+        <div style="display: flex; justify-content: space-between;">Visibility (km): <span>${safeFixed(safeNumber(weatherMeta.visibility, 0) * 0.001, 1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Wind speed 10 m (km/h): <span>${safeFixed(weatherMeta.wind_speed_10m, 1)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Wind direction 10 m (°): <span>${safeFixed(weatherMeta.wind_dir_10m, 0)}</span></div>
+        <div style="display: flex; justify-content: space-between;">Jetstream @9.2km (km/h): <span>${safeFixed(weatherMeta.wind_speed_300hPa, 1)} ${getSeeingLabel(safeNumber(weatherMeta.wind_speed_300hPa, 0))}</span></div>`;
+          }
           weatherHtml = `
       <div class="metadata-section">
         <h2>Weather</h2>
-        <div style="display: flex; justify-content: space-between;">Temperature (°C): <span>${weatherMeta.temperature.toFixed(1)}</span></div>
-        <div style="display: flex; justify-content: space-between;">Humidity (%): <span>${weatherMeta.humidity.toFixed(1)}</span></div>
-        <div style="display: flex; justify-content: space-between;">Dew point (°C): <span>${weatherMeta.dew_point.toFixed(1)}</span></div>
-        <div style="display: flex; justify-content: space-between;">Pressure MSL (hPa): <span>${weatherMeta.pressure_msl.toFixed(1)}</span></div>
-        <div style="display: flex; justify-content: space-between;">Surface pressure (hPa): <span>${weatherMeta.surface_pressure.toFixed(1)}</span></div>
-        <div style="display: flex; justify-content: space-between;">Cloud low (%): <span>${weatherMeta.cloud_low.toFixed(1)} <span style="display:inline-block; width: 1.5em; height: 1em; background-color: ${cloudCoverToRGB(weatherMeta.cloud_low)};"></span></span></div>
-        <div style="display: flex; justify-content: space-between;">Cloud mid (%): <span>${weatherMeta.cloud_mid.toFixed(1)} <span style="display:inline-block; width: 1.5em; height: 1em; background-color: ${cloudCoverToRGB(weatherMeta.cloud_mid)};"></span></span></div>
-        <div style="display: flex; justify-content: space-between;">Cloud high (%): <span>${weatherMeta.cloud_high.toFixed(1)} <span style="display:inline-block; width: 1.5em; height: 1em; background-color: ${cloudCoverToRGB(weatherMeta.cloud_high)};"></span></span></div>
-        <div style="display: flex; justify-content: space-between;">Visibility (km): <span>${weatherMeta.visibility.toFixed(0) * 0.001}</span></div>
-        <div style="display: flex; justify-content: space-between;">Wind speed 10 m (km/h): <span>${(weatherMeta.wind_speed_10m).toFixed(1)}</span></div>
-        <div style="display: flex; justify-content: space-between;">Wind direction 10 m (°): <span>${weatherMeta.wind_dir_10m.toFixed(0)}</span></div>
-        <div style="display: flex; justify-content: space-between;">Jetstream @9.2km (km/h): <span>${(weatherMeta.wind_speed_300hPa).toFixed(1)} ${getSeeingLabel(weatherMeta.wind_speed_300hPa)}</span></div>
+${weatherLines}
       </div>`;
         }
 

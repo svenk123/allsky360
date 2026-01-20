@@ -22,12 +22,26 @@
 #include <stdlib.h>
 #include <string.h>
 
+float calc_exposure_time(float t0, int ev_steps, int index) {
+  if (index <= 0) {
+    // index 0 = longest exposure → no reduction
+    return t0;
+  }
+
+  float exponent = (float)(index * ev_steps);
+  float factor = powf(2.0f, exponent);
+
+  return t0 / factor;
+}
+
 int adjust_exposure_gain(double brightness, double target_brightness,
                          double max_exposure, double min_exposure,
                          double max_gain, double min_gain, double *exposure,
                          double *gain) {
-  if (brightness == 0.0 || target_brightness == 0.0)
+  if (brightness == 0.0 || target_brightness == 0.0) {
+    printf("No brightness or target brightness\n");
     return 1;
+  }
 
   double prev_exposure = *exposure;
   double prev_gain = *gain;
@@ -159,12 +173,6 @@ int update_exposure_controller(ExposureController *ctrl, float current_median,
     // Example: day = 0.3, night = 0.8
     target =
         0.3f + 0.3f * expf(-4.0f * median_avg); // adjust exponent as needed
-
-    // float ev = log2f(ctrl->shutter * ctrl->gain);  // pseudo Belichtungswert
-    //  target = 0.04f + 0.36f * sigmoid(ev);
-
-    // day = 0.4, night = 0.04
-    //	target = 0.04f + 0.36f * (1.0f - expf(-5.0f * median_avg));
   }
   printf(" current_median: %.2f, target_median: %.2f (%s)\n", current_median,
          target, target_median > 0.0f ? "fixed" : "dynamic");
@@ -237,47 +245,64 @@ static double compute_channel_median(const unsigned int *histogram,
   return (double)median_bin / (MEDIAN_BINS - 1);
 }
 
-int compute_filtered_median_brightness_rgbf1(
-    const float *rgba, int width, int height, double center_pct,
-    double *red_brightness, double *green_brightness, double *blue_brightness) {
+int compute_filtered_median_brightness_rgbf1(const float *rgba, int width,
+                                             int height, double *red_brightness,
+                                             double *green_brightness,
+                                             double *blue_brightness,
+                                             double *luminance_brightness,
+                                             int cx, int cy, int radius) {
   if (!rgba || width <= 0 || height <= 0 || !red_brightness ||
-      !green_brightness || !blue_brightness)
+      !green_brightness || !blue_brightness || !luminance_brightness ||
+      cx < 0 || cy < 0 || radius <= 0)
     return 1;
 
-  if (center_pct < 0.1)
-    center_pct = 0.1;
-  if (center_pct > 1.0)
-    center_pct = 1.0;
+  printf("Compute filtered median brightness: cx: %d, cy: %d, radius: %d\n", cx,
+         cy, radius);
 
-  double margin = (1.0 - center_pct) / 2.0;
-  int x_start = (int)(width * margin);
-  int x_end = (int)(width * (1.0 - margin));
-  int y_start = (int)(height * margin);
-  int y_end = (int)(height * (1.0 - margin));
+  int radius2 = radius * radius;
+
+  /* Calculate the boundaries of the enclosing rectangle for optimization */
+  int x_start = (cx - radius > 0) ? cx - radius : 0;
+  int x_end = (cx + radius < width) ? cx + radius + 1 : width;
+  int y_start = (cy - radius > 0) ? cy - radius : 0;
+  int y_end = (cy + radius < height) ? cy + radius + 1 : height;
 
   unsigned int histogram_r[MEDIAN_BINS] = {0};
   unsigned int histogram_g[MEDIAN_BINS] = {0};
   unsigned int histogram_b[MEDIAN_BINS] = {0};
+  unsigned int histogram_l[MEDIAN_BINS] = {0};
   int total_pixels = 0;
 
   for (int y = y_start; y < y_end; y++) {
     for (int x = x_start; x < x_end; x++) {
+      /* Calculate the distance from the pixel to the center */
+      int dx = x - cx;
+      int dy = y - cy;
+      int dist2 = dx * dx + dy * dy;
+
+      /* Only process pixels within the circle */
+      if (dist2 > radius2)
+        continue;
+
       int offset = (y * width + x) * CHANNELS;
       float r = rgba[offset + 0];
       float g = rgba[offset + 1];
       float b = rgba[offset + 2];
+      float l = rgba[offset + 3];
 
-      // Pixel mit RGB=0 ignorieren
-      if (r == 0.0f && g == 0.0f && b == 0.0f)
+      /* Ignore pixels with zero RGB or zero luminance values */
+      if (r == 0.0f && g == 0.0f && b == 0.0f && l == 0.0f)
         continue;
 
       int r_bin = (int)(clampf1(r) * (MEDIAN_BINS - 1) + 0.5f);
       int g_bin = (int)(clampf1(g) * (MEDIAN_BINS - 1) + 0.5f);
       int b_bin = (int)(clampf1(b) * (MEDIAN_BINS - 1) + 0.5f);
+      int l_bin = (int)(clampf1(l) * (MEDIAN_BINS - 1) + 0.5f);
 
       histogram_r[r_bin]++;
       histogram_g[g_bin]++;
       histogram_b[b_bin]++;
+      histogram_l[l_bin]++;
       total_pixels++;
     }
   }
@@ -286,38 +311,19 @@ int compute_filtered_median_brightness_rgbf1(
     *red_brightness = 0.0;
     *green_brightness = 0.0;
     *blue_brightness = 0.0;
+    *luminance_brightness = 0.0;
     return 0;
   }
 
   *red_brightness = compute_channel_median(histogram_r, total_pixels);
   *green_brightness = compute_channel_median(histogram_g, total_pixels);
   *blue_brightness = compute_channel_median(histogram_b, total_pixels);
+  *luminance_brightness = compute_channel_median(histogram_l, total_pixels);
 
-  printf("Filtered median brightness calculation (RGB, %.0f%% center region): "
-         "R=%.3f G=%.3f B=%.3f\n",
-         center_pct * 100, *red_brightness, *green_brightness,
-         *blue_brightness);
-
-  return 0;
-}
-
-int compute_filtered_median_brightness_green_rgbf1(const float *rgba, int width,
-                                                   int height,
-                                                   double center_pct,
-                                                   double *brightness) {
-  if (!brightness)
-    return 1;
-
-  double r = 0.0;
-  double g = 0.0;
-  double b = 0.0;
-
-  int status = compute_filtered_median_brightness_rgbf1(
-      rgba, width, height, center_pct, &r, &g, &b);
-  if (status != 0)
-    return status;
-
-  *brightness = g;
+  printf("Filtered median brightness calculation (circular region, radius=%d): "
+         "R=%.3f G=%.3f B=%.3f L=%.3f\n",
+         radius, *red_brightness, *green_brightness, *blue_brightness,
+         *luminance_brightness);
 
   return 0;
 }

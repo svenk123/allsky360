@@ -24,12 +24,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/wait.h>
-#include <sys/resource.h>
 
 #include <indigo/indigo_bus.h>
 #include <indigo/indigo_ccd_driver.h>
@@ -485,7 +485,7 @@ void setup_signal_handlers() {
  *   3 = waitpid error on intermediate child
  *   127 = execl failed
  */
-int run_end_of_night_tasks(void) {
+int run_end_of_night(const char *image_directory, const char *database_directory, const char *video_directory) {
   pid_t pid = fork();
   if (pid < 0) {
     // First fork failed
@@ -537,37 +537,42 @@ int run_end_of_night_tasks(void) {
       close(devnull);
   }
 
-  // Execute sudo/systemd-run
-  execl("/usr/bin/sudo", "sudo", "/usr/bin/systemd-run",
-        "--unit=allsky360-endofnight-%j",
-        "--description=Allsky360 End of Night Tasks", "--collect",
-        "/opt/allsky360/scripts/endofnight.sh", (char *)NULL);
+  // Execute sudo + systemd-run + script
+  // Assumes sudoers allows this without password for the running user.
+
+  setenv("ALLSKY360_IMAGE_DIRECTORY", image_directory, 1);
+  setenv("ALLSKY360_DATABASE_DIRECTORY", database_directory, 1);
+  setenv("ALLSKY360_VIDEO_DIRECTORY", video_directory, 1);
+
+  execl("/usr/bin/sudo", "sudo",
+    "/opt/allsky360/scripts/allsky360-endofnight-run.sh",
+    image_path,
+    (char *)NULL);
 
   // If execl returns, something failed
   _exit(127);
 }
 
 /**
- * Run AI processing asynchronously via systemd-run + sudo.
- * 
+ * Run postprocessing asynchronously via systemd-run + sudo.
+ *
  * This function:
  *  - validates the image_path,
  *  - double-forks to avoid zombies and detach from the parent,
  *  - redirects stdio to /dev/null in the final child,
  *  - executes:
- *      sudo /usr/bin/systemd-run --unit=ai-processing-%j \
- *           --description=Allsky360 AI Processing --collect \
- *           /opt/allsky360/scripts/run_ai_processing.sh <image_path>
- * 
+ *      sudo /usr/bin/systemd-run 
+ *           /opt/allsky360/scripts/allsky360-postprocessing-run.sh <image_path>
+ *
  * @param image_path: path to the image
- * @return: 
+ * @return:
  *   0 = background job successfully spawned
  *   1 = parameter/usage error
  *   2 = fork error
  *   3 = waitpid error on intermediate child
  *   127 = execl failed (something went wrong)
  */
-int run_ai_processing(const char *image_path) {
+int run_postprocessing(const char *today_str, const char *now_str, int is_night, const char *image_path, const char *image_directory) {
   if (!image_path || image_path[0] == '\0') {
     // Parameter/usage error
     return 1;
@@ -630,9 +635,15 @@ int run_ai_processing(const char *image_path) {
 
   // Execute sudo + systemd-run + script
   // Assumes sudoers allows this without password for the running user.
-  execl("/usr/bin/sudo", "sudo", "/usr/bin/systemd-run",
-        "--unit=ai-processing-%j", "--description=Allsky360 AI Processing",
-        "--collect", "/opt/allsky360/scripts/run_ai_processing.sh", image_path,
+
+  setenv("ALLSKY360_TODAY_STR", today_str, 1);
+  setenv("ALLSKY360_NOW_STR", now_str, 1);
+  setenv("ALLSKY360_IS_NIGHT", is_night ? "1" : "0", 1);
+  setenv("ALLSKY360_IMAGE_PATH", image_path, 1);
+  setenv("ALLSKY360_IMAGE_DIRECTORY", image_directory, 1);
+  execl("/usr/bin/sudo", "sudo",
+        "/opt/allsky360/scripts/allsky360-postprocessing-run.sh",
+        image_path,
         (char *)NULL);
 
   // If execl returns, something went wrong
@@ -665,28 +676,6 @@ long get_timezone_offset_seconds(time_t utc_timestamp) {
 #endif
 }
 
-/* Compute exposure time for HDR bracketing.
- *
- * t0        = longest exposure time in seconds (float)
- * ev_steps  = EV distance between exposures (e.g. 1 or 2)
- * index     = image index: 0 = longest exposure, 1 = next shorter, etc.
- *
- * The formula:
- * t(index) = t0 / powf(2.0f, index * ev_steps)
- */
-
-float calc_exposure_time(float t0, int ev_steps, int index) {
-  if (index <= 0) {
-    // index 0 = longest exposure → no reduction
-    return t0;
-  }
-
-  float exponent = (float)(index * ev_steps);
-  float factor = powf(2.0f, exponent);
-
-  return t0 / factor;
-}
-
 /***** Main function **********/
 
 int main(int argc, const char *argv[]) {
@@ -699,6 +688,7 @@ int main(int argc, const char *argv[]) {
   const char *img2 = NULL;
   const char *img3 = NULL;
   const char *img4 = NULL;
+  int dryrun = 0;
   config_t config;
 
   image_metadata_t image_metadata = {0};
@@ -779,6 +769,8 @@ int main(int argc, const char *argv[]) {
         fprintf(stderr, "Error: --img4 requires a file path\n");
         exit(1);
       }
+    } else if (strcmp(argv[i], "--dryrun") == 0) {
+      dryrun = 1;
     } else if ((strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0 ||
                 strcmp(argv[i], "-?") == 0)) {
       printf("%s v%s\n", argv[0], PROG_VERSION);
@@ -789,6 +781,8 @@ int main(int argc, const char *argv[]) {
       printf("--start-gain|-g gain           Start gain\n");
       printf("--verbose [n]|-v[n]            Verbosity level (e.g., -vv or "
              "--verbose 2)\n");
+      printf(
+          "--dryrun                       Dry run mode to load images only\n");
       printf("--img0 file                    Optional image file 0\n");
       printf("--img1 file                    Optional image file 1\n");
       printf("--img2 file                    Optional image file 2\n");
@@ -829,7 +823,7 @@ int main(int argc, const char *argv[]) {
     frames[i].median_r = 0.0f;
     frames[i].median_g = 0.0f;
     frames[i].median_b = 0.0f;
-    frames[i].brightness = 0.0f;
+    frames[i].median_l = 0.0f;
     frames[i].sigma_noise = 0.0f;
   }
 
@@ -862,8 +856,8 @@ int main(int argc, const char *argv[]) {
   }
 
   /* Check if it is night or day */
-  int is_night =
-      is_sun_below_6_degrees(time(NULL), config.longitude, config.latitude);
+  int is_night = is_sun_below_6_degrees(time(NULL), config.location_longitude,
+                                        config.location_latitude);
   printf("Night mode: %s\n", is_night ? "on" : "off");
 
   /* Set exposure und gain initially */
@@ -922,13 +916,13 @@ int main(int argc, const char *argv[]) {
 
       /* Set day or night mode */
       int was_night = is_night;
-      is_night =
-          is_sun_below_6_degrees(time(NULL), config.longitude, config.latitude);
+      is_night = is_sun_below_6_degrees(time(NULL), config.location_longitude,
+                                        config.location_latitude);
 
       if (was_night && !is_night) {
         printf(
             "It is night and it is now day. Starting end of night tasks...\n");
-        if (run_end_of_night_tasks() != 0) {
+        if (run_end_of_night_tasks(config.image_directory, config.database_directory, config.video_directory) != 0) {
           fprintf(stderr, "ERROR: Failed to run end of night tasks.\n");
         }
         printf("End of night tasks started\n");
@@ -1006,7 +1000,7 @@ int main(int argc, const char *argv[]) {
         frames[i].median_r = 0.0f;
         frames[i].median_g = 0.0f;
         frames[i].median_b = 0.0f;
-        frames[i].brightness = 0.0f;
+        frames[i].median_l = 0.0f;
         frames[i].sigma_noise = 0.0f;
       }
 
@@ -1018,9 +1012,9 @@ int main(int argc, const char *argv[]) {
 
       /* Set debayer algorithm */
       int debayer_alg = DEBAYER_ALG_NNI;
-      if (!strcmp(config.debayer, "bilinear"))
+      if (!strcmp(config.camera_debayer, "bilinear"))
         debayer_alg = DEBAYER_ALG_BILINEAR;
-      if (!strcmp(config.debayer, "vng"))
+      if (!strcmp(config.camera_debayer, "vng"))
         debayer_alg = DEBAYER_ALG_VNG;
 
       clock_t function_start = 0;
@@ -1072,47 +1066,52 @@ int main(int argc, const char *argv[]) {
           }
         }
 
-        /* Check if image file parameter is provided for this frame index */
-        const char *img_file = NULL;
-        if (i == 0 && img0 != NULL)
-          img_file = img0;
-        else if (i == 1 && img1 != NULL)
-          img_file = img1;
-        else if (i == 2 && img2 != NULL)
-          img_file = img2;
-        else if (i == 3 && img3 != NULL)
-          img_file = img3;
-        else if (i == 4 && img4 != NULL)
-          img_file = img4;
+        /* Load indigo raw images from disk instead of capturing */
+        if (dryrun) {
+          /* Check if image file parameter is provided for this frame index */
+          const char *img_file = NULL;
+          if (i == 0 && img0 != NULL)
+            img_file = img0;
+          else if (i == 1 && img1 != NULL)
+            img_file = img1;
+          else if (i == 2 && img2 != NULL)
+            img_file = img2;
+          else if (i == 3 && img3 != NULL)
+            img_file = img3;
+          else if (i == 4 && img4 != NULL)
+            img_file = img4;
 
-        /* Exit conditions */
-        if (img0 != NULL && i==1 && img1 == NULL) {
+          /* Exit conditions */
+          if (img0 != NULL && i == 1 && img1 == NULL) {
 
-          fprintf(stderr, "ERROR: Image file 1 is not provided. Exiting...\n");
-          abort_captures = 1;
-          failed_no++;
-          continue;
-        }
-        if (img0 != NULL && i==2 && img2 == NULL) {
-          fprintf(stderr, "ERROR: Image file 2 is not provided. Exiting...\n");
-          abort_captures = 1;
-          failed_no++;
-          continue;
-        }
-        if (img0 != NULL && i==3 && img3 == NULL) {
-          fprintf(stderr, "ERROR: Image file 3 is not provided. Exiting...\n");
-          abort_captures = 1;
-          failed_no++;
-          continue;
-        }
-        if (img0 != NULL && i==4 && img4 == NULL) {
-          fprintf(stderr, "ERROR: Image file 4 is not provided. Exiting...\n");
-          abort_captures = 1;
-          failed_no++;
-          continue;
-        }
+            fprintf(stderr,
+                    "ERROR: Image file 1 is not provided. Exiting...\n");
+            abort_captures = 1;
+            failed_no++;
+            continue;
+          }
+          if (img0 != NULL && i == 2 && img2 == NULL) {
+            fprintf(stderr,
+                    "ERROR: Image file 2 is not provided. Exiting...\n");
+            abort_captures = 1;
+            failed_no++;
+            continue;
+          }
+          if (img0 != NULL && i == 3 && img3 == NULL) {
+            fprintf(stderr,
+                    "ERROR: Image file 3 is not provided. Exiting...\n");
+            abort_captures = 1;
+            failed_no++;
+            continue;
+          }
+          if (img0 != NULL && i == 4 && img4 == NULL) {
+            fprintf(stderr,
+                    "ERROR: Image file 4 is not provided. Exiting...\n");
+            abort_captures = 1;
+            failed_no++;
+            continue;
+          }
 
-        if (img_file != NULL) {
           /* Load image file from disk */
           FILE *file = fopen(img_file, "rb");
           if (!file) {
@@ -1140,8 +1139,9 @@ int main(int argc, const char *argv[]) {
            * necessary */
           size_t needed_raw_buffer_size = (size_t)file_size;
           if (needed_raw_buffer_size > raw_buffer_size) {
-            unsigned char *temp_raw_buffer = (unsigned char *)allsky_safe_realloc(
-                raw_buffer, needed_raw_buffer_size);
+            unsigned char *temp_raw_buffer =
+                (unsigned char *)allsky_safe_realloc(raw_buffer,
+                                                     needed_raw_buffer_size);
             if (!temp_raw_buffer) {
               fprintf(stderr,
                       "ERROR: realloc() failed (raw_buffer_size=%ld bytes, "
@@ -1178,15 +1178,16 @@ int main(int argc, const char *argv[]) {
         } else {
           /* Connect to Indigo server */
           if (!server)
-            indigo_connect_server(config.indigoservername, config.indigoserver,
-                                  config.indigoport,
-                                  &server); // Check correct host name in 2nd arg!!!
+            indigo_connect_server(
+                config.indigoservername, config.indigoserver, config.indigoport,
+                &server); // Check correct host name in 2nd arg!!!
 
           /* Set camera binning */
           set_camera_binning(&client, indigo_camera, config.camera_binning2x2);
 
           /* Capturing a single frame */
-          if (capture_image(frames[i].exposure, config.indigo_capture_timeout)) {
+          if (capture_image(frames[i].exposure,
+                            config.indigo_capture_timeout)) {
             abort_captures = 1;
             exposure_sec = frames[0].exposure;
 
@@ -1259,11 +1260,11 @@ int main(int argc, const char *argv[]) {
 
         /* Load camera image buffer into RGBA (float) */
         TIMED_BLOCK("indigo_raw_to_rgbf1", {
-          if (indigo_raw_to_rgbf1(frames[i].image, raw_width, raw_height,
-                                  raw_buffer, debayer_alg, width, height,
-                                  config.crop_image ? config.crop_x_offset : 0,
-                                  config.crop_image ? config.crop_y_offset
-                                                    : 0)) {
+          if (indigo_raw_to_rgbf1(
+                  frames[i].image, raw_width, raw_height, raw_buffer,
+                  config.camera_monochrome, debayer_alg, width, height,
+                  config.crop_image ? config.crop_x_offset : 0,
+                  config.crop_image ? config.crop_y_offset : 0)) {
             fprintf(stderr, "ERROR: Loading raw data to rgbf array.\n");
 
             abort_captures = 1;
@@ -1290,26 +1291,18 @@ int main(int argc, const char *argv[]) {
                                       i * 100 + 1, images_dir, 1);
           }
         }
-#if 0
-#define CAL_REGION_X0 123
-#define CAL_REGION_Y0 987
-#define CAL_REGION_X1 133
-#define CAL_REGION_Y1 997
-		float scale_r, scale_b;
-		estimate_gray_scaling_rgbf1(rgba16_data, width, height,
-                      CAL_REGION_X0, CAL_REGION_Y0, CAL_REGION_X1, CAL_REGION_Y1,
-                      &scale_r, &scale_b);
-#endif
 
         /* RGB channel scaling */
         TIMED_BLOCK("white_balance_rgbf1", {
-          white_balance_rgbf1(frames[i].image, width, height,
-                              is_night ? config.nighttime_white_balance_red
-                                       : config.daytime_white_balance_red,
-                              1.0f,
-                              is_night ? config.nighttime_white_balance_blue
-                                       : config.daytime_white_balance_blue,
-                              config.daytime_white_balance_light_protect);
+          if (config.camera_monochrome == 0) {
+            white_balance_rgbf1(frames[i].image, width, height,
+                                is_night ? config.nighttime_white_balance_red
+                                         : config.daytime_white_balance_red,
+                                1.0f,
+                                is_night ? config.nighttime_white_balance_blue
+                                         : config.daytime_white_balance_blue,
+                                config.daytime_white_balance_light_protect);
+          }
         });
 
         if (debug_pipeline_images) {
@@ -1420,8 +1413,10 @@ int main(int argc, const char *argv[]) {
         /* Compute (median) brightness */
         TIMED_BLOCK("compute_filtered_median_brightness_rgbf1", {
           compute_filtered_median_brightness_rgbf1(
-              frames[i].image, width, height, config.measure_brightness_area,
-              &frames[i].median_r, &frames[i].median_g, &frames[i].median_b);
+              frames[i].image, width, height, &frames[i].median_r,
+              &frames[i].median_g, &frames[i].median_b, &frames[i].median_l,
+              config.image_center_x, config.image_center_y,
+              config.measure_brightness_area);
         });
 
         /* Measure background noise at night and at higher gains */
@@ -1435,7 +1430,7 @@ int main(int argc, const char *argv[]) {
         }
 
         /* SCNR filter to reduce artificial light sources */
-        if (config.scnr_filter && is_night) {
+        if (config.scnr_filter && is_night && config.camera_monochrome == 0) {
           /* Set protection mode */
           int scnr_protection = SCNR_PROTECT_NONE;
           if (!strcmp(config.scnr_filter_protection, "average_neutral"))
@@ -1644,7 +1639,9 @@ int main(int argc, const char *argv[]) {
       /* Autostretch */
       if (config.autostretch) {
         TIMED_BLOCK("autostretch_rgbf1", {
-          autostretch_rgbf1(hdr_image_device, width, height, config.autostretch_min_val, config.autostretch_max_val);
+          autostretch_rgbf1(hdr_image_device, width, height,
+                            config.autostretch_min_val,
+                            config.autostretch_max_val);
         });
 
         if (debug_pipeline_images) {
@@ -1670,105 +1667,6 @@ int main(int argc, const char *argv[]) {
         if (debug_pipeline_images) {
           save_debug_pipeline_image(hdr_image_device, width, height, 803,
                                     images_dir, 1);
-        }
-      }
-#if 0
-      /* Auto color calibration */
-      if (is_night) {
-        TIMED_BLOCK("auto_color_calibration_rgbf1", {
-          auto_color_calibration_rgbf1(hdr_image_device, width, height, 40);
-        });
-
-        if (debug_pipeline_images) {
-          save_debug_pipeline_image(hdr_image_device, width, height, 809,
-                                    images_dir, 1);
-        }
-      } else {
-#endif
-      /* Ambience Color Calibration */
-      if (config.ambience_color_calibration) {
-
-        /* Scene detection */
-        SceneType scene = detect_scene_rgbf1(hdr_image_device, width, height);
-
-        int do_ambience_color_calibration = 0;
-        float subframe_percent = 40.0f;
-        float luma_clip_high = 0.80f;
-        float sat_clip_high = 0.30f;
-        float sigma_factor = 1.0f;
-        float mix_factor = 0.25f;
-
-        switch (scene) {
-        case SCENE_NIGHT_CLEAR:
-          subframe_percent = 40.0f;
-          luma_clip_high = 0.80f;
-          sat_clip_high = 0.30f;
-          sigma_factor = 1.0f;
-          mix_factor = 0.25f;
-          do_ambience_color_calibration = 1;
-          printf("Scene: SCENE_NIGHT_CLEAR\n");
-          break;
-
-        case SCENE_NIGHT_CLOUDY:
-          subframe_percent = 15.0f;
-          luma_clip_high = 0.75f;
-          sat_clip_high = 0.25f;
-          sigma_factor = 0.8f;
-          mix_factor = 0.10f;
-          do_ambience_color_calibration = 1;
-          printf("Scene: SCENE_NIGHT_CLOUDY\n");
-          break;
-
-        case SCENE_NIGHT_MOON:
-          subframe_percent = 20.0f;
-          luma_clip_high = 0.70f;
-          sat_clip_high = 0.20f;
-          sigma_factor = 1.2f;
-          mix_factor = 0.20f;
-          do_ambience_color_calibration = 1;
-          printf("Scene: SCENE_NIGHT_MOON\n");
-          break;
-
-        case SCENE_NIGHT_AURORA:
-          /* lighter correction, bigger subframe */
-          subframe_percent = 60.0f;
-          luma_clip_high = 0.70f;
-          sat_clip_high = 0.60f;
-          sigma_factor = 1.0f;
-          mix_factor = 0.15f;
-          do_ambience_color_calibration = 1;
-          printf("Scene: SCENE_NIGHT_AURORA\n");
-          break;
-
-        case SCENE_TWILIGHT:
-          /* DO NOT correct color → skip */
-          printf("Scene: SCENE_TWILIGHT\n");
-          break;
-
-        case SCENE_DAY_CLEAR:
-        case SCENE_DAY_CLOUDY:
-          /* daytime */
-          subframe_percent = 20.0f;
-          luma_clip_high = 0.30f;
-          sat_clip_high = 0.80f;
-          sigma_factor = 0.6f;
-          mix_factor = 0.08f;
-          do_ambience_color_calibration = 1;
-          printf("Scene: SCENE_DAY_CLEAR or SCENE_DAY_CLOUDY\n");
-          break;
-        }
-
-        if (do_ambience_color_calibration) {
-          TIMED_BLOCK("ambience_color_calibration_rgbf1", {
-            ambience_color_calibration_rgbf1(
-                hdr_image_device, width, height, subframe_percent,
-                luma_clip_high, sat_clip_high, sigma_factor, mix_factor);
-          });
-
-          if (debug_pipeline_images) {
-            save_debug_pipeline_image(hdr_image_device, width, height, 802,
-                                      images_dir, 1);
-          }
         }
       }
 
@@ -1864,7 +1762,7 @@ int main(int argc, const char *argv[]) {
       }
 
       /* Boost colors */
-      if (config.saturation != 1.0) {
+      if (config.saturation != 1.0 && config.camera_monochrome == 0) {
         TIMED_BLOCK("adjust_saturation_rgbf1", {
           adjust_saturation_rgbf1(hdr_image_device, width, height,
                                   config.saturation);
@@ -1930,19 +1828,21 @@ int main(int argc, const char *argv[]) {
       /* Measure focus */
       float sharpness = 0.0f;
       measure_focus_laplacian_rgba(hdr_image, width, height,
-                                   config.focus_center_x, config.focus_center_y,
+                                   config.image_zenith_x, config.image_zenith_y,
                                    config.focus_radius, &sharpness);
 
       /* Calculate next exposure and gain */
       // Exposure t0 for exposure calculation
       exposure_sec = frames[0].exposure;
       if (frames[0].median_g >= 0) {
+        printf("Adjusting exposure and gain\n");
         adjust_exposure_gain(frames[0].median_g,
                              is_night ? config.nighttime_meanbrightness
                                       : config.daytime_meanbrightness,
                              config.camera_max_exposure,
                              config.camera_min_exposure, config.camera_max_gain,
                              config.camera_min_gain, &exposure_sec, &gain);
+        printf("Exposure: %.6f, Gain: %.1f\n", exposure_sec, gain);
       }
 
       // Format timestamp into datetime string
@@ -1952,8 +1852,8 @@ int main(int argc, const char *argv[]) {
                tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec);
 
       /* Draw text on image */
-      draw_text_red_freetype_rgbf1(hdr_image_device, width, height, datetime, config.font_size, 10, 10, config.font_path);
-
+      draw_text_red_freetype_rgbf1(hdr_image_device, width, height, datetime,
+                                   config.font_size, 10, 10, config.font_path);
 
       /* Final 16-bit tonemapping (convert to 0-65535.0)*/
       TIMED_BLOCK("tonemap_rgbf1_to_rgbf16", {
@@ -1972,6 +1872,7 @@ int main(int argc, const char *argv[]) {
                                "%s/latest_image.jpg", images_dir))
         fprintf(stderr, "WARNING: String %s truncated\n",
                 latest_image_filepath);
+
       TIMED_BLOCK("save_jpeg_rgbf16", {
         if (save_jpeg_rgbf16(hdr_image_device, width, height,
                              config.jpeg_quality, 1.0f,
@@ -2112,16 +2013,16 @@ int main(int argc, const char *argv[]) {
       image_metadata.night_mode = is_night;
       image_metadata.hdr = use_max_images;
       image_metadata.sensor_temperature = 9.0;
-      image_metadata.mean_brightness = frames[0].median_g;
+      image_metadata.mean_brightness = frames[0].median_l;
       image_metadata.target_brightness = is_night
                                              ? config.nighttime_meanbrightness
                                              : config.daytime_meanbrightness;
       image_metadata.stars = num_stars;
       image_metadata.sqm = estimated_sqm;
-      image_metadata.sun_altitude =
-          sun_altitude(now, config.longitude, config.latitude);
-      image_metadata.moon_altitude =
-          moon_altitude(now, config.longitude, config.latitude);
+      image_metadata.sun_altitude = sun_altitude(now, config.location_longitude,
+                                                 config.location_latitude);
+      image_metadata.moon_altitude = moon_altitude(
+          now, config.location_longitude, config.location_latitude);
       image_metadata.moon_phase_percentage = moon_phase_percentage(now);
 
       char metadata_filepath[PATH_MAX + 1];
@@ -2186,7 +2087,7 @@ int main(int argc, const char *argv[]) {
       printf("Data added to database %s\n", db_filepath);
 
       /* Run AI processing */
-      if (run_ai_processing(latest_image_filepath) != 0) {
+      if (run_postprocessing(today_str, now_str, is_night, latest_image_filepath, config.image_directory) != 0) {
         fprintf(stderr, "ERROR: Failed to run AI processing.\n");
       }
       printf("AI processing started\n");
@@ -2203,6 +2104,11 @@ int main(int argc, const char *argv[]) {
     sleep(1);
     printf(".");
     fflush(stdout);
+
+    if (dryrun) {
+      printf("Dry run mode, exiting...\n");
+      keep_running = 0;
+    }
   }
 
   cleanup_resources();

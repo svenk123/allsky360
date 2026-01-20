@@ -162,7 +162,7 @@ int hdrmt_rgbf1(float *rgb, int width, int height, int levels, int start_level,
     float r = rgb[idx + 0];
     float g = rgb[idx + 1];
     float b = rgb[idx + 2];
-    float y = rgb_to_luma(r, g, b);
+    float y = rgb_to_luminance_rec709(r, g, b);
     Y[i] = y;
     A[i] = y;
   }

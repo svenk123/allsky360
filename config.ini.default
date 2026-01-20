@@ -4,6 +4,94 @@
 # and ZWO 2.1mm fisheye lens.
 #
 
+# General settings
+######################
+# Observing location
+location_latitude=51.2349N
+location_longitude=7.4479E
+location_altitude=114
+location_city="Musterstadt/Germany"
+location_owner="Max Mustermann"
+# Capture intervall
+capture_interval=120
+# Directories
+image_directory=/home/allskyuser/images
+video_directory=/home/allskyuser/videos
+database_directory=/home/allskyuser/database
+# Node.js API
+api-port=3000
+
+# Indigo Server settings
+########################
+# IP address or hostname of the Indigo server
+indigo_server=192.168.3.61
+# Port number of the Indigo server
+indigo_port=7624
+# Name of the Indigo camera to use
+indigo_camera="Uranus-C @ 192.168.3.61"
+indigo_capture_timeout=30
+
+# Camera settings
+#########################
+camera_max_exposure=60.0
+camera_min_exposure=0.0007
+# Maximum and minimum automatic gain (depends on camera)
+camera_max_gain=200
+camera_min_gain=0
+camera_binning2x2=0
+camera_cooling=0
+camara_cooling_temperature=5
+camera_roi_width=0
+camera_roi_height=0
+camera_roi_x=0
+camera_roi_y=0
+# Debayer algorithm: nni, bilinear or vng
+camera_debayer=vng
+
+# Lens
+######
+lens_name="ZWO 2.1mm f/2.0"
+lens_focallength=2.1
+lens_focalratio=1.6
+
+# Image settings
+######################
+# JPEG quality (0...100 %)
+jpeg_quality=100
+# Center of the image
+image_center_x=1925
+image_center_y=1185
+# mask_radius set to 0 disables masking
+image_mask_radius=1090
+# Zenith position
+image_zenith_x=1925
+image_zenith=y=1185
+image_horizon_radius=1090
+image_north_angle=-11.0
+
+# Focus measurement
+###################
+focus_radius=200
+
+# Crop image
+############
+crop_image=1
+crop_width=2280
+crop_height=2180
+crop_x_offset=760
+crop_y_offset=0
+rotate_image=0
+
+# Panorama (horizon view)
+#########################
+# Enable/Disable panorama generation
+panorama=1
+panorama_center_x=1144
+panorama_center_y=1180
+panorama_width=3048
+panorama_height=1090
+panorama_horizontal_start=260
+
 # Daytime settings
 ####################
 # Take images during daytime
@@ -26,6 +114,8 @@ daytime_hdr_exposure_factor=2.0
 
 # Nighttime settings
 ####################
+# Altitude of the Sun in degrees relative to the horizon at which to switch between day and night.
+nighttime_sunangle=-6
 # Exposure and gain when entering night mode or at start
 nighttime_startexposure=10.0
 nighttime_startgain=0
@@ -46,17 +136,14 @@ nighttime_move_blackpoint_max_shift_pct=0.02
 nighttime_move_blackpoint_dark_threshold=0.2
 # HDR exposure factor (should be 1.0 or 2.0 for good results)
 nighttime_hdr_exposure_factor=2.0
-
 # Noise estimation
-##################
 nighttime_measure_noise=1
 nighttime_measure_noise_radius=250
-
 
 # Brightness measurement for auto-exposure
 ##########################################
 # Percentage of the image
-measure_brightness_area=0.2
+autoexposure_measure_radius=600
 
 # Multiscale Median Filter (reduce noise at high gains)
 #######################################################
@@ -102,10 +189,6 @@ hdrmt=0
 autostretch=1
 autostretch_min_val=0.01
 autostretch_max_val=0.99
-
-# Color correction (experimental)
-#################################
-ambience_color_calibration=0
 
 # Adaptive Contrast‑Driven Noise Reduction Filter
 #################################################
@@ -165,7 +248,7 @@ wavelet_sharpen_gain_medium=0.0
 wavelet_sharpen_gain_large=0.0
 
 # SQM estimation
-#########################
+################
 sqm=1
 sqm_threshold=0.6
 sqm_max_stars=1000
@@ -180,103 +263,7 @@ sqm_intercept=21.2
 # slope is controlling the sensitivity of the SQM estimate to the detected star count
 sqm_slope=1.5
 
-# Camera settings
-#########################
-camera_max_exposure=60.0
-camera_min_exposure=0.0007
-# Maximum and minimum automatic gain (depends on camera)
-camera_max_gain=200
-camera_min_gain=0
-camera_binning2x2=0
-camera_cooling=0
-camara_cooling_temperature=5
-camera_roi_width=0
-camera_roi_height=0
-camera_roi_x=0
-camera_roi_y=0
-# Debayer algorithm: nni, bilinear or vng
-debayer=vng
 
-# Lens
-######
-lens_name="ZWO 2.1mm f/2.0"
-lens_focallength=2.1
-lens_focalratio=1.6
 
-# Image settings
-######################
-# JPEG quality (0...100 %)
-jpeg_quality=100
-# mask_radius set to 0 disables masking
-mask_center_x=1925
-mask_center_y=1185
-mask_radius=1090
-image_center_x=1925
-image_center_y=1185
-image_mask_radius=1090
-image_horizon_radius=1090
-image_north_angle=-11.0
-
-# Focus measurement
-###################
-focus_center_x=989
-focus_center_y=1238
-focus_radius=200
-
-# Crop image
-############
-crop_image=1
-crop_width=2280
-crop_height=2180
-crop_x_offset=760
-crop_y_offset=0
-rotate_image=0
-
-# Panorama (horizon view)
-#########################
-# Enable/Disable panorama generation
-panorama=1
-panorama_center_x=1144
-panorama_center_y=1180
-panorama_width=3048
-panorama_height=1090
-panorama_horizontal_start=260
-
-# Thumbnails
-#########################
-thumbnail=1
-thumbnail_width=100
-
-# General settings
-######################
-# Observing location
-latitude=51.2349N
-longitude=7.4479E
-altitude=114
-city="Musterstadt/Germany"
-# Altitude of the Sun in degrees relative to the horizon at which to switch between day and night.
-sunangle=-6
-capture_interval=120
-owner="Max Mustermann"
-image_directory=/home/allskyuser/images
-video_directory=/home/allskyuser/videos
-database_directory=/home/allskyuser/database
-api-port=3000
-
-# Aurora alerts
-########################
-aurora=1
-
-# Indigo Server settings
-########################
-# IP address or hostname of the Indigo server
-indigo_server=192.168.3.61
-# Port number of the Indigo server
-indigo_port=7624
-# Name of the Indigo camera to use
-indigo_camera="Uranus-C @ 192.168.3.61"
-# Capturing format: fits, jpeg, raw
-indigo_image_format=raw
-indigo_capture_timeout=30
 
 

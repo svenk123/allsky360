@@ -241,7 +241,7 @@ int clarity_filter_rgbf_masked(float *rgba, int width, int height,
     int masked = is_masked(p, mask_mode);
     V[i] = masked ? 0 : 1;
 
-    float y = rgb_to_luma(p[0], p[1], p[2]);
+    float y = rgb_to_luminance_rec709(p[0], p[1], p[2]);
     /* For masked pixels Y is irrelevant, but keep plausible value. */
     Y[i] = clampf1(y);
   }
@@ -291,7 +291,7 @@ int clarity_filter_rgbf_masked(float *rgba, int width, int height,
     if (!V[i])
       continue; /* keep original masked pixel (including alpha) */
 
-    float y_old = rgb_to_luma(p[0], p[1], p[2]);
+    float y_old = rgb_to_luminance_rec709(p[0], p[1], p[2]);
     float scale = safe_ratio(Y[i], y_old);
 
     if (y_old < 1e-4f) {

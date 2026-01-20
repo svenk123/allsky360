@@ -76,6 +76,8 @@
     let meanBrightness = 0;
     let sqm = 0;
     let stars = 0;
+    let weather = null;
+    let weatherScore = null;
 
     async function loadLatestPanorama() {
       if (loading)
@@ -120,6 +122,8 @@
             meanBrightness = imageMeta.mean_brightness || 0;
             sqm = imageMeta.sqm || 0;
             stars = imageMeta.stars || 0;
+            weather = imageMeta.weather || null;
+            weatherScore = imageMeta.weather_score !== undefined ? imageMeta.weather_score : null;
 
             lastImageLoadTime = Date.now();
             currentRemaining = refreshInterval;
@@ -229,6 +233,22 @@
         maxWidth = Math.max(maxWidth, textMetrics.width);
       }
       
+      // Weather-Text
+      let weatherText = "";
+      if (weather !== null && weather !== undefined) {
+        weatherText = `Weather: ${weather}`;
+        textMetrics = ctx.measureText(weatherText);
+        maxWidth = Math.max(maxWidth, textMetrics.width);
+      }
+      
+      // Weather Score-Text
+      let weatherScoreText = "";
+      if (weatherScore !== null && weatherScore !== undefined) {
+        weatherScoreText = `Weather Score: ${weatherScore}`;
+        textMetrics = ctx.measureText(weatherScoreText);
+        maxWidth = Math.max(maxWidth, textMetrics.width);
+      }
+      
       // SQM-Text
       let sqmText = "";
       if (sqm > 0) {
@@ -249,7 +269,7 @@
       const bgX = containerRect.width - maxWidth - padding * 2;
       const bgY = padding;
       const bgWidth = maxWidth + padding * 2;
-      const bgHeight = (timestampText ? lineHeight : 0) + (brightnessText ? lineHeight : 0) + (sqmText ? lineHeight : 0) + (starsText ? lineHeight : 0) + lineHeight + padding;
+      const bgHeight = (timestampText ? lineHeight : 0) + (brightnessText ? lineHeight : 0) + (weatherText ? lineHeight : 0) + (weatherScoreText ? lineHeight : 0) + (sqmText ? lineHeight : 0) + (starsText ? lineHeight : 0) + lineHeight + padding;
       
       ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
       ctx.fillRect(bgX, bgY, bgWidth, bgHeight);
@@ -266,6 +286,18 @@
       // Brightness
       if (brightnessText) {
         ctx.fillText(brightnessText, containerRect.width - padding, yPos);
+        yPos += lineHeight;
+      }
+      
+      // Weather
+      if (weatherText) {
+        ctx.fillText(weatherText, containerRect.width - padding, yPos);
+        yPos += lineHeight;
+      }
+      
+      // Weather Score
+      if (weatherScoreText) {
+        ctx.fillText(weatherScoreText, containerRect.width - padding, yPos);
         yPos += lineHeight;
       }
       

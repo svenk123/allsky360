@@ -21,9 +21,9 @@
 #include <limits.h>
 
 typedef struct {
-    double latitude;
-    double longitude;
-    int altitude;
+    double location_latitude;
+    double location_longitude;
+    int location_altitude;
     char database_directory[NAME_MAX+1];
 
 } config_t;

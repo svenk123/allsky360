@@ -39,7 +39,43 @@ int hdr_check_overexposure_rgbf1(const float *img, int width, int height,
 
   size_t pixel_count = width * height;
   *overexposed = 0;
+#if 0
+  float max_luminance = 0.0;
 
+  size_t overexposed_pixels_count = 0;
+  size_t clip_limit = (size_t)(clip_fraction_threshold * pixel_count);
+
+  if (clip_limit == 0) {
+    clip_limit = 1; // at least 1 pixel required, if clip_fraction_threshold is
+                    // very small
+  }
+
+  for (size_t i = 0; i < pixel_count; i++) {
+    int idx = i * CHANNELS; // RGBA
+    const float *pixel = &img[idx];
+
+    if (pixel[3] > max_luminance)
+      max_luminance = pixel[3];
+
+    int clipped = pixel[3] >= clipping_threshold;
+
+    if (clipped) {
+      overexposed_pixels_count++;
+
+      // Overexposed when more than 0.x of all pixels
+      if (overexposed_pixels_count >= clip_limit) {
+        *overexposed = 1;
+        printf("early: max luminance: %.4f, clipped pixels: %zu\n",
+               max_luminance, overexposed_pixels_count);
+        return 0; // Return early
+      }
+    }
+  }
+
+  printf("Overexposure check: ok, max luminance: %.4f, clipped pixels: %zu\n",
+         max_luminance, overexposed_pixels_count);
+#endif
+#if 1
   float max_r = 0.0;
   float max_g = 0.0;
   float max_b = 0.0;
@@ -85,6 +121,7 @@ int hdr_check_overexposure_rgbf1(const float *img, int width, int height,
          "(blue): %.4f, clipped "
          "pixels: %zu\n",
          max_r, max_g, max_b, overexposed_pixels_count);
+#endif
 
   return 0;
 }

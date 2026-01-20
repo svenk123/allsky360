@@ -62,7 +62,7 @@ int adjust_black_point_rgbf1(float *rgbf, int width, int height,
         continue;
 
       // Compute luminance (Rec.709)
-      float L = rgb_to_luma(px[0], px[1], px[2]);
+      float L = rgb_to_luminance_rec709(px[0], px[1], px[2]);
 
       if (L < 0.0f)
         L = 0.0f;

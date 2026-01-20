@@ -28,12 +28,6 @@ extern "C" {
 int auto_color_calibration_rgbf1_cuda(float *rgba, int width, int height, float subframe_percent);
 int auto_color_calibration_rgbf1_cuda_Wrapper(float *rgba, int width, int height, float subframe_percent);
 
-SceneType detect_scene_rgbf1_cuda(float *rgba, int width, int height);
-SceneType detect_scene_rgbf1_cuda_Wrapper(float *rgba, int width, int height);
-
-int ambience_color_calibration_rgbf1_cuda(float *rgba, int width, int height, float subframe_percent, float luma_clip_high, float sat_clip_high, float sigma_factor, float mix_factor);
-int ambience_color_calibration_rgbf1_cuda_Wrapper(float *rgba, int width, int height, float subframe_percent, float luma_clip_high, float sat_clip_high, float sigma_factor, float mix_factor);
-
 #ifdef __cplusplus
 }
 #endif

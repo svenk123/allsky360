@@ -128,7 +128,7 @@ int perceptual_dehaze_rgbf1_multiscale_full(float *rgba_image, int width,
     float r = rgba_image[idx + 0];
     float g = rgba_image[idx + 1];
     float b = rgba_image[idx + 2];
-    luma[i] = rgb_to_luma(r, g, b);
+    luma[i] = rgb_to_luminance_rec709(r, g, b);
   }
 
   /* Step 2: Global haze level estimate */

@@ -21,6 +21,19 @@
 #define CHANNELS	4
 
 /**
+ * Compute exposure time for HDR bracketing.
+ *
+ * @param t0: longest exposure time in seconds (float)
+ * @param ev_steps: EV distance between exposures (e.g. 1 or 2)
+ * @param index: image index: 0 = longest exposure, 1 = next shorter, etc.
+ * @return: exposure time in seconds (float)
+ *
+ * The formula:
+ * t(index) = t0 / powf(2.0f, index * ev_steps)
+ */
+float calc_exposure_time(float t0, int ev_steps, int index);
+
+/**
  * Automatic exposure control calculates the exposure time and gain value based on image brightness.
  * 
  * @param config     Pointer to the configuration
@@ -73,16 +86,15 @@ int update_exposure_controller(ExposureController *ctrl, float current_median, f
  * @param red_brightness: pointer receiving the filtered median for the red channel.
  * @param green_brightness: pointer receiving the filtered median for the green channel.
  * @param blue_brightness: pointer receiving the filtered median for the blue channel.
+ * @param luminance_brightness: pointer receiving the filtered median for the luminance channel.
  * @return: 0 on success, 1 on error.
  */
 int compute_filtered_median_brightness_rgbf1(const float *rgba, int width, int height,
-                                              double center_pct, double *red_brightness,
-                                              double *green_brightness, double *blue_brightness);
-
-/**
- * Backwards-compatible helper returning only the green median brightness.
- */
-int compute_filtered_median_brightness_green_rgbf1(const float *rgba, int width, int height,
-                                                   double center_pct, double *brightness);
+                                              double *red_brightness,
+                                              double *green_brightness, double *blue_brightness,
+                                              double *luminance_brightness, 
+                                              int cx,
+                                              int cy,
+                                              int radius);
 
 #endif // AUTOEXPOSURE_H

@@ -20,16 +20,6 @@
 
 #define CHANNELS 4
 
-typedef enum {
-  SCENE_NIGHT_CLEAR = 0,
-  SCENE_NIGHT_MOON,
-  SCENE_NIGHT_AURORA,
-  SCENE_NIGHT_CLOUDY,
-  SCENE_TWILIGHT,
-  SCENE_DAY_CLEAR,
-  SCENE_DAY_CLOUDY
-} SceneType;
-
 /**
  * Applies channel-wise scaling to an RGBA image (float) with light protection.
  *
@@ -75,11 +65,6 @@ int estimate_gray_scaling_rgbf1(const float *rgba, int width, int height,
   auto_color_calibration_rgbf1_cuda_Wrapper(rgba, width, height,               \
                                             subframe_percent)
 
-#define detect_scene_rgbf1(rgba, width, height)                               \
-  detect_scene_rgbf1_cuda_Wrapper(rgba, width, height)
-
-#define ambience_color_calibration_rgbf1(rgba, width, height, subframe_percent, luma_clip_high, sat_clip_high, sigma_factor, mix_factor) \
-  ambience_color_calibration_rgbf1_cuda_Wrapper(rgba, width, height, subframe_percent, luma_clip_high, sat_clip_high, sigma_factor, mix_factor)
 #else
 
 /**
@@ -99,42 +84,6 @@ int auto_color_calibration_rgbf1(float *rgba, int width, int height,
                                  float subframe_percent);
 
 
-/**
- * Scene detection for HDR/Allsky images.
- * Works on RGBA float image (0.0–1.0).
- *
- * @param rgba: pointer to RGBA float image data (0.0 - 1.0), size = width * height * 4
- * @param width: image width in pixels
- * @param height: image height in pixels
- * @return: scene type (SCENE_NIGHT_CLEAR, SCENE_NIGHT_MOON, SCENE_NIGHT_AURORA, SCENE_NIGHT_CLOUDY, SCENE_TWILIGHT, SCENE_DAY_CLEAR, SCENE_DAY_CLOUDY)
- */
-SceneType detect_scene_rgbf1(float *rgba, int width, int height);
-
-/**
- * Ambience-based color calibration
- *
- * Parameters:
- * @param rgba: pointer to RGBA float image data (0.0 - 1.0), size = width * height * 4
- * @param width: image width in pixels
- * @param height: image height in pixels
- * @param subframe_percent: percentage of the central image region used for ambience statistics (e.g. 30.0)
- * @param luma_clip_high: ignore pixels with luminance above this threshold (e.g. 0.80)
- * @param sat_clip_high: ignore pixels with saturation above this threshold (e.g. 0.30)
- * @param sigma_factor: only use pixels within ±sigma_factor * stddev(Y) around mean Y (e.g. 1.0 - 1.5)
- * @param mix_factor: blend factor for the correction (0.0 = off, 1.0 = full correction, e.g. 0.2 - 0.4)
- *
- * @return:
- *   0 on success
- *  >0 on error (invalid parameters or not enough valid pixels)
- */
-int ambience_color_calibration_rgbf1(float *rgba,
-  int width,
-  int height,
-  float subframe_percent,
-  float luma_clip_high,
-  float sat_clip_high,
-  float sigma_factor,
-  float mix_factor);
 
 #endif
 

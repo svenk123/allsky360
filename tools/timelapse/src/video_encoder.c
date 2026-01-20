@@ -55,7 +55,7 @@ int init_encoder_nvenc(const char *filename, int w, int h, int fps) {
     return -1;
   }
 
-  AVCodec *codec = avcodec_find_encoder_by_name("libx264");
+  const AVCodec *codec = avcodec_find_encoder_by_name("libx264");
   if (!codec) {
     fprintf(stderr, "[ERROR] libx264 encoder not found!\n");
     return -1;

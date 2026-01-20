@@ -33,6 +33,8 @@ typedef struct {
     double daytime_white_balance_red;
     double daytime_white_balance_blue;
     double daytime_white_balance_light_protect;
+
+    double nighttime_sunangle;
     double nighttime_startexposure;
     int nighttime_startgain;
     double nighttime_meanbrightness;
@@ -49,7 +51,6 @@ typedef struct {
     int nighttime_measure_noise_radius;
 
     double measure_brightness_area;
-    int median_brightness;
     double target_mean;
     double black_clipping_point;
     double white_clipping_point;
@@ -75,9 +76,6 @@ typedef struct {
     int autostretch;
     double autostretch_min_val;
     double autostretch_max_val;
-
-
-    int ambience_color_calibration;
 
     int acdnr_filter;
     double acdnr_filter_lum_stddev;
@@ -128,6 +126,7 @@ typedef struct {
     double sqm_slope;
 
     int debug_raw_exposures;
+    int camera_monochrome;
     double camera_max_exposure;
     double camera_min_exposure;
     int camera_max_gain;
@@ -135,6 +134,10 @@ typedef struct {
     int camera_binning2x2;
     int camera_cooling;
     int camera_cooling_temperature;
+    double camera_r_factor;
+    double camera_g_factor;
+    double camera_b_factor;
+    char camera_debayer[50];
     int jpeg_quality;
     char lens_name[100];
     double lens_focallength;
@@ -147,8 +150,6 @@ typedef struct {
     double image_north_angle;
     int image_zenith_x;
     int image_zenith_y;
-    int focus_center_x;
-    int focus_center_y;
     int focus_radius;
 
 
@@ -169,24 +170,20 @@ typedef struct {
     int panorama_width;
     int panorama_height;
     int panorama_horizontal_start;
-    double latitude;
-    double longitude;
-    int altitude;
-    char city[100];
-    double sunangle;
-    char owner[100];
+    double location_latitude;
+    double location_longitude;
+    int location_altitude;
+    char location_city[100];
+    char location_owner[100];
+    char working_directory[NAME_MAX+1];
     char image_directory[NAME_MAX+1];
     char video_directory[NAME_MAX+1];
     char database_directory[NAME_MAX+1];
-    int weather_sensor;
-    char weather_sensor_type[50];
-    int weather_sensor_i2c_bus;
     int capture_interval;
     char indigoservername[100];
     char indigoserver[100];
     int indigoport;
     char indigocamera[100];
-    char debayer[50];
     int indigo_capture_timeout;
 } config_t;
 
