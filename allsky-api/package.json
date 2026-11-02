@@ -1,0 +1,29 @@
+{
+  "name": "allsky-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "build": "esbuild astro_bundle.js --bundle --minify --format=iife --global-name=Astronomia --outfile=public/js/astronomia.bundle.min.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "mime-types": "^3.0.1",
+    "sqlite3": "^6.0.1",
+    "suncalc": "^1.9.0"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "allowScripts": {
+    "sqlite3@6.0.1": true,
+    "esbuild@0.28.2": true
+  },
+  "devDependencies": {
+    "astronomia": "^4.2.0",
+    "esbuild": "^0.28.2"
+  }
+}

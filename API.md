@@ -359,9 +359,11 @@ HTTP 200 — JSON object:
 ### Service Management
 
 The following endpoints allow starting, stopping, restarting, and querying the
-status of allsky360 systemd services.  Operations are executed via
-`sudo -n systemctl` and require the API process to run as `allskyuser` with
-passwordless sudo rights for `systemctl`.
+status of allsky360 systemd services. The API runs `systemctl` directly
+(no sudo, no shell) as `allskyuser`. Querying the status needs no rights;
+start/stop/restart are authorised by the polkit rule
+`/etc/polkit-1/rules.d/50-allsky360.rules` (installed by `make install`),
+which allows exactly these three actions on the units listed below.
 
 **Allowed services**
 
@@ -372,9 +374,25 @@ passwordless sudo rights for `systemctl`.
 | `allsky360-meteo.service`       | Meteorological data fetcher       |
 | `allsky360-location.service`    | Location/astronomical data tool   |
 | `allsky360-aurora.service`      | Aurora / space weather fetcher    |
-| `allsky360-mount.service`       | Mount position service            |
+| `allsky360-mount-position.service` | Mount position service (timer-driven) |
 
 Requests for any service not in the list above are rejected with HTTP 500.
+
+**Authentication for start/stop/restart**
+
+`start`, `stop` and `restart` require:
+
+- the HTTP method `POST` (otherwise HTTP 405),
+- the header `X-API-Token` matching `api-token` in `config.ini` (otherwise HTTP 401).
+
+If `api-token` is empty in `config.ini`, these endpoints are disabled and return HTTP 403.
+The web UI (`config.html`) asks for the token on the first control action and keeps it
+in the browser's `sessionStorage` until the tab is closed. `status` needs no token.
+
+```
+curl -X POST -H "X-API-Token: <token>" \
+  "http://allsky:3000/api/services/restart?service=allsky360-camera.service"
+```
 
 ---
 
@@ -421,7 +439,7 @@ GET /api/services/status?service=allsky360-camera.service
 
 ---
 
-#### `GET /api/services/start`
+#### `POST /api/services/start`
 
 Starts a systemd service.
 
@@ -446,7 +464,7 @@ HTTP 200 — JSON object:
 
 ---
 
-#### `GET /api/services/stop`
+#### `POST /api/services/stop`
 
 Stops a systemd service.
 
@@ -462,7 +480,7 @@ HTTP 200 — JSON object with fields `service`, `action` (`"stop"`), `status`, `
 
 ---
 
-#### `GET /api/services/restart`
+#### `POST /api/services/restart`
 
 Restarts a systemd service.
 

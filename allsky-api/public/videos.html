@@ -4,352 +4,608 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Allsky360 Videos</title>
+  <title>Allsky360 – Videos</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180" />
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
-  
   <link rel="manifest" href="manifest.json" />
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Allsky360 Videos">
-  <meta name="theme-color" content="#111111" />
+  <meta name="theme-color" content="#0d1117" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="stylesheet" href="style.css">
+
   <script src="js/allsky-common.js"></script>
+
+  <link rel="stylesheet" href="allsky.css">
+  <style>
+    /* Purple accent overrides for Videos page */
+    .nav-item.active { background: rgba(168,85,247,0.18); color: #a855f7; }
+    .thumb-wrap { cursor: pointer; }
+    .thumb {
+      width: 120px;
+      cursor: default; /* thumb-wrap handles cursor */
+    }
+    .thumb:hover {
+      border-color: rgba(168,85,247,0.55);
+      box-shadow: 0 4px 16px rgba(168,85,247,0.2);
+    }
+    .thumb.active { border-color: #a855f7; box-shadow: 0 0 0 1px rgba(168,85,247,0.5); }
+
+    /* Play icon overlay */
+    .thumb-play {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none; border-radius: 8px;
+    }
+    .thumb-play-icon {
+      width: 30px; height: 30px;
+      background: rgba(0,0,0,0.55); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      border: 1.5px solid rgba(255,255,255,0.45);
+      transition: all 0.15s; backdrop-filter: blur(4px);
+    }
+    .thumb-wrap:hover .thumb-play-icon {
+      background: rgba(168,85,247,0.6);
+      border-color: rgba(168,85,247,0.8);
+      transform: scale(1.1);
+    }
+
+    /* ── VIDEO SIDEBAR ──────────────────────────────────────────── */
+    #video-sidebar {
+      width: 50%;
+      min-width: 360px;
+      flex-shrink: 0;
+      background: rgba(22,27,34,0.85);
+      border-left: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #video-panel {
+      flex-shrink: 0;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 80vh;
+      position: relative;
+    }
+
+    #video-player {
+      width: 100%;
+      display: block;
+      max-height: 80vh;
+      background: #000;
+      outline: none;
+    }
+
+    #video-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 40px 20px;
+      color: #4b5563;
+      text-align: center;
+      width: 100%;
+    }
+    #video-placeholder svg { opacity: 0.35; }
+    #video-placeholder p { font-size: 12px; line-height: 1.6; }
+
+    #video-info {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #video-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #e5e7eb;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    #video-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .action-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 10px; border-radius: 8px; font-size: 11px;
+      font-weight: 600; cursor: pointer; text-decoration: none;
+      transition: all 0.15s; border: 1px solid;
+      font-family: inherit;
+    }
+    .action-btn-purple {
+      background: rgba(168,85,247,0.12); color: #a855f7;
+      border-color: rgba(168,85,247,0.3);
+    }
+    .action-btn-purple:hover { background: rgba(168,85,247,0.25); }
+    .action-btn-gray {
+      background: rgba(255,255,255,0.05); color: #9ca3af;
+      border-color: rgba(255,255,255,0.1);
+    }
+    .action-btn-gray:hover { background: rgba(255,255,255,0.1); color: #e5e7eb; }
+
+    /* Metadata rows */
+    .meta-section-title {
+      font-size: 10px; font-weight: 700; color: #6b7280;
+      text-transform: uppercase; letter-spacing: 0.09em;
+      margin-bottom: 6px; margin-top: 10px;
+    }
+    .meta-section-title:first-child { margin-top: 0; }
+    .meta-row {
+      display: flex; justify-content: space-between;
+      font-size: 11.5px; padding: 2.5px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: #9ca3af;
+    }
+    .meta-row span { color: #e5e7eb; font-weight: 500; }
+
+    .meta-hint {
+      color: #4b5563;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+  </style>
 </head>
 
 <body>
-  <div id="header">
-    <div class="title-icon">
-      <img src="allsky360_256x256.png" alt="Allsky Icon" width="32" height="32" />
-      <h1>Allsky360 Videos</h1>
-    </div>
-    <!-- Hamburger Menu Button -->
-    <button id="hamburger-menu-btn" class="hamburger-menu-btn" onclick="toggleHamburgerMenu()">
-      <span class="hamburger-line"></span>
-      <span class="hamburger-line"></span>
-      <span class="hamburger-line"></span>
-    </button>
-    
-    <!-- Navigation Menu -->
-    <nav id="nav-menu" class="nav-menu">
-      <ul class="nav-list">
-        <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
-        <li><a href="archive.html" class="nav-link">Archive</a></li>
-        <li><a href="videos.html" class="nav-link">Videos</a></li>
-        <li><a href="graphs.html" class="nav-link">Graphs</a></li>
-        <li><a href="meteo.html" class="nav-link">Weather</a></li>
-        <li><a href="aurora.html" class="nav-link">Aurora</a></li>
-        <li><a href="config.html" class="nav-link">Config</a></li>
-        <li><a href="calibration.html" class="nav-link">Calibration</a></li>
-        <li><a href="processing.html" class="nav-link">Processing</a></li>
-      </ul>
-    </nav>
-  </div>
-  <div id="subheader">
-    <div class="settings-group">
-      <label style="align-items: center; gap: 0.3rem;">
-        Select date:
-        <input type="date" id="datePicker">
-      </label>
-      <label style="align-items: center; gap: 0.3rem;">
-        Select time:
-        <input type="time" id="timePicker" step="1">
-      </label>
-      <label style="align-items: center; gap: 0.3rem;">
-        Time range:
-        <select id="timeRangeSelect">
-          <option value="6">Last 6 hours</option>
-          <option value="12">Last 12 hours</option>
-          <option value="24">Last 24 hours</option>
-        </select>
-      </label>
-    </div>
-  </div>
+  <!-- allsky-common.js click handler requires these elements to exist -->
+  <div id="nav-menu"           style="display:none;"></div>
+  <div id="hamburger-menu-btn" style="display:none;"></div>
 
-  <div id="container">
-    <div id="video-list-container" style="flex: 1; min-width: 300px; max-height: 80vh; overflow-y: auto; padding: 1rem; background: #1a1a1a; border-radius: 4px;">
-      <div id="video-list">
-        <!-- Videos will appear here -->
+  <!-- ═══════════════════ HEADER ════════════════════════════════════ -->
+  <header id="app-header">
+    <a class="hdr-brand" href="dashboard1.html">
+      <img src="allsky360_256x256.png" alt="Allsky360" width="30" height="30" />
+      <div class="hdr-brand-text">
+        <div class="hdr-title">Allsky360</div>
+        <div class="hdr-crumb">Videos · Timelapse Browser</div>
       </div>
+    </a>
+
+    <div class="hdr-badges">
+      <span class="badge badge-gray"   id="hdr-date">–</span>
+      <span class="badge badge-purple" id="hdr-count">0 videos</span>
     </div>
-    <div id="video-player-container" style="flex: 1; min-width: 300px; padding: 1rem; align-items: center; justify-content: center; background: #1a1a1a; border-radius: 4px;">      <video id="video-player" controls style="max-width: 100%; max-height: 70vh; background: #000; border-radius: 4px;">
-        Your browser does not support the video tag.
-      </video>
-      <div id="video-info" style="margin-top: 1rem; text-align: center; color: #aaa; font-size: 0.9rem;"></div>
-    </div>
-  </div>
+  </header>
+
+  <!-- ═══════════════════ MAIN LAYOUT ═══════════════════════════════ -->
+  <div id="main-layout">
+
+    <!-- ── ICON NAV ─────────────────────────────────────────────── -->
+    <nav id="icon-nav">
+      <a href="index.html" class="nav-item" title="Dashboard">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </a>
+      <a href="dashboard.html" class="nav-item" title="Dashboard">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+      </a>
+      <div class="nav-sep"></div>
+      <a href="archive.html" class="nav-item" title="Archive">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="21 8 21 21 3 21 3 8"></polyline>
+          <rect x="1" y="3" width="22" height="5"></rect>
+          <line x1="10" y1="12" x2="14" y2="12"></line>
+        </svg>
+      </a>
+      <a href="videos.html" class="nav-item active" title="Videos">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="23 7 16 12 23 17 23 7"></polygon>
+          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+        </svg>
+      </a>
+      <a href="graphs.html" class="nav-item" title="Graphs">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="20" x2="18" y2="10"></line>
+          <line x1="12" y1="20" x2="12" y2="4"></line>
+          <line x1="6"  y1="20" x2="6"  y2="14"></line>
+        </svg>
+      </a>
+      <a href="meteo.html" class="nav-item" title="Weather">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+        </svg>
+      </a>
+      <a href="aurora.html" class="nav-item" title="Aurora">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+      </a>
+      <div class="nav-sep"></div>
+      <a href="aircraft.html" class="nav-item" title="Aircraft">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 16l-4-4V6a2 2 0 0 0-4 0v6l-4 4H3l2 3h5l2-1 2 1h5l2-3z"></path>
+        </svg>
+      </a>
+      <a href="hdr.html" class="nav-item" title="HDR Debug">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </a>
+      <a href="config.html" class="nav-item" title="Config">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </a>
+      <a href="calibration.html" class="nav-item" title="Calibration">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8"  x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          <line x1="2"  y1="12" x2="22"  y2="12"></line>
+          <line x1="12" y1="2"  x2="12"  y2="22"></line>
+        </svg>
+      </a>
+    </nav>
+
+    <!-- ── GALLERY AREA ──────────────────────────────────────────── -->
+    <main id="gallery-area">
+
+      <!-- Controls -->
+      <div id="controls-bar">
+        <div class="ctrl-group">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span class="ctrl-label-text">Date</span>
+          <input type="date" id="datePicker" class="ctrl-date" />
+        </div>
+
+        <div class="ctrl-group">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+          <span class="ctrl-label-text">Order</span>
+          <select id="orderSelect" class="ctrl-select">
+            <option value="descending">Descending</option>
+            <option value="ascending">Ascending</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Gallery grid -->
+      <div id="gallery-wrap">
+        <div id="gallery">
+          <div id="gallery-status">Select a date to browse timelapse videos.</div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- ── VIDEO SIDEBAR ─────────────────────────────────────────── -->
+    <aside id="video-sidebar">
+
+      <!-- Video player -->
+      <div id="video-panel">
+        <div id="video-placeholder">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.5">
+            <polygon points="23 7 16 12 23 17 23 7"></polygon>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+          </svg>
+          <p>Click a thumbnail<br>to play the video</p>
+        </div>
+        <video id="video-player" controls playsinline style="display:none;" preload="metadata">
+          Your browser does not support HTML5 video.
+        </video>
+      </div>
+
+      <!-- Info panel -->
+      <div id="video-info">
+        <div id="video-title" class="meta-hint">No video selected</div>
+
+        <div id="video-actions" style="display:none;">
+          <a id="btn-open" href="#" target="_blank" class="action-btn action-btn-purple">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+            Open
+          </a>
+          <button id="btn-download" class="action-btn action-btn-gray" onclick="downloadCurrentVideo()">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Download
+          </button>
+        </div>
+
+        <div id="metadata-content">
+          <p class="meta-hint">Click a thumbnail to load video details.</p>
+        </div>
+      </div>
+
+    </aside>
+
+  </div><!-- #main-layout -->
 
   <script>
-    let allVideos = [];
-    let firstLoad = true;
+    // ══════════════════════════════════════════════════════════════
+    //  STATE
+    // ══════════════════════════════════════════════════════════════
+    let allTimestamps  = [];
+    let currentDateStr = '';   // yyyymmdd
+    let activeThumb    = null;
+    let currentVideoPath = '';
 
-    // Convert Date object to YYYYMMDDhhmmss format (UTC)
-    function formatDateTimeString(date) {
-      const year = date.getUTCFullYear();
-      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(date.getUTCDate()).padStart(2, '0');
-      const hour = String(date.getUTCHours()).padStart(2, '0');
-      const minute = String(date.getUTCMinutes()).padStart(2, '0');
-      const second = String(date.getUTCSeconds()).padStart(2, '0');
-      return `${year}${month}${day}${hour}${minute}${second}`;
+    // ══════════════════════════════════════════════════════════════
+    //  HELPERS
+    // ══════════════════════════════════════════════════════════════
+    function formatThumbTime(ts) {
+      // ts = e.g. "night_avg_20251205" → return type label "night_avg"
+      return ts.replace(/_\d{8}$/, '');
     }
 
-    // Extract date from video filename (e.g., "20240101/video-20240101120000.mp4" -> "20240101")
-    function extractDateFromVideoPath(videoPath) {
-      const match = videoPath.match(/^(\d{8})\//);
-      return match ? match[1] : null;
+    function formatThumbDate(ts) {
+      // ts = e.g. "night_avg_20251205" → return "2025-12-05"
+      const d = ts.slice(-8);
+      return `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
     }
 
-    // Extract timestamp from video filename (e.g., "20240101/video-20240101120000.mp4" -> "20240101120000")
-    function extractTimestampFromVideoPath(videoPath) {
-      const match = videoPath.match(/video-(\d{14})\.mp4/);
-      return match ? match[1] : null;
+    function safeFixed(v, digits) {
+      return (v != null && !isNaN(v)) ? Number(v).toFixed(digits) : 'N/A';
     }
 
-    // Convert YYYYMMDDhhmmss to Date object
-    function parseDateTimeString(dateTimeStr) {
-      if (!dateTimeStr || !/^\d{14}$/.test(dateTimeStr)) {
-        return null;
-      }
-      
-      const year = parseInt(dateTimeStr.substring(0, 4), 10);
-      const month = parseInt(dateTimeStr.substring(4, 6), 10) - 1;
-      const day = parseInt(dateTimeStr.substring(6, 8), 10);
-      const hour = parseInt(dateTimeStr.substring(8, 10), 10);
-      const minute = parseInt(dateTimeStr.substring(10, 12), 10);
-      const second = parseInt(dateTimeStr.substring(12, 14), 10);
-      
-      return new Date(Date.UTC(year, month, day, hour, minute, second));
+    function thumbPath(ts) {
+      return `videos/${ts}.png`;
     }
 
-    // Load videos from API
-    async function loadVideos() {
-      try {
-        const response = await fetch('/api/videos');
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const videos = await response.json();
-        allVideos = videos;
-        
-        // Log for debugging
-        console.log(`Loaded ${videos.length} videos from API`);
-        
-        filterAndDisplayVideos();
-      } catch (err) {
-        console.error("Error loading videos:", err);
-        const videoList = document.getElementById("video-list");
-        videoList.innerHTML = `<div style="color: #f44; padding: 1rem;">Error loading videos: ${err.message}</div>`;
-      }
+    function videoPath(ts) {
+      return `videos/${ts}.mp4`;
     }
 
-    // Filter videos based on date, time, and time range
-    function filterAndDisplayVideos() {
-      // If no videos loaded yet, show message
-      if (!allVideos || allVideos.length === 0) {
-        document.getElementById("video-list").innerHTML = "<div style='padding: 1rem; color: #aaa;'>Loading videos...</div>";
+    function metaPath(ts) {
+      return `videos/${ts}.json`;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  GALLERY LOADING
+    // ══════════════════════════════════════════════════════════════
+    function loadThumbnails() {
+      const dateInput = document.getElementById('datePicker').value;
+      const order     = document.getElementById('orderSelect').value;
+      const gallery   = document.getElementById('gallery');
+      const hdrDate   = document.getElementById('hdr-date');
+      const hdrCount  = document.getElementById('hdr-count');
+
+      if (!dateInput) {
+        gallery.innerHTML = '<div id="gallery-status">Please select a date.</div>';
         return;
       }
 
-      const dateInput = document.getElementById("datePicker").value;
-      const timeInput = document.getElementById("timePicker").value;
-      const timeRange = parseInt(document.getElementById("timeRangeSelect").value);
+      currentDateStr = dateInput.replace(/-/g, '');
+      hdrDate.textContent = dateInput;
+      gallery.innerHTML = '<div id="gallery-status">Loading…</div>';
+      resetPlayer();
+      allTimestamps = [];
+      activeThumb   = null;
 
-      // If no date/time selected, show all videos
-      if (!dateInput || !timeInput) {
-        const sortedVideos = [...allVideos].sort((a, b) => {
-          const timestampA = extractTimestampFromVideoPath(a);
-          const timestampB = extractTimestampFromVideoPath(b);
-          if (!timestampA || !timestampB) return b.localeCompare(a); // Sort by filename if no timestamp
-          return timestampB.localeCompare(timestampA); // Descending order
-        });
-        displayVideos(sortedVideos);
-        return;
-      }
+      fetch(`/api/thumbnails?date=${dateInput}&type=video`)
+        .then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
+        .then(list => {
+          gallery.innerHTML = '';
 
-      // Parse date and time
-      const [year, month, day] = dateInput.split('-').map(Number);
-      const timeParts = timeInput.split(':');
-      const hours = parseInt(timeParts[0] || 0, 10);
-      const minutes = parseInt(timeParts[1] || 0, 10);
-      const seconds = parseInt(timeParts[2] || 0, 10);
-      
-      const endDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
-      
-      // Calculate start date (end - timeRange hours)
-      const startDate = new Date(endDate);
-      startDate.setUTCHours(startDate.getUTCHours() - timeRange);
-
-      const endStr = formatDateTimeString(endDate);
-      const startStr = formatDateTimeString(startDate);
-
-      // Filter videos that fall within the time range
-      const filteredVideos = allVideos.filter(videoPath => {
-        const timestampStr = extractTimestampFromVideoPath(videoPath);
-        if (!timestampStr) {
-          // If no timestamp found, include it anyway (show all videos that can't be filtered)
-          return true;
-        }
-        
-        const videoDate = parseDateTimeString(timestampStr);
-        if (!videoDate) {
-          // If timestamp can't be parsed, include it anyway
-          return true;
-        }
-        
-        const videoStr = formatDateTimeString(videoDate);
-        return videoStr >= startStr && videoStr <= endStr;
-      });
-
-      // On first load, if no videos match the filter, show all videos
-      if (firstLoad && filteredVideos.length === 0 && allVideos.length > 0) {
-        firstLoad = false;
-        const sortedVideos = [...allVideos].sort((a, b) => {
-          const timestampA = extractTimestampFromVideoPath(a);
-          const timestampB = extractTimestampFromVideoPath(b);
-          if (!timestampA || !timestampB) return b.localeCompare(a);
-          return timestampB.localeCompare(timestampA);
-        });
-        displayVideos(sortedVideos);
-        return;
-      }
-
-      firstLoad = false;
-
-      // Sort videos by timestamp (newest first)
-      filteredVideos.sort((a, b) => {
-        const timestampA = extractTimestampFromVideoPath(a);
-        const timestampB = extractTimestampFromVideoPath(b);
-        if (!timestampA || !timestampB) {
-          // If no timestamp, sort by filename
-          return b.localeCompare(a);
-        }
-        return timestampB.localeCompare(timestampA); // Descending order
-      });
-
-      displayVideos(filteredVideos);
-    }
-
-    // Display videos in the list
-    function displayVideos(videos) {
-      const videoList = document.getElementById("video-list");
-      
-      if (videos.length === 0) {
-        videoList.innerHTML = "<div style='padding: 1rem; color: #aaa;'>No videos found for the selected criteria.</div>";
-        return;
-      }
-
-      videoList.innerHTML = "";
-
-      videos.forEach(videoPath => {
-        const timestampStr = extractTimestampFromVideoPath(videoPath);
-        let displayName;
-
-        if (timestampStr) {
-          const videoDate = parseDateTimeString(timestampStr);
-          if (videoDate) {
-            // Format display name from timestamp
-            const dateStr = timestampStr.substring(0, 8);
-            const timeStr = timestampStr.substring(8, 14);
-            displayName = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)} ${timeStr.substring(0, 2)}:${timeStr.substring(2, 4)}:${timeStr.substring(4, 6)}`;
-          } else {
-            // Use filename if timestamp can't be parsed
-            displayName = videoPath;
+          if (!Array.isArray(list) || list.length === 0) {
+            gallery.innerHTML = '<div id="gallery-status">No videos found for this date.</div>';
+            hdrCount.textContent = '0 videos';
+            return;
           }
-        } else {
-          // Use filename if no timestamp found
-          displayName = videoPath;
-        }
 
-        const videoItem = document.createElement("div");
-        videoItem.style.cssText = "padding: 0.75rem; margin: 0.5rem 0; background: #222; border: 1px solid #444; border-radius: 4px; cursor: pointer; transition: background 0.2s, border-color 0.2s; color: #fff; display: flex; align-items: center; gap: 1rem;";
-        
-        // Create thumbnail image (replace .mp4 with .jpg)
-        const thumbnailPath = videoPath.replace(/\.mp4$/i, '.png');
-        const thumbnailUrl = `/videos/${thumbnailPath}`;
-        
-        const thumbnailImg = document.createElement("img");
-        thumbnailImg.src = thumbnailUrl;
-        thumbnailImg.alt = displayName;
-        thumbnailImg.style.cssText = "width: 150px; height: auto; object-fit: cover; border-radius: 4px; flex-shrink: 0;";
-        thumbnailImg.onerror = function() {
-          // If thumbnail doesn't exist, hide the image
-          this.style.display = 'none';
-        };
-        
-        const videoText = document.createElement("div");
-        videoText.textContent = displayName;
-        videoText.style.cssText = "flex: 1;";
-        
-        videoItem.appendChild(thumbnailImg);
-        videoItem.appendChild(videoText);
-        
-        videoItem.addEventListener("mouseenter", () => {
-          videoItem.style.background = "#333";
-          videoItem.style.borderColor = "#666";
-        });
-        
-        videoItem.addEventListener("mouseleave", () => {
-          videoItem.style.background = "#222";
-          videoItem.style.borderColor = "#444";
-        });
+          if (order === 'descending') list = list.slice().reverse();
 
-        videoItem.addEventListener("click", () => {
-          playVideo(videoPath, displayName);
-        });
+          allTimestamps = list;
+          hdrCount.textContent = `${list.length} video${list.length !== 1 ? 's' : ''}`;
 
-        videoList.appendChild(videoItem);
-      });
+          let currentType = null;
+
+          list.forEach((ts) => {
+            const vtype = ts.replace(/_\d{8}$/, '');
+            if (vtype !== currentType) {
+              currentType = vtype;
+              const sep = document.createElement('div');
+              sep.className = 'hour-sep';
+              sep.textContent = vtype;
+              gallery.appendChild(sep);
+            }
+
+            const wrap = document.createElement('div');
+            wrap.className = 'thumb-wrap';
+
+            const img = document.createElement('img');
+            img.className = 'thumb';
+            img.src     = thumbPath(ts);
+            img.alt     = ts;
+            img.title   = formatThumbDate(ts);
+            img.loading = 'lazy';
+
+            // Play icon overlay
+            const playOverlay = document.createElement('div');
+            playOverlay.className = 'thumb-play';
+            playOverlay.innerHTML = `
+              <div class="thumb-play-icon">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+              </div>`;
+
+            const timeLabel = document.createElement('div');
+            timeLabel.className = 'thumb-time';
+            timeLabel.textContent = formatThumbTime(ts);
+
+            wrap.appendChild(img);
+            wrap.appendChild(playOverlay);
+            wrap.appendChild(timeLabel);
+
+            wrap.addEventListener('click', () => {
+              setActiveThumb(img);
+              playVideo(ts);
+            });
+
+            gallery.appendChild(wrap);
+          });
+        })
+        .catch(err => {
+          console.error('Error loading thumbnails:', err);
+          gallery.innerHTML = '<div id="gallery-status">No data available for this date.</div>';
+          hdrCount.textContent = '0 videos';
+        });
     }
 
-    // Play video in the player
-    function playVideo(videoPath, displayName) {
-      const videoPlayer = document.getElementById("video-player");
-      const videoInfo = document.getElementById("video-info");
-      
-      // Construct full path to video - API returns only filename, full URL is /videos/<filename>
-      const fullPath = `/videos/${videoPath}`;
-      
-      videoPlayer.src = fullPath;
-      videoInfo.textContent = displayName;
-      
-      // Load and play
-      videoPlayer.load();
-      videoPlayer.play().catch(err => {
-        console.error("Error playing video:", err);
-      });
+    // ══════════════════════════════════════════════════════════════
+    //  VIDEO PLAYER
+    // ══════════════════════════════════════════════════════════════
+    function resetPlayer() {
+      const player      = document.getElementById('video-player');
+      const placeholder = document.getElementById('video-placeholder');
+      const actions     = document.getElementById('video-actions');
+      const titleEl     = document.getElementById('video-title');
+      const metaEl      = document.getElementById('metadata-content');
+
+      player.pause();
+      player.removeAttribute('src');
+      player.removeAttribute('poster');
+      player.load();
+      player.style.display = 'none';
+      placeholder.style.display = 'flex';
+      actions.style.display = 'none';
+      titleEl.className = 'meta-hint';
+      titleEl.textContent = 'No video selected';
+      metaEl.innerHTML = '<p class="meta-hint">Click a thumbnail to load video details.</p>';
+      currentVideoPath = '';
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      const datePicker = document.getElementById("datePicker");
-      const timePicker = document.getElementById("timePicker");
-      const timeRangeSelect = document.getElementById("timeRangeSelect");
+    async function playVideo(ts) {
+      const player      = document.getElementById('video-player');
+      const placeholder = document.getElementById('video-placeholder');
+      const actions     = document.getElementById('video-actions');
+      const titleEl     = document.getElementById('video-title');
+      const metaEl      = document.getElementById('metadata-content');
+      const btnOpen     = document.getElementById('btn-open');
 
-      // Set default values
-      const now = new Date();
-      const today = now.toISOString().slice(0, 10);
-      const currentTime = now.toTimeString().slice(0, 8);
-      datePicker.value = today;
-      timePicker.value = currentTime;
+      const vPath = videoPath(ts);
+      currentVideoPath = vPath;
 
-      // Add event listeners
-      datePicker.addEventListener("change", filterAndDisplayVideos);
-      timePicker.addEventListener("change", filterAndDisplayVideos);
-      timeRangeSelect.addEventListener("change", filterAndDisplayVideos);
+      placeholder.style.display = 'none';
+      player.style.display = 'block';
+      // Last frame (written by the timelapse tool) as poster until playback starts
+      player.poster = thumbPath(ts);
+      player.src = vPath;
+      player.load();
+      player.play().catch(() => {}); // autoplay may be blocked
 
-      // Load videos initially
-      loadVideos();
+      titleEl.className = '';
+      titleEl.textContent = `${ts}.mp4`;
+      btnOpen.href = vPath;
+      actions.style.display = 'flex';
+
+      metaEl.innerHTML = '<p class="meta-hint">Loading metadata…</p>';
+
+      try {
+        const resp = await fetch(metaPath(ts), { cache: 'no-cache' });
+        if (!resp.ok) throw new Error('not found');
+        const m = await resp.json();
+        metaEl.innerHTML = buildMetaHtml(m, ts);
+      } catch {
+        metaEl.innerHTML = '<p class="meta-hint">No metadata available.</p>';
+      }
+    }
+
+    function buildMetaHtml(m, ts) {
+      let html = '';
+
+      html += '<div class="meta-section-title">Video Data</div>';
+      html += `<div class="meta-row">Date/Time <span>${formatThumbDate(ts)}</span></div>`;
+      if (m.timestamp != null)
+        html += `<div class="meta-row">Timestamp <span>${formatTimestamp(m.timestamp, m.timezone_offset)}</span></div>`;
+      if (m.exposure_t0 != null)
+        html += `<div class="meta-row">Exposure t0 (s) <span>${safeFixed(m.exposure_t0, 5)}</span></div>`;
+      if (m.gain != null)
+        html += `<div class="meta-row">Gain <span>${safeFixed(m.gain, 1)}</span></div>`;
+      if (m.sensor_temperature != null)
+        html += `<div class="meta-row">Sensor temp (°C) <span>${safeFixed(m.sensor_temperature, 1)}</span></div>`;
+      if (m.capture_interval != null)
+        html += `<div class="meta-row">Interval (s) <span>${m.capture_interval}</span></div>`;
+      if (m.night_mode != null)
+        html += `<div class="meta-row">Night mode <span>${m.night_mode ? '✓ Yes' : '✗ No'}</span></div>`;
+      if (m.hdr != null)
+        html += `<div class="meta-row">HDR <span>${m.hdr}</span></div>`;
+
+      if (m.sun_altitude != null || m.moon_altitude != null || m.moon_phase_percentage != null) {
+        html += '<div class="meta-section-title">Environment</div>';
+        if (m.sun_altitude != null)
+          html += `<div class="meta-row">Sun altitude (°) <span>${safeFixed(m.sun_altitude, 1)}</span></div>`;
+        if (m.moon_altitude != null)
+          html += `<div class="meta-row">Moon altitude (°) <span>${safeFixed(m.moon_altitude, 1)}</span></div>`;
+        if (m.moon_phase_percentage != null)
+          html += `<div class="meta-row">Moon phase (%) <span>${safeFixed(m.moon_phase_percentage, 1)}</span></div>`;
+      }
+
+      return html;
+    }
+
+    function downloadCurrentVideo() {
+      if (!currentVideoPath) return;
+      const a = document.createElement('a');
+      a.href = currentVideoPath;
+      a.download = currentVideoPath.split('/').pop();
+      a.click();
+    }
+
+    function setActiveThumb(imgEl) {
+      if (activeThumb) activeThumb.classList.remove('active');
+      imgEl.classList.add('active');
+      activeThumb = imgEl;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  INIT
+    // ══════════════════════════════════════════════════════════════
+    document.addEventListener('DOMContentLoaded', () => {
+      const datePicker  = document.getElementById('datePicker');
+      const orderSelect = document.getElementById('orderSelect');
+
+      datePicker.addEventListener('change',  loadThumbnails);
+      orderSelect.addEventListener('change', loadThumbnails);
+
+      datePicker.value = new Date().toISOString().slice(0, 10);
+
+      loadThumbnails();
     });
   </script>
 
-  <footer id="footer">
-    <div class="copyright">Copyright (c) 2025 Sven Kreiensen</div>
-  </footer>
 </body>
-
 </html>
-

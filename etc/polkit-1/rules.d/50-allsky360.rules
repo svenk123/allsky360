@@ -1,0 +1,35 @@
+// Allsky360: allow the service account to start/stop/restart its own units.
+//
+// The web API (allsky360-api.service, running as allskyuser) calls
+// "systemctl start|stop|restart <unit>". systemd asks polkit for the action
+// org.freedesktop.systemd1.manage-units; this rule grants exactly these verbs
+// on exactly these units - nothing else, and no password prompt.
+//
+// This replaces the former sudoers rules: sudo is a setuid program and cannot
+// run inside a hardened unit (NoNewPrivileges, implied by most systemd
+// sandboxing options), polkit goes through D-Bus instead.
+// Installed by "make install" to /etc/polkit-1/rules.d/ (review.md, SEC-09).
+
+polkit.addRule(function (action, subject) {
+    if (action.id !== "org.freedesktop.systemd1.manage-units" ||
+        subject.user !== "allskyuser") {
+        return polkit.Result.NOT_HANDLED;
+    }
+
+    var units = [
+        "allsky360-camera.service",
+        "allsky360-api.service",
+        "allsky360-aurora.service",
+        "allsky360-meteo.service",
+        "allsky360-location.service",
+        "allsky360-mount-position.service"
+    ];
+    var verbs = ["start", "stop", "restart"];
+
+    if (units.indexOf(action.lookup("unit")) >= 0 &&
+        verbs.indexOf(action.lookup("verb")) >= 0) {
+        return polkit.Result.YES;
+    }
+
+    return polkit.Result.NOT_HANDLED;
+});
