@@ -44,7 +44,7 @@ The system runs on Linux (Ubuntu or Debian). You'll also need INDIGO server runn
 
 ## Getting started
 
-The installation process is documented in [INSTALL.md](INSTALL.md). The main thing is getting [INDIGO](https://github.com/indigo-astronomy/indigo) set up first, then building Allsky360. It's not complicated, but there are a few steps to follow.
+The installation process is documented in [INSTALL.md](INSTALL.md). The main thing is getting [INDIGO](https://github.com/indigo-astronomy/indigo) set up first, then building Allsky360. It's not complicated, but there are a few steps to follow. Once INDIGO is built, `sudo ./install.sh` installs and configures everything else in one step.
 
 ## Documentation
 

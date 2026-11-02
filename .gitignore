@@ -1,0 +1,80 @@
+# Build artifacts
+build/
+bin/
+obj/
+*.o
+*.a
+*.so
+*.dll
+*.exe
+*.out
+*.log
+*.AppleDouble
+tools/aurora/bin
+tools/aurora/obj
+tools/indigo-list-cameras/bin
+tools/indigo-list-cameras/obj
+tools/indigo-mount-status/bin
+tools/indigo-mount-status/obj
+tools/location/bin
+tools/location/obj
+tools/meteo/bin
+tools/meteo/obj
+tools/panorama/bin
+tools/panorama/obj
+tools/timelapse/bin
+tools/timelapse/obj
+
+# AI artifacts
+runs/
+*.engine
+*.cache
+__pycache__/
+.ipynb_checkpoints/
+
+# Editors/OS
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# CMake / Make
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# Local configs
+config.ini.saturn-c
+config.ini.uranus-c
+
+# Dependency/externals
+indigo/
+GPUJPEG/
+
+# Local data - not part of the repository
+/test_images/
+/*.raw
+/database/
+/ai/models/
+/allsky-api/node_modules/
+/allsky-api/public/images/
+/allsky-api/public/videos/
+/.claude/
+
+# Tool build output not covered above
+tools/indigo-cameras/bin
+tools/indigo-mount-position/bin
+tools/indigo-mount-status/bin/
+examples/*/bin/
+examples/*/obj/
+
+# Compiled example programs
+/examples/gpio-output/gpio_out
+/examples/modbus-scan/modbus_scan
+/examples/modbus_tool/modbus_tool
+/examples/temp-humidity-sensor/temp_humidity_sensor
+/examples/weather-sensor/weather_sensor
+/examples/wind-direction/wind_direction
+/examples/wind-speed/wind_speed
