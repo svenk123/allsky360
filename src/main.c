@@ -16,6 +16,7 @@
  *
  *****************************************************************************/
 #include <cairo.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <json-c/json.h>
 #include <limits.h>
@@ -36,9 +37,11 @@
 #include <indigo/indigo_client.h>
 
 #include "acdnr_filter.h"
+#include "auto_gamma.h"
 #include "ai_training.h"
 #include "allsky.h"
 #include "allsky_panorama.h"
+#include "atomic_file.h"
 #include "autoexposure.h"
 #include "clarity_filter.h"
 #include "color_calibration.h"
@@ -56,18 +59,23 @@
 #include "indigo_raw_to_rgbf.h"
 #include "jpeg_functions.h"
 #include "jpeg_to_cairo.h"
+#include "sd_notify.h"
 #include "lights_and_shadows.h"
 #include "mask_image.h"
 #include "median_filter.h"
 #include "moon_calc.h"
 #include "png_to_cairo.h"
 #include "png_to_rgbf.h"
+#include "raw_dump.h"
+#include "retention.h"
+#include "run_state.h"
 #include "rgb16_to_cairo.h"
 #include "rotate_image.h"
 #include "scnr_filter.h"
 #include "star_detector.h"
 #include "sun_calc.h"
 #include "thumbnail.h"
+#include "spektrum.h"
 #include "wavelet_sharpen.h"
 #include "white_balance.h"
 
@@ -75,26 +83,38 @@
 
 int allsky_debug;
 
-#define MAX_FRAMES 5
+/* The number of bracketed exposures is defined once, in hdr_merge.h (MAX_IMAGES).
+ * The fusion takes 'const struct HdrFrames frames[MAX_IMAGES]' and sizes all of
+ * its internal arrays with it, and image_metadata_t carries exposure_t0..t4 /
+ * sigma_noise_t0..t4 - so the three must not drift apart again. */
+_Static_assert(MAX_IMAGES == 5,
+               "MAX_IMAGES must stay 5: image_metadata_t has exactly the fields "
+               "exposure_t0..exposure_t4 and sigma_noise_t0..sigma_noise_t4");
 
-struct HdrFrames frames[MAX_FRAMES];
+struct HdrFrames frames[MAX_IMAGES];
 
 float *hdr_image = NULL;
 size_t hdr_image_size = 0;
-int debug_pipeline_images = 0;
+static volatile sig_atomic_t debug_pipeline_images = 0;
+static volatile sig_atomic_t dump_next_raw_series = 0;
+static volatile sig_atomic_t reload_requested = 0;
 
 // #define AI_TRAINING 0
 
 #define MIN_EXPOSURE 0.000032
+/* Maximum time to wait for the INDIGO server connection (seconds) */
+#define INDIGO_CONNECT_TIMEOUT 10
 
 /******* Global indigo variables **********/
 
 indigo_server_entry *server = NULL;
+/* Connection state of the INDIGO server, updated by the INDIGO client thread */
+static bool server_connection_state = false;
 char *indigo_camera = NULL;
-double exposure_sec = 0.0;
-double gain = 0;
+volatile double exposure_sec = 0.0;
+volatile double gain = 0;
 static bool connected = false;
-static int count = 1;
+static volatile int count = 1;
 unsigned char *raw_buffer = NULL;
 size_t raw_buffer_size = 0;
 
@@ -367,9 +387,37 @@ static indigo_result client_detach(indigo_client *client) {
 
 /* Indigo client client structure */
 static indigo_client client = {
-    "Allsky camera client", false, NULL,          INDIGO_OK,
-    INDIGO_VERSION_CURRENT, NULL,  client_attach, client_define_property,
-    client_update_property, NULL,  NULL,          client_detach};
+    .name = "Allsky camera client",
+    .is_remote = false,
+    .client_context = NULL,
+    .last_result = INDIGO_OK,
+    .version = INDIGO_VERSION_CURRENT,
+    .enable_blob_mode_records = NULL,
+    .attach = client_attach,
+    .define_property = client_define_property,
+    .update_property = client_update_property,
+    .delete_property = NULL,
+    .send_message = NULL,
+    .detach = client_detach,
+};
+
+/**
+ *  Wait until the INDIGO server connection is established.
+ *  indigo_connect_server() only starts a background thread; that thread sets
+ *  server_connection_state once the TCP connection is up and keeps
+ *  reconnecting on its own if the server goes away.
+ * @param timeout_sec: maximum time to wait
+ * @return: true if connected, false on timeout
+ */
+static bool wait_for_indigo_server(int timeout_sec) {
+  for (int waited_ms = 0; waited_ms < timeout_sec * 1000; waited_ms += 100) {
+    if (__atomic_load_n(&server_connection_state, __ATOMIC_ACQUIRE))
+      return true;
+    allsky_watchdog_ping();
+    indigo_usleep(100000);
+  }
+  return __atomic_load_n(&server_connection_state, __ATOMIC_ACQUIRE);
+}
 
 /**
  *  Capture image function
@@ -388,6 +436,9 @@ static int capture_image(double exposure, int capture_timeout) {
   /* Wait until capture is finished */
   while (count > 0) {
     indigo_usleep(ONE_SECOND_DELAY);
+    /* Long exposures are legitimate waiting time; the loop itself is bounded
+     * by exposure + capture_timeout below. */
+    allsky_watchdog_ping();
 
     time_t now_sec = time(NULL);
     if (difftime(now_sec, exposure_sec_begin) >= (exposure + capture_timeout)) {
@@ -407,13 +458,14 @@ static int capture_image(double exposure, int capture_timeout) {
 
 /***** Signal handlers **********/
 
-volatile sig_atomic_t keep_running =
+static volatile sig_atomic_t keep_running =
     1; // Set to 0 when program should be terminated
 
 /**
  *  Cleanup resources function
  */
 static void cleanup_resources() {
+  allsky_sd_notify("STOPPING=1");
   if (server) {
     indigo_device_disconnect(&client, indigo_camera);
 
@@ -424,10 +476,16 @@ static void cleanup_resources() {
   if (raw_buffer)
     allsky_safe_free(raw_buffer);
 
-  if (hdr_image)
+  if (hdr_image) {
+#ifdef USE_CUDA
+    free_rgbf_on_host(hdr_image, ALLSKY_HOST_ALLOC_MAPPED);
+#else
     allsky_safe_free(hdr_image);
+#endif
+    hdr_image = NULL;
+  }
 
-  for (int i = 0; i < MAX_FRAMES; i++) {
+  for (int i = 0; i < MAX_IMAGES; i++) {
     allsky_safe_free(frames[i].image);
     frames[i].image = NULL;
   }
@@ -438,15 +496,8 @@ static void cleanup_resources() {
  * @param signum: signal number
  */
 void cleanup_and_exit(int signum) {
-  printf("\nReceived signal %d, cleaning up...\n", signum);
-
-  keep_running = 0; // Stop main loop
-
-  cleanup_resources();
-
-  if (signum == SIGINT || signum == SIGTERM) {
-    exit(EXIT_SUCCESS);
-  }
+  (void)signum;
+  keep_running = 0;
 }
 
 /**
@@ -454,9 +505,29 @@ void cleanup_and_exit(int signum) {
  * @param signum: signal number
  */
 void debug_pipeline_handler(int signum) {
-  (void)signum; // Suppress unused parameter warning
-  printf("\nReceived SIGUSR2, enabling debug pipeline images...\n");
+  (void)signum;
   debug_pipeline_images = 1;
+}
+
+/**
+ * Reload handler (SIGHUP, sent by 'systemctl reload')
+ * The configuration is re-read at the start of every capture cycle anyway,
+ * so SIGHUP only has to keep the process alive (the default action of
+ * SIGHUP terminates it).
+ * @param signum: signal number
+ */
+void reload_handler(int signum) {
+  (void)signum;
+  reload_requested = 1;
+}
+
+/**
+ * Raw dump handler
+ * @param signum: signal number
+ */
+void raw_dump_handler(int signum) {
+  (void)signum;
+  dump_next_raw_series = 1;
 }
 
 /* Setup signal handlers */
@@ -472,62 +543,79 @@ void setup_signal_handlers() {
   /* Setup SIGUSR2 handler for debug pipeline images */
   sa.sa_handler = debug_pipeline_handler;
   sigaction(SIGUSR2, &sa, NULL);
+
+  /* Setup SIGUSR1 handler for one-shot INDIGO raw dumps */
+  sa.sa_handler = raw_dump_handler;
+  sigaction(SIGUSR1, &sa, NULL);
+
+  /* Setup SIGHUP handler for 'systemctl reload' */
+  sa.sa_handler = reload_handler;
+  sigaction(SIGHUP, &sa, NULL);
 }
 
 /************************************************/
 
 /**
- *  Run end-of-night tasks asynchronously via systemd-run + sudo
+ * Spawn a hook script detached from the daemon.
  *
+ * The hook runs as the same user as this daemon, so no sudo and no systemd-run
+ * is involved - both used to be in the chain and neither was ever needed
+ * (see review.md, REL-03 and SEC-01). Dropping them also means the
+ * ALLSKY360_* environment actually reaches the script: sudo's env_reset used
+ * to wipe it.
+ *
+ * Double fork so the daemon never accumulates children and the hook survives
+ * a daemon restart; stdio goes to /dev/null because the hook is expected to
+ * write its own log.
+ *
+ * @param script: absolute path of the hook, empty or NULL disables it
+ * @param arg: optional single argument for the hook (may be NULL)
  * @return:
- *   0 = background job successfully spawned
+ *   0 = hook spawned (or deliberately disabled)
+ *   1 = parameter/usage error, script missing or not executable
  *   2 = fork error
  *   3 = waitpid error on intermediate child
- *   127 = execl failed
  */
-int run_end_of_night(const char *image_directory, const char *database_directory, const char *video_directory) {
-  pid_t pid = fork();
-  if (pid < 0) {
-    // First fork failed
-    return 2;
+static int spawn_hook(const char *script, const char *arg) {
+  if (!script || script[0] == '\0')
+    return 0; /* hook disabled by configuration */
+
+  if (access(script, X_OK) != 0) {
+    fprintf(stderr, "ERROR: hook %s is not executable: %s\n", script,
+            strerror(errno));
+    return 1;
   }
+
+  pid_t pid = fork();
+  if (pid < 0)
+    return 2;
 
   if (pid > 0) {
-    // Parent: wait for the first child (avoid zombie)
+    /* Parent: reap the intermediate child right away */
     int status;
-    if (waitpid(pid, &status, 0) < 0) {
+    if (waitpid(pid, &status, 0) < 0)
       return 3;
-    }
-    return 0; // parent returns immediately
+    return 0;
   }
 
-  // ========== FIRST CHILD PROCESS ==========
-  // second fork to fully detach
+  /* First child: fork again so the worker is re-parented to init */
   pid_t pid2 = fork();
-  if (pid2 < 0) {
-    _exit(2); // fork error
-  }
-
-  if (pid2 > 0) {
-    // first child exits immediately
+  if (pid2 < 0)
+    _exit(2);
+  if (pid2 > 0)
     _exit(0);
-  }
 
-  // ========== GRANDCHILD PROCESS (REAL WORKER) ==========
-  // Fully detached now
+  /* Grandchild: the actual worker */
   if (setsid() < 0) {
-    // not fatal
+    /* not fatal */
   }
 
-  // Close all file descriptors except stdin/out/err
   struct rlimit rl;
   if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
-    for (int fd = 3; fd < (int)rl.rlim_cur; fd++) {
+    for (int fd = 3; fd < (int)rl.rlim_cur; fd++)
       close(fd);
-    }
   }
 
-  // Redirect stdin/out/err to /dev/null
   int devnull = open("/dev/null", O_RDWR);
   if (devnull >= 0) {
     dup2(devnull, STDIN_FILENO);
@@ -537,117 +625,49 @@ int run_end_of_night(const char *image_directory, const char *database_directory
       close(devnull);
   }
 
-  // Execute sudo + systemd-run + script
-  // Assumes sudoers allows this without password for the running user.
+  if (arg)
+    execl(script, script, arg, (char *)NULL);
+  else
+    execl(script, script, (char *)NULL);
 
-  setenv("ALLSKY360_IMAGE_DIRECTORY", image_directory, 1);
-  setenv("ALLSKY360_DATABASE_DIRECTORY", database_directory, 1);
-  setenv("ALLSKY360_VIDEO_DIRECTORY", video_directory, 1);
-
-  execl("/usr/bin/sudo", "sudo",
-    "/opt/allsky360/scripts/allsky360-endofnight-run.sh",
-    image_path,
-    (char *)NULL);
-
-  // If execl returns, something failed
+  /* Only reached when execl failed */
   _exit(127);
 }
 
 /**
- * Run postprocessing asynchronously via systemd-run + sudo.
- *
- * This function:
- *  - validates the image_path,
- *  - double-forks to avoid zombies and detach from the parent,
- *  - redirects stdio to /dev/null in the final child,
- *  - executes:
- *      sudo /usr/bin/systemd-run 
- *           /opt/allsky360/scripts/allsky360-postprocessing-run.sh <image_path>
- *
- * @param image_path: path to the image
- * @return:
- *   0 = background job successfully spawned
- *   1 = parameter/usage error
- *   2 = fork error
- *   3 = waitpid error on intermediate child
- *   127 = execl failed (something went wrong)
+ *  Run the end-of-night hook (timelapse generation and whatever else the
+ *  operator put into the script).
  */
-int run_postprocessing(const char *today_str, const char *now_str, int is_night, const char *image_path, const char *image_directory) {
-  if (!image_path || image_path[0] == '\0') {
-    // Parameter/usage error
+int run_end_of_night(const char *script, const char *image_directory,
+                     const char *database_directory,
+                     const char *video_directory) {
+  setenv("ALLSKY360_IMAGE_DIRECTORY", image_directory, 1);
+  setenv("ALLSKY360_DATABASE_DIRECTORY", database_directory, 1);
+  setenv("ALLSKY360_VIDEO_DIRECTORY", video_directory, 1);
+
+  return spawn_hook(script, NULL);
+}
+
+/**
+ *  Run the post-processing hook for a finished image.
+ *
+ *  This is the operator's extension point: the script receives the absolute
+ *  path of the archived image as its first argument and can run an AI model
+ *  over it, push it somewhere, or anything else.
+ */
+int run_postprocessing(const char *script, const char *today_str,
+                       const char *now_str, int is_night,
+                       const char *image_path, const char *image_directory) {
+  if (!image_path || image_path[0] == '\0')
     return 1;
-  }
-
-  pid_t pid = fork();
-  if (pid < 0) {
-    // fork error
-    return 2;
-  }
-
-  if (pid > 0) {
-    // Parent: wait for first child so it does not become a zombie
-    int status;
-    pid_t w = waitpid(pid, &status, 0);
-    if (w < 0) {
-      // waitpid failed; not fatal for functionality, but report error
-      return 3;
-    }
-    // Parent returns immediately; actual work is in grandchild
-    return 0;
-  }
-
-  // First child process here
-  // Do second fork to fully detach from the original parent
-  pid_t pid2 = fork();
-  if (pid2 < 0) {
-    _exit(2); // fork error in child
-  }
-
-  if (pid2 > 0) {
-    // First child exits immediately, grandchild continues
-    _exit(0);
-  }
-
-  // Grandchild process here: fully detached worker
-  // Optional: create new session to detach from controlling terminal
-  if (setsid() < 0) {
-    // Not fatal, continue anyway
-  }
-
-  // Close all inherited file descriptors except stdin/stdout/stderr
-  struct rlimit rl;
-  if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
-    for (int fd = 3; fd < (int)rl.rlim_cur; fd++) {
-      close(fd);
-    }
-  }
-
-  // Redirect stdin, stdout, stderr to /dev/null
-  int devnull = open("/dev/null", O_RDWR);
-  if (devnull >= 0) {
-    dup2(devnull, STDIN_FILENO);
-    dup2(devnull, STDOUT_FILENO);
-    dup2(devnull, STDERR_FILENO);
-    if (devnull > 2) {
-      close(devnull);
-    }
-  }
-
-  // Execute sudo + systemd-run + script
-  // Assumes sudoers allows this without password for the running user.
 
   setenv("ALLSKY360_TODAY_STR", today_str, 1);
   setenv("ALLSKY360_NOW_STR", now_str, 1);
   setenv("ALLSKY360_IS_NIGHT", is_night ? "1" : "0", 1);
   setenv("ALLSKY360_IMAGE_PATH", image_path, 1);
   setenv("ALLSKY360_IMAGE_DIRECTORY", image_directory, 1);
-  execl("/usr/bin/sudo", "sudo",
-        "/opt/allsky360/scripts/allsky360-postprocessing-run.sh",
-        image_path,
-        (char *)NULL);
 
-  // If execl returns, something went wrong
-  _exit(127);
+  return spawn_hook(script, image_path);
 }
 
 /**
@@ -706,12 +726,22 @@ int main(int argc, const char *argv[]) {
       }
     } else if ((strcmp(argv[i], "--start-exposure") == 0 ||
                 strcmp(argv[i], "-e") == 0)) {
-      exposure_sec = atof(argv[i + 1]);
-      i++;
+      if (i + 1 < argc) {
+        exposure_sec = atof(argv[i + 1]);
+        i++;
+      } else {
+        fprintf(stderr, "Error: -e/--start-exposure requires a value\n");
+        exit(1);
+      }
     } else if ((strcmp(argv[i], "--start-gain") == 0 ||
                 strcmp(argv[i], "-g") == 0)) {
-      gain = atof(argv[i + 1]);
-      i++;
+      if (i + 1 < argc) {
+        gain = atof(argv[i + 1]);
+        i++;
+      } else {
+        fprintf(stderr, "Error: -g/--start-gain requires a value\n");
+        exit(1);
+      }
     } else if (strncmp(argv[i], "--verbose", 9) == 0) {
       // Long form: --verbose [level]
       if (i + 1 < argc && argv[i + 1][0] != '-') {
@@ -801,8 +831,13 @@ int main(int argc, const char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  /* Reap all child processes automatically */
-  signal(SIGCHLD, SIG_IGN);
+  /* NOTE: SIGCHLD is deliberately left at its default.
+   * It used to be set to SIG_IGN, which makes the kernel reap children
+   * automatically and therefore makes every waitpid() fail with ECHILD - so
+   * run_end_of_night()/run_postprocessing() always reported an error even on
+   * success (see review.md, BUG-05). Zombies are already avoided by the
+   * double fork: the first child is waited for here, the detached grandchild
+   * is re-parented to init. */
 
   /* Load configuration */
   if (load_config(config_path, &config) != 0) {
@@ -815,7 +850,7 @@ int main(int argc, const char *argv[]) {
   setup_signal_handlers();
 
   /* Initialize frames array */
-  for (i = 0; i < MAX_FRAMES; i++) {
+  for (i = 0; i < MAX_IMAGES; i++) {
     frames[i].image = NULL;
     frames[i].image_size = 0;
     frames[i].exposure = 0.0;
@@ -847,6 +882,15 @@ int main(int argc, const char *argv[]) {
     return EXIT_FAILURE;
   }
 
+  /* Initialise CUDA device (must happen before any other CUDA call).
+   * Sets cudaDeviceMapHost so that zero-copy mapped buffers work.
+   * On the Jetson Orin the iGPU always supports canMapHostMemory. */
+#ifdef USE_CUDA
+  if (allsky_cuda_init() != 0) {
+    fprintf(stderr, "WARNING: CUDA initialisation failed - GPU processing unavailable\n");
+  }
+#endif
+
   /* Start INDIGO API */
   indigo_camera = allsky_safe_strdup(config.indigocamera);
   indigo_set_log_level(INDIGO_LOG_INFO);
@@ -856,9 +900,45 @@ int main(int argc, const char *argv[]) {
   }
 
   /* Check if it is night or day */
-  int is_night = is_sun_below_6_degrees(time(NULL), config.location_longitude,
-                                        config.location_latitude);
+  int is_night = is_sun_below_angle(time(NULL), config.location_longitude,
+                                    config.location_latitude,
+                                    config.nighttime_sunangle);
   printf("Night mode: %s\n", is_night ? "on" : "off");
+
+  /* Which UTC day the end-of-night processing last ran for. Persisted, so a
+   * restart across dawn no longer loses a whole night (review.md, REL-06). */
+  char last_endofnight_day[9] = {0};
+  if (run_state_get(config.database_directory, "last_endofnight",
+                    last_endofnight_day, sizeof(last_endofnight_day)) != 0) {
+    /* No state yet.
+     *
+     * Starting in DAY mode: the night of this day either never happened here
+     * or predates this installation - seed with today so we do not fire on an
+     * empty archive.
+     *
+     * Starting at NIGHT: a run is owed at the coming dawn. The sentinel is
+     * written to disk rather than just kept in memory, because otherwise a
+     * crash before dawn would leave no state at all, and the restart (then in
+     * day mode) would take the branch above and suppress the very run this
+     * whole mechanism exists for. */
+    if (is_night) {
+      allsky_safe_strncpy(last_endofnight_day, "pending",
+                          sizeof(last_endofnight_day));
+    } else {
+      time_t seed_now = time(NULL);
+      struct tm seed_tm;
+      if (gmtime_r(&seed_now, &seed_tm) != NULL)
+        allsky_safe_snprintf(last_endofnight_day, sizeof(last_endofnight_day),
+                             "%04d%02d%02d", seed_tm.tm_year + 1900,
+                             seed_tm.tm_mon + 1, seed_tm.tm_mday);
+    }
+
+    run_state_set(config.database_directory, "last_endofnight",
+                  last_endofnight_day);
+    printf("End of night state initialised: %s\n", last_endofnight_day);
+  } else {
+    printf("End of night last ran for: %s\n", last_endofnight_day);
+  }
 
   /* Set exposure und gain initially */
   if (exposure_sec == 0.0)
@@ -880,20 +960,31 @@ int main(int argc, const char *argv[]) {
     }
   }
 
-  int time_1 = time(NULL) - config.capture_interval - 1;
+  time_t time_1 = time(NULL) - config.capture_interval - 1;
   int capture_no = 1; // Capture counter
   int failed_no = 0;  // Failed captures
 
   printf("\nWaiting");
   fflush(stdout);
 
+  /* Initialisation done: tell systemd (Type=notify) that we are up. From now
+   * on the main loop has to ping the watchdog regularly (WatchdogSec=). */
+  allsky_sd_notify("READY=1\nSTATUS=Capturing");
+
   /* Loop forever and taking pictures */
   while (keep_running) {
+    allsky_watchdog_ping();
+
     time_t now1 = time(NULL);
 
     /* Capture interval reached, start taking picture */
     if (now1 > time_1 + config.capture_interval) {
       time_1 = now1;
+
+      if (reload_requested) {
+        reload_requested = 0;
+        printf("SIGHUP received, configuration reloaded\n");
+      }
 
       /* Read configuration again */
       if (load_config(config_path, &config) != 0) {
@@ -914,18 +1005,70 @@ int main(int argc, const char *argv[]) {
                images_dir);
       config_to_json(config_json_path, &config);
 
-      /* Set day or night mode */
-      int was_night = is_night;
-      is_night = is_sun_below_6_degrees(time(NULL), config.location_longitude,
-                                        config.location_latitude);
+      /* Archive retention: once per UTC day, and once right after start so a
+       * station that is already over its limit does not have to wait for
+       * midnight. */
+      {
+        static char last_retention_day[9] = {0};
+        time_t retention_now = time(NULL);
+        struct tm retention_tm;
+        char retention_day[9];
 
-      if (was_night && !is_night) {
-        printf(
-            "It is night and it is now day. Starting end of night tasks...\n");
-        if (run_end_of_night_tasks(config.image_directory, config.database_directory, config.video_directory) != 0) {
-          fprintf(stderr, "ERROR: Failed to run end of night tasks.\n");
+        if (gmtime_r(&retention_now, &retention_tm) != NULL &&
+            allsky_safe_snprintf(retention_day, sizeof(retention_day),
+                                 "%04d%02d%02d", retention_tm.tm_year + 1900,
+                                 retention_tm.tm_mon + 1,
+                                 retention_tm.tm_mday) == 0 &&
+            strcmp(retention_day, last_retention_day) != 0) {
+          allsky_safe_strncpy(last_retention_day, retention_day,
+                              sizeof(last_retention_day));
+          run_retention(&config, retention_day);
         }
-        printf("End of night tasks started\n");
+      }
+
+      /* Set day or night mode */
+      is_night = is_sun_below_angle(time(NULL), config.location_longitude,
+                                    config.location_latitude,
+                                    config.nighttime_sunangle);
+
+      /* End-of-night processing: run once per UTC day, as soon as we are in
+       * day mode. Driven by persisted state instead of by observing the
+       * night->day transition inside this process - a crash or a restart
+       * during dawn used to skip the whole night silently (REL-06). */
+      if (!is_night) {
+        time_t eon_now = time(NULL);
+        struct tm eon_tm;
+        char eon_day[9];
+
+        if (gmtime_r(&eon_now, &eon_tm) != NULL &&
+            allsky_safe_snprintf(eon_day, sizeof(eon_day), "%04d%02d%02d",
+                                 eon_tm.tm_year + 1900, eon_tm.tm_mon + 1,
+                                 eon_tm.tm_mday) == 0 &&
+            strcmp(eon_day, last_endofnight_day) != 0) {
+
+          printf("It is day and %s was not processed yet (last run: %s). "
+                 "Starting end of night tasks...\n",
+                 eon_day, last_endofnight_day[0] ? last_endofnight_day : "never");
+
+          /* Record the attempt BEFORE spawning: the hook is detached and may
+           * run for minutes. If the daemon dies meanwhile, the next start must
+           * not launch a second, competing run. */
+          allsky_safe_strncpy(last_endofnight_day, eon_day,
+                              sizeof(last_endofnight_day));
+          if (run_state_set(config.database_directory, "last_endofnight",
+                            eon_day) != 0)
+            fprintf(stderr,
+                    "WARNING: end of night state not persisted - the run may "
+                    "repeat after a restart\n");
+
+          if (run_end_of_night(config.endofnight_script, config.image_directory,
+                               config.database_directory,
+                               config.video_directory) != 0) {
+            fprintf(stderr, "ERROR: Failed to spawn end of night tasks.\n");
+          } else {
+            printf("End of night tasks spawned\n");
+          }
+        }
       }
 
       /* Don't capture if it is day and daytime_capture is off */
@@ -954,6 +1097,13 @@ int main(int argc, const char *argv[]) {
       char now_str[7];
       snprintf(now_str, sizeof(now_str), "%02d%02d%02d", tm_info->tm_hour,
                tm_info->tm_min, tm_info->tm_sec);
+
+      int dump_this_raw_series = dump_next_raw_series ? 1 : 0;
+      if (dump_this_raw_series) {
+        dump_next_raw_series = 0;
+        printf("INDIGO raw dump requested for image series %s%s\n", today_str,
+               now_str);
+      }
 
       /* Create image directory images/YYYYMMDD */
       char today_directory[NAME_MAX + 1];
@@ -992,7 +1142,7 @@ int main(int argc, const char *argv[]) {
 #endif
 
       /* Reset frames array, but keep image data */
-      for (i = 0; i < MAX_FRAMES; i++) {
+      for (i = 0; i < MAX_IMAGES; i++) {
         // Don't touch frames[i].image = NULL...
         // Don't touch frames[i].image_size...
         frames[i].exposure = 0.0;
@@ -1004,8 +1154,6 @@ int main(int argc, const char *argv[]) {
         frames[i].sigma_noise = 0.0f;
       }
 
-      double f = is_night ? config.nighttime_hdr_exposure_factor
-                          : config.daytime_hdr_exposure_factor;
       int use_max_images = 0;
       int overexposed_images = 0;
       int width = 0, height = 0; // Image width and height
@@ -1025,12 +1173,12 @@ int main(int argc, const char *argv[]) {
       /* Capture frames */
       int abort_captures = 0;
 
-      for (i = 0; i < MAX_FRAMES; i++) {
+      for (i = 0; i < MAX_IMAGES; i++) {
         if (abort_captures)
           break;
 
         printf("===== Capturing HDR frame %d / %d (night: %s)=====\n", i,
-               MAX_FRAMES, is_night ? "on" : "off");
+               MAX_IMAGES, is_night ? "on" : "off");
 
         frames[i].gain = gain;
 
@@ -1047,22 +1195,28 @@ int main(int argc, const char *argv[]) {
                                           : config.daytime_hdr_exposure_factor,
                                  i);
 
-          // frames[i].exposure = frames[i - 1].exposure / f;
+          /* Stop the ladder once the next step would fall below what the
+           * camera can actually deliver. Requesting a shorter time makes the
+           * driver clamp it silently: the frame then carries the same exposure
+           * as its predecessor, adds no dynamic range, and the fusion merges
+           * two statistically identical - and equally noisy - frames.
+           * MIN_EXPOSURE remains the absolute backstop for a config that
+           * declares an unusable minimum. */
+          double min_exposure = config.camera_min_exposure > MIN_EXPOSURE
+                                    ? config.camera_min_exposure
+                                    : MIN_EXPOSURE;
 
-          if (frames[i].exposure < MIN_EXPOSURE) {
-            frames[i].exposure = MIN_EXPOSURE;
+          if (frames[i].exposure < min_exposure) {
+            fprintf(stderr,
+                    "HDR ladder stops before frame %d: computed exposure "
+                    "%.8fs is below the camera minimum (%.8fs). Lower "
+                    "%s_hdr_exposure_factor to use more frames.\n",
+                    i, frames[i].exposure, min_exposure,
+                    is_night ? "nighttime" : "daytime");
 
-            /* If last frame was minimum exposure. Give up here. */
-            if (i > 0) {
-              if (frames[i - 1].exposure == config.camera_min_exposure) {
-                fprintf(stderr, "WARNING: Calculated exposure is below minimum "
-                                "exposure. Sorry we give up here.\n");
-                break; // Next frame
-              }
-            }
-            fprintf(stderr, "WARNING: Calculated exposure is below minimum "
-                            "exposure. Taking next frame.\n");
-            break; // Next frame
+            /* Not captured - do not report a phantom exposure in the metadata */
+            frames[i].exposure = 0.0;
+            break;
           }
         }
 
@@ -1180,7 +1334,22 @@ int main(int argc, const char *argv[]) {
           if (!server)
             indigo_connect_server(
                 config.indigoservername, config.indigoserver, config.indigoport,
-                &server); // Check correct host name in 2nd arg!!!
+                &server,
+                &server_connection_state); // Check correct host name in 2nd arg!!!
+
+          /* The connection is established asynchronously - wait for it
+           * instead of sending commands into a not yet connected session. */
+          if (!wait_for_indigo_server(INDIGO_CONNECT_TIMEOUT)) {
+            fprintf(stderr,
+                    "ERROR: INDIGO server %s:%d not reachable within %d s, "
+                    "skipping this capture cycle\n",
+                    config.indigoserver, config.indigoport,
+                    INDIGO_CONNECT_TIMEOUT);
+            /* Keep the server entry: INDIGO keeps reconnecting in the
+             * background, the next cycle waits for it again. */
+            abort_captures = 1;
+            continue;
+          }
 
           /* Set camera binning */
           set_camera_binning(&client, indigo_camera, config.camera_binning2x2);
@@ -1196,6 +1365,20 @@ int main(int argc, const char *argv[]) {
             server = NULL;
 
             continue;
+          }
+        }
+
+        if (dump_this_raw_series && !dryrun) {
+          char raw_dump_path[PATH_MAX + 1];
+          if (save_indigo_raw_dump(config.raw_dump_directory, today_str,
+                                   now_str, i, raw_buffer, raw_buffer_size,
+                                   raw_dump_path, sizeof(raw_dump_path)) == 0) {
+            printf("INDIGO raw HDR frame %d / %d saved to %s\n", i, MAX_IMAGES,
+                   raw_dump_path);
+          } else {
+            fprintf(stderr,
+                    "WARNING: Failed to save INDIGO raw HDR frame %d / %d\n",
+                    i, MAX_IMAGES);
           }
         }
 
@@ -1244,7 +1427,7 @@ int main(int argc, const char *argv[]) {
               frames[i].image, processing_image_size);
           if (!temp_image) {
             fprintf(stderr, "HDR frame %d / %d: image buffer realloc failed\n",
-                    i, MAX_FRAMES);
+                    i, MAX_IMAGES);
             allsky_safe_free(frames[i].image);
             frames[i].image = NULL;
             frames[i].image_size = 0;
@@ -1252,7 +1435,7 @@ int main(int argc, const char *argv[]) {
           }
 
           printf("HDR frame %d / %d: image buffer allocated: %ld bytes\n", i,
-                 MAX_FRAMES, processing_image_size);
+                 MAX_IMAGES, processing_image_size);
 
           frames[i].image = temp_image;
         }
@@ -1276,7 +1459,7 @@ int main(int argc, const char *argv[]) {
         printf(
             "------ HDR frame %d / %d (exposure: %.6fs, gain: %.1f) captured "
             "--------\n\n",
-            i, MAX_FRAMES, frames[i].exposure, gain);
+            i, MAX_IMAGES, frames[i].exposure, gain);
 
         /* Mask areas outside of the image circle */
         if (config.image_mask_radius > 0) {
@@ -1290,6 +1473,23 @@ int main(int argc, const char *argv[]) {
             save_debug_pipeline_image(frames[i].image, width, height,
                                       i * 100 + 1, images_dir, 1);
           }
+        }
+
+        /* Spectral analysis on first HDR frame only */
+        if (i == 0 && config.spektrum_enabled) {
+          int scx    = config.spektrum_cx >= 0 ? config.spektrum_cx : width / 2;
+          int scy    = config.spektrum_cy >= 0 ? config.spektrum_cy : height / 2;
+          int srad   = config.spektrum_radius;
+          if (srad < 1)   srad = 1;
+          if (srad > 100) srad = 100;
+
+          int sret = spektrum_analyze(
+              frames[i].image, width, height, scx, scy, srad,
+              (float)config.spektrum_regularization,
+              config.spektrum_output_path);
+
+          if (sret != 0)
+            printf("[spektrum] Analyse fehlgeschlagen (code %d)\n", sret);
         }
 
         /* RGB channel scaling */
@@ -1322,7 +1522,7 @@ int main(int argc, const char *argv[]) {
           save_jpeg_rgbf1(frames[i].image, width, height, 9, 0.25f,
                           re_filename);
 
-          printf("Debug raw HDR frame %d / %d image %s saved.\n", i, MAX_FRAMES,
+          printf("Debug raw HDR frame %d / %d image %s saved.\n", i, MAX_IMAGES,
                  re_filename);
         }
 
@@ -1336,15 +1536,15 @@ int main(int argc, const char *argv[]) {
 
         if (overexposed) {
           printf("------------ HDR frame %d / %d is overexposed!\n", i,
-                 MAX_FRAMES);
+                 MAX_IMAGES);
 
-          if (overexposed_images < MAX_FRAMES)
+          if (overexposed_images < MAX_IMAGES)
             overexposed_images++;
         }
 
         use_max_images++;
         printf("Can use %d of %d HDR frames for HDR fusion\n", use_max_images,
-               MAX_FRAMES);
+               MAX_IMAGES);
 
         /* No HDR */
         if (!config.hdr) {
@@ -1412,12 +1612,17 @@ int main(int argc, const char *argv[]) {
 
         /* Compute (median) brightness */
         TIMED_BLOCK("compute_filtered_median_brightness_rgbf1", {
+          int brightness_radius =
+              (int)(config.measure_brightness_area * config.image_horizon_radius);
           compute_filtered_median_brightness_rgbf1(
               frames[i].image, width, height, &frames[i].median_r,
               &frames[i].median_g, &frames[i].median_b, &frames[i].median_l,
               config.image_center_x, config.image_center_y,
-              config.measure_brightness_area);
+              brightness_radius);
         });
+        printf("[DEBUG] frame %d median brightness: R=%.4f G=%.4f B=%.4f L=%.4f",
+                   i, frames[i].median_r, frames[i].median_g,
+                   frames[i].median_b, frames[i].median_l);
 
         /* Measure background noise at night and at higher gains */
         if (is_night && gain > 0.0) {
@@ -1450,13 +1655,26 @@ int main(int argc, const char *argv[]) {
           // Only at night
           // Gain must be > 0.0
           // Only for short exposures
-          if (is_night && frames[i].exposure > 1.0 && gain > 1.0 && i > 0) {
+          if (is_night && frames[i].exposure > 1.0 && gain > 1.0) {
             TIMED_BLOCK("multiscale_median_filter_rgbf1", {
-              /* Adaptive multiscale median filter: Max scale is dynamic based
-               * on the number of HDR frames */
+              /* Adaptive multiscale median filter: scale is proportional to
+               * measured sigma_noise for this frame. Longer exposures with
+               * more thermal noise get a stronger filter, shorter exposures
+               * get a weaker filter. noise_ref is the expected sigma at max
+               * gain/exposure; at or above this the full max_scale is used. */
+              int adaptive_scale = 1;
+              if (frames[i].sigma_noise > 0.0f) {
+                const float noise_ref = 0.010f;
+                float t = frames[i].sigma_noise / noise_ref;
+                if (t > 1.0f) t = 1.0f;
+                adaptive_scale = 1 + (int)roundf(
+                    (config.nighttime_multiscale_median_filter_max_scale - 1) * t);
+              }
+              printf("Median filter frame %d: sigma_noise=%.5f -> adaptive_scale=%d\n",
+                     i, frames[i].sigma_noise, adaptive_scale);
               multiscale_median_filter_rgbf1(
                   frames[i].image, width, height,
-                  config.nighttime_multiscale_median_filter_max_scale * (i + 1),
+                  adaptive_scale,
                   config.nighttime_multiscale_median_filter_amount);
             });
 
@@ -1507,17 +1725,32 @@ int main(int argc, const char *argv[]) {
       size_t needed_hdr_image_size =
           (size_t)(pixel_count * channels * sizeof(float));
       if (needed_hdr_image_size > hdr_image_size) {
+#ifdef USE_CUDA
+        /* Zero-copy mapped memory: GPU accesses host buffer directly via a
+         * device pointer obtained with cudaHostGetDevicePointer(). On Jetson
+         * Orin, CPU and GPU share the same DDR so no H2D/D2H copy is needed. */
+        if (hdr_image) {
+          free_rgbf_on_host(hdr_image, ALLSKY_HOST_ALLOC_MAPPED);
+          hdr_image = NULL;
+        }
+        hdr_image = (float *)alloc_rgbf_on_host(needed_hdr_image_size,
+                                                 ALLSKY_HOST_ALLOC_MAPPED);
+        if (!hdr_image) {
+          fprintf(stderr, "hdr_image mapped alloc failed (%zu bytes)\n",
+                  needed_hdr_image_size);
+          continue;
+        }
+#else
         float *temp_hdr_image =
             (float *)allsky_safe_realloc(hdr_image, needed_hdr_image_size);
         if (!temp_hdr_image) {
           fprintf(stderr, "hdr_image realloc failed");
           allsky_safe_free(hdr_image);
           hdr_image = NULL;
-
           continue;
         }
-
         hdr_image = temp_hdr_image;
+#endif
       }
       hdr_image_size = needed_hdr_image_size;
 
@@ -1551,31 +1784,25 @@ int main(int argc, const char *argv[]) {
           y_max_expected *= scale_factor;
         }
         TIMED_BLOCK("hdr_multi_scale_fusion_rgbf1", {
-          /* Get channel scaling factors used in white balance */
-          float channel_scale_r =
-              is_night ? (float)config.nighttime_white_balance_red
-                       : (float)config.daytime_white_balance_red;
-          float channel_scale_g = 1.0f; // Green is always 1.0
-          float channel_scale_b =
-              is_night ? (float)config.nighttime_white_balance_blue
-                       : (float)config.daytime_white_balance_blue;
+          /* The white-balance factors are no longer passed in: they cancel out
+           * in the fusion's colour-gain ratio (see review.md, BUG-09). */
 
           if (overexposed_images == 0)
             use_max_images = 1;
 
-          if (use_max_images > 3) {
-            use_max_images = 3;
+          if (use_max_images > MAX_IMAGES) {
+            use_max_images = MAX_IMAGES;
           }
 
           hdr_multi_scale_fusion_laplacian_rgbf1(
               frames, use_max_images, width, height,
               (float)config.hdr_clipping_threshold, y_max_expected, hdr_image,
               images_dir, config.hdr_weight_maps, config.hdr_weight_stats,
-              config.hdr_chroma_mode, config.hdr_contrast_weight_strength,
+              (float)config.hdr_contrast_weight_strength,
+              (float)config.hdr_noise_fusion_strength,
               config.hdr_pyramid_levels_override,
               (float)config.hdr_weight_sigma,
-              (float)config.hdr_weight_clip_factor, channel_scale_r,
-              channel_scale_g, channel_scale_b);
+              (float)config.hdr_weight_clip_factor);
         });
 
         /* High Dynamic Range Tone Mapping */
@@ -1628,13 +1855,16 @@ int main(int argc, const char *argv[]) {
 
       printf("===== Postprocessing =====\n");
 
-      /* Upload HDR image to GPU */
+      /* Get CUDA device pointer for the zero-copy mapped hdr_image buffer.
+       * No H2D transfer: on Jetson Orin the device pointer addresses the
+       * same physical DDR as hdr_image. */
       float *hdr_image_device = NULL;
-      if (upload_rgbf_to_device(hdr_image, width, height, &hdr_image_device) !=
-          0) {
-        printf("WARNING: GPU upload failed, using CPU processing\n");
-        hdr_image_device = NULL; // Signal for CPU fallback
+#ifdef USE_CUDA
+      if (get_device_ptr_from_mapped(hdr_image, &hdr_image_device) != 0) {
+        printf("WARNING: Zero-copy mapping failed, using CPU processing\n");
+        hdr_image_device = NULL;
       }
+#endif
 
       /* Autostretch */
       if (config.autostretch) {
@@ -1735,25 +1965,46 @@ int main(int argc, const char *argv[]) {
         }
       }
 
-      /* Adaptive Gamma based on number of HDR subframes */
-      if (config.gamma != 1.0) {
-        float base_gamma = config.gamma;
-        /* Linear decay based on number of HDR subframes */
-        // float gamma = base_gamma - 0.07f * (use_max_images);
-        //  Quadratic decay based on number of HDR subframes */
-        float gamma =
-            base_gamma -
-            0.07f * (1.0f - 1.0f / (1.0f + (use_max_images - 1) * 0.3f));
-        // Logarithmic decay based on number of HDR subframes */
-        // float gamma = base_gamma - 0.05f * logf(1.0f + (use_max_images - 1) *
-        // 0.5f);
-        printf("Gamma: %.3f (use_max_images: %d)\n", gamma, use_max_images);
-        if (gamma < 0.1f)
-          gamma = 0.1f;
+      /* Gamma correction: auto or fixed */
+      {
+        float gamma;
 
-        TIMED_BLOCK("apply_gamma_correction_rgbf1", {
-          apply_gamma_correction_rgbf1(hdr_image_device, width, height, gamma);
-        });
+        if (config.auto_gamma) {
+          TIMED_BLOCK("compute_auto_gamma_rgbf1", {
+            gamma = compute_auto_gamma_rgbf1(
+                hdr_image_device, width, height,
+                (float)config.auto_gamma_target,
+                (float)config.auto_gamma_min,
+                (float)config.auto_gamma_max);
+          });
+        } else {
+          gamma = (float)config.gamma;
+        }
+
+        if (gamma != 1.0f) {
+          if (gamma < 0.1f)
+            gamma = 0.1f;
+          printf("Gamma: %.3f (auto=%d)\n", gamma, config.auto_gamma);
+          TIMED_BLOCK("apply_gamma_correction_rgbf1", {
+            apply_gamma_correction_rgbf1(hdr_image_device, width, height,
+                                         gamma);
+          });
+        }
+
+        if (config.reinhard_tonemap) {
+          TIMED_BLOCK("reinhard_tonemap_rgbf1", {
+            reinhard_tonemap_rgbf1(hdr_image_device, width, height,
+                                   (float)config.reinhard_white_point);
+          });
+        }
+
+        if (config.tone_curve) {
+          TIMED_BLOCK("apply_tone_curve_rgbf1", {
+            apply_tone_curve_rgbf1(hdr_image_device, width, height,
+                                   (float)config.tone_curve_shadow_lift,
+                                   (float)config.tone_curve_midtone_contrast);
+          });
+        }
 
         if (debug_pipeline_images) {
           save_debug_pipeline_image(hdr_image_device, width, height, 804,
@@ -1789,11 +2040,15 @@ int main(int argc, const char *argv[]) {
 
         star_position_t *stars = NULL;
 
+        int sqm_cx = (config.sqm_center_x > 0) ? config.sqm_center_x : config.image_zenith_x;
+        int sqm_cy = (config.sqm_center_y > 0) ? config.sqm_center_y : config.image_zenith_y;
+
         TIMED_BLOCK("find_stars_template_rgbf1", {
           int result = find_stars_template(
               frames[0].image, width, height, template_data, tpl_size, tpl_size,
-              config.image_zenith_x, config.image_zenith_y, config.sqm_radius,
-              config.sqm_threshold, config.sqm_max_stars, &stars, &num_stars);
+              sqm_cx, sqm_cy, config.sqm_radius,
+              config.sqm_threshold, config.sqm_min_brightness,
+              config.sqm_max_stars, &stars, &num_stars);
 
           if (result == 0) {
 #if 0
@@ -1836,12 +2091,16 @@ int main(int argc, const char *argv[]) {
       exposure_sec = frames[0].exposure;
       if (frames[0].median_g >= 0) {
         printf("Adjusting exposure and gain\n");
+        double new_exposure = exposure_sec;
+        double new_gain = gain;
         adjust_exposure_gain(frames[0].median_g,
                              is_night ? config.nighttime_meanbrightness
                                       : config.daytime_meanbrightness,
                              config.camera_max_exposure,
                              config.camera_min_exposure, config.camera_max_gain,
-                             config.camera_min_gain, &exposure_sec, &gain);
+                             config.camera_min_gain, &new_exposure, &new_gain);
+        exposure_sec = new_exposure;
+        gain = new_gain;
         printf("Exposure: %.6f, Gain: %.1f\n", exposure_sec, gain);
       }
 
@@ -1903,11 +2162,10 @@ int main(int argc, const char *argv[]) {
         }
       }
 
-      /* Download HDR image from GPU and free GPU memory */
-      if (hdr_image_device != NULL) {
-        download_rgbf_from_device(hdr_image_device, width, height, hdr_image);
-        free_rgbf_on_device(hdr_image_device);
-      }
+      /* Zero-copy: hdr_image_device and hdr_image point to the same physical
+       * memory. All GPU writes are already visible to the CPU - no D2H copy
+       * or device free required. */
+      hdr_image_device = NULL;
 
       /* Move images/latest_image.* to images/YYYYMMDD directory */
       char archive_image_filepath[PATH_MAX + 1];
@@ -2052,16 +2310,12 @@ int main(int argc, const char *argv[]) {
                                sizeof(latest_json_filepath),
                                "%s/latest_image.json", images_dir))
         fprintf(stderr, "WARNING: String %s truncated\n", latest_json_filepath);
-      FILE *file = fopen(latest_json_filepath, "w");
-      if (file) {
-        // fprintf(file, "%s\n", json_object_to_json_string_ext(jroot,
-        // JSON_C_TO_STRING_NOSLASHESCAPE));
-        fprintf(file, "%s\n",
-                json_object_to_json_string_ext(jroot, JSON_C_TO_STRING_SPACED));
-        // fprintf(file, "%s\n", json_object_to_json_string_ext(jroot,
-        // JSON_C_TO_STRING_PRETTY));
-        fclose(file);
-      }
+      /* The dashboard polls this file every few seconds and the postprocessing
+       * hook derives paths from it - publish it atomically (REL-05). */
+      if (write_text_file_atomic(
+              latest_json_filepath,
+              json_object_to_json_string_ext(jroot, JSON_C_TO_STRING_SPACED)) != 0)
+        fprintf(stderr, "ERROR: Failed to write %s\n", latest_json_filepath);
 
       json_object_put(jroot);
 
@@ -2087,10 +2341,13 @@ int main(int argc, const char *argv[]) {
       printf("Data added to database %s\n", db_filepath);
 
       /* Run AI processing */
-      if (run_postprocessing(today_str, now_str, is_night, latest_image_filepath, config.image_directory) != 0) {
-        fprintf(stderr, "ERROR: Failed to run AI processing.\n");
+      if (run_postprocessing(config.postprocessing_script, today_str, now_str,
+                             is_night, archive_image_filepath,
+                             config.image_directory) != 0) {
+        fprintf(stderr, "ERROR: Failed to spawn AI processing.\n");
+      } else {
+        printf("AI processing spawned\n");
       }
-      printf("AI processing started\n");
 
       // Reset debug pipeline images flag at end of processing pipeline
       debug_pipeline_images = 0;
