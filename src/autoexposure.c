@@ -22,13 +22,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-float calc_exposure_time(float t0, int ev_steps, int index) {
+float calc_exposure_time(float t0, float ev_steps, int index) {
   if (index <= 0) {
     // index 0 = longest exposure → no reduction
     return t0;
   }
 
-  float exponent = (float)(index * ev_steps);
+  /* ev_steps is a double in config.ini (*_hdr_exposure_factor). It used to be
+   * truncated to int here, so 1.5 silently became 1. */
+  float exponent = (float)index * ev_steps;
   float factor = powf(2.0f, exponent);
 
   return t0 / factor;

@@ -21,6 +21,9 @@
 #include "png_to_rgb8.h"
 #include "stacker.h"
 #include "video_encoder.h"
+#ifdef USE_CUDA
+#include "stacker_cuda.h"
+#endif
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -130,7 +133,119 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  if (mode != STACK_NONE) {
+  if (mode == STACK_MOTION) {
+    size_t buffer_size = (size_t)width * height * 3;
+    size_t n_pixels    = buffer_size;
+    uint8_t *median_bg = (uint8_t *)allsky_safe_malloc(buffer_size);
+    uint8_t *out_frame = (uint8_t *)allsky_safe_malloc(buffer_size);
+    int loaded = 0;
+
+#ifdef USE_CUDA
+    // ── GPU-Pfad ────────────────────────────────────────────────────────────
+    if (cuda_stacker_init(n_pixels) != 0) {
+      fprintf(stderr, "CUDA stacker init failed, aborting.\n");
+      return 1;
+    }
+
+    printf("Pass 1 (GPU): Building median histogram...\n");
+    for (int i = optind; i < argc; ++i) {
+      uint8_t *rgb = load_and_resize_jpeg(argv[i], width, height, ref_width, ref_height);
+      if (!rgb) { fprintf(stderr, "[WARN] Skipping %s\n", argv[i]); continue; }
+      cuda_update_pixel_histogram(rgb, n_pixels);
+      allsky_safe_free(rgb);
+      ++loaded;
+      if (verbose) print_progress_bar(loaded, image_count);
+    }
+
+    printf("\nPass 1 (GPU): Computing median from %d frames...\n", loaded);
+    cuda_build_median_from_histogram(loaded, n_pixels, median_bg);
+
+    printf("Pass 2 (GPU): Encoding motion video...\n");
+    int frame_idx = 0;
+    for (int i = optind; i < argc; ++i) {
+      uint8_t *rgb = load_and_resize_jpeg(argv[i], width, height, ref_width, ref_height);
+      if (!rgb) { fprintf(stderr, "[WARN] Skipping %s\n", argv[i]); continue; }
+      cuda_update_motion(rgb, median_bg, sigma_clip_threshold, n_pixels);
+      cuda_export_motion(n_pixels, out_frame);
+      encode_frame(out_frame);
+      allsky_safe_free(rgb);
+      ++frame_idx;
+      if (verbose) print_progress_bar(frame_idx, loaded);
+    }
+
+    finalize_encoder();
+
+    if (stack_output_filename) {
+      cuda_export_motion(n_pixels, out_frame);
+      if (save_rgb8_as_png(out_frame, width, height, 3, stack_output_filename) == 0)
+        printf("\n✅ Final motion image saved as PNG: %s\n", stack_output_filename);
+      else
+        fprintf(stderr, "\n[ERROR] Failed to write PNG file.\n");
+    }
+
+    cuda_stacker_free();
+
+#else
+    // ── CPU-Pfad ────────────────────────────────────────────────────────────
+    size_t hist_bytes = n_pixels * 256 * sizeof(uint16_t);
+    printf("Pass 1 (CPU): Building median histogram (%.0f MB)...\n",
+           (double)hist_bytes / (1024.0 * 1024.0));
+    uint16_t *hist = (uint16_t *)calloc(n_pixels * 256, sizeof(uint16_t));
+    if (!hist) {
+      fprintf(stderr, "Out of memory for histogram (%.0f MB needed).\n",
+              (double)hist_bytes / (1024.0 * 1024.0));
+      return 1;
+    }
+
+    for (int i = optind; i < argc; ++i) {
+      uint8_t *rgb = load_and_resize_jpeg(argv[i], width, height, ref_width, ref_height);
+      if (!rgb) { fprintf(stderr, "[WARN] Skipping %s\n", argv[i]); continue; }
+      update_pixel_histogram(hist, rgb, n_pixels);
+      allsky_safe_free(rgb);
+      ++loaded;
+      if (verbose) print_progress_bar(loaded, image_count);
+    }
+
+    printf("\nPass 1 (CPU): Computing median from %d frames...\n", loaded);
+    build_median_from_histogram(hist, loaded, n_pixels, median_bg);
+    free(hist);
+
+    printf("Pass 2 (CPU): Encoding motion video...\n");
+    stack_context_t stack;
+    if (init_stack_context(&stack, width, height, mode, sigma_clip_threshold) != 0) {
+      fprintf(stderr, "Failed to initialize stack context.\n");
+      return 1;
+    }
+    stack.median_bg = median_bg;
+
+    int frame_idx = 0;
+    for (int i = optind; i < argc; ++i) {
+      uint8_t *rgb = load_and_resize_jpeg(argv[i], width, height, ref_width, ref_height);
+      if (!rgb) { fprintf(stderr, "[WARN] Skipping %s\n", argv[i]); continue; }
+      update_stack(&stack, rgb);
+      export_stacked_rgb(&stack, out_frame);
+      encode_frame(out_frame);
+      allsky_safe_free(rgb);
+      ++frame_idx;
+      if (verbose) print_progress_bar(frame_idx, loaded);
+    }
+
+    finalize_encoder();
+
+    if (stack_output_filename) {
+      if (save_rgb8_as_png(out_frame, width, height, 3, stack_output_filename) == 0)
+        printf("\n✅ Final motion image saved as PNG: %s\n", stack_output_filename);
+      else
+        fprintf(stderr, "\n[ERROR] Failed to write PNG file.\n");
+    }
+
+    free_stack_context(&stack);
+#endif
+
+    allsky_safe_free(median_bg);
+    allsky_safe_free(out_frame);
+
+  } else if (mode != STACK_NONE) {
     stack_context_t stack;
     if (init_stack_context(&stack, width, height, mode, sigma_clip_threshold) !=
         0) {
@@ -152,7 +267,7 @@ int main(int argc, char *argv[]) {
       ++frame_idx;
       update_stack(&stack, rgb_data);
       export_stacked_rgb(&stack, out_frame);
-	  
+
       encode_frame(out_frame);
       allsky_safe_free(rgb_data);
       if (verbose)
@@ -174,6 +289,7 @@ int main(int argc, char *argv[]) {
     free_stack_context(&stack);
     allsky_safe_free(out_frame);
   } else {
+    uint8_t *last_frame = NULL;
     for (int i = optind; i < argc; ++i) {
       if (verbose)
         print_progress_bar(i - optind + 1, image_count);
@@ -186,13 +302,25 @@ int main(int argc, char *argv[]) {
       }
 
       encode_frame(rgb_data);
-      if (rgb_data) {
+      if (stack_output_filename) {
+        allsky_safe_free(last_frame);
+        last_frame = rgb_data;
+      } else {
         allsky_safe_free(rgb_data);
-        rgb_data = NULL;
       }
     }
 
     finalize_encoder();
+
+    if (stack_output_filename && last_frame) {
+      if (save_rgb8_as_png(last_frame, width, height, 3,
+                           stack_output_filename) == 0) {
+        printf("\n✅ Last frame saved as PNG: %s\n", stack_output_filename);
+      } else {
+        fprintf(stderr, "\n[ERROR] Failed to write PNG file.\n");
+      }
+      allsky_safe_free(last_frame);
+    }
   }
 
   if (verbose) {

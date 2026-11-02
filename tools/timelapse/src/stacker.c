@@ -41,6 +41,7 @@ int init_stack_context(stack_context_t *ctx, int width, int height, stacking_mod
     ctx->accum = (float *)calloc(size, sizeof(float));
     ctx->accum2 = (float *)calloc(size, sizeof(float));
     ctx->background = (float *)calloc(size, sizeof(float));
+    ctx->median_bg = NULL;
 
     if (!ctx->accum)
 	return 1;
@@ -62,8 +63,8 @@ void update_stack(stack_context_t *ctx, const uint8_t *rgb_data) {
     size_t size = ctx->width * ctx->height * 3;
     ctx->count++;
 
-    // Hintergrundinitialisierung für min-stack (optional)
-    if (ctx->mode == STACK_SIGMA_CLIP || ctx->mode == STACK_MOTION) {
+    // Hintergrundinitialisierung für sigma-stack
+    if (ctx->mode == STACK_SIGMA_CLIP) {
         if (ctx->count == 1) {
 #pragma omp parallel for
             for (size_t i = 0; i < size; ++i)
@@ -79,15 +80,19 @@ void update_stack(stack_context_t *ctx, const uint8_t *rgb_data) {
     }
 
     if (ctx->mode == STACK_MOTION) {
+        // median_bg muss vor dem ersten Aufruf gesetzt sein (siehe main.c)
+        if (!ctx->median_bg) return;
+
+        // Jeden Pixel mit dem Median-Hintergrund vergleichen.
+        // Nur positive Abweichungen (heller als Median) zaehlen.
+        // Max-Akkumulator: staerkste Einzelabweichung pro Pixel bleibt erhalten.
 #pragma omp parallel for
         for (size_t i = 0; i < size; ++i) {
-            float val = (float)rgb_data[i];
-            float bg  = ctx->background[i];
-            float diff = fabsf(val - bg);
-
-            if (diff >= ctx->motion_threshold) {
-                ctx->accum[i] += diff;
-            }
+            float val  = (float)rgb_data[i];
+            float bg   = (float)ctx->median_bg[i];
+            float diff = val - bg;
+            if (diff >= ctx->motion_threshold && diff > ctx->accum[i])
+                ctx->accum[i] = diff;
         }
 
         return;
@@ -209,8 +214,33 @@ void free_stack_context(stack_context_t *ctx) {
     ctx->accum = NULL;
     ctx->accum2 = NULL;
     ctx->background = NULL;
+    ctx->median_bg = NULL;  // extern verwaltet, nicht hier freigeben
 
     ctx->count = 0;
+}
+
+void update_pixel_histogram(uint16_t *hist, const uint8_t *rgb, size_t n_pixels) {
+    // Jeder Pixel greift auf einen anderen hist-Bereich zu -> keine Konflikte
+#pragma omp parallel for schedule(static)
+    for (size_t p = 0; p < n_pixels; ++p) {
+        uint16_t *h = hist + p * 256;
+        if (h[rgb[p]] < 65535)
+            h[rgb[p]]++;
+    }
+}
+
+void build_median_from_histogram(const uint16_t *hist, int n_frames, size_t n_pixels, uint8_t *out) {
+    size_t half = ((size_t)n_frames + 1) / 2;
+
+#pragma omp parallel for schedule(dynamic, 4096)
+    for (size_t p = 0; p < n_pixels; ++p) {
+        const uint16_t *h = hist + p * 256;
+        uint32_t cum = 0;
+        for (int v = 0; v < 256; ++v) {
+            cum += h[v];
+            if (cum >= half) { out[p] = (uint8_t)v; break; }
+        }
+    }
 }
 
 #ifdef __cplusplus

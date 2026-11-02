@@ -18,10 +18,22 @@
 #ifndef GPU_FUNCTIONS_CUDA_H
 #define GPU_FUNCTIONS_CUDA_H
 
-// CUDA-GPU-Functions (C-kompatibel)
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * Allocation modes for alloc_rgbf_on_host / free_rgbf_on_host.
+ *
+ * ALLSKY_HOST_ALLOC_CPU    - Standard malloc (pageable, no GPU access)
+ * ALLSKY_HOST_ALLOC_PINNED - cudaMallocHost (page-locked, faster DMA)
+ * ALLSKY_HOST_ALLOC_MAPPED - cudaHostAllocMapped (zero-copy, GPU gets device
+ *                            pointer via cudaHostGetDevicePointer; ideal on
+ *                            Jetson Orin where CPU and GPU share the same DDR)
+ */
+#define ALLSKY_HOST_ALLOC_CPU    0
+#define ALLSKY_HOST_ALLOC_PINNED 1
+#define ALLSKY_HOST_ALLOC_MAPPED 2
 
 /**
  * Upload an RGBA float image from host to device memory.
@@ -74,23 +86,44 @@ int free_rgbf_on_device_Wrapper(float *rgba_device);
 /**
  * Allocate RGBA float buffer on host.
  *
- * @param size Size of the memory to allocate
- * @param pinned 1 if the memory is pinned, 0 otherwise
- * @return pointer to the allocated memory
+ * @param size Size of the memory to allocate in bytes
+ * @param mode ALLSKY_HOST_ALLOC_CPU / _PINNED / _MAPPED
+ * @return pointer to the allocated memory, NULL on error
  */
-void* alloc_rgbf_on_host(size_t size, int pinned);
-void alloc_rgbf_on_host_Wrapper(size_t size, int pinned);
+void* alloc_rgbf_on_host(size_t size, int mode);
+void* alloc_rgbf_on_host_Wrapper(size_t size, int mode);
 
 /**
- * Free pinned memory on host.
+ * Free host buffer previously allocated with alloc_rgbf_on_host.
  *
- * @param ptr Pointer to the memory to free
- * @param pinned 1 if the memory is pinned, 0 otherwise
+ * @param ptr  Pointer to the memory to free
+ * @param mode Must match the mode used during allocation
+ */
+void free_rgbf_on_host(void* ptr, int mode);
+void free_rgbf_on_host_Wrapper(void* ptr, int mode);
+
+/**
+ * Get a CUDA device pointer for a zero-copy mapped host buffer.
+ * The host buffer must have been allocated with ALLSKY_HOST_ALLOC_MAPPED.
+ * On Jetson Orin the returned device pointer addresses the same physical
+ * memory — no H2D/D2H transfer is required.
+ *
+ * @param host_ptr   Host pointer (from alloc_rgbf_on_host with MAPPED mode)
+ * @param device_ptr [out] Corresponding CUDA device pointer
  * @return 0 on success, 1 on error
  */
-void free_rgbf_on_host(void* ptr, int pinned);
+int get_device_ptr_from_mapped(float *host_ptr, float **device_ptr);
+int get_device_ptr_from_mapped_Wrapper(float *host_ptr, float **device_ptr);
 
-void free_rgbf_on_host_Wrapper(void* ptr, int pinned);
+/**
+ * One-time CUDA device initialisation. Must be called before any other
+ * CUDA function. Sets cudaDeviceMapHost so that mapped/zero-copy host
+ * allocations work, verifies canMapHostMemory, and warms up the context.
+ *
+ * @return 0 on success, 1 on error
+ */
+int allsky_cuda_init(void);
+int allsky_cuda_init_Wrapper(void);
 
 #ifdef __cplusplus
 }

@@ -15,6 +15,7 @@
  * DEALINGS IN THE SOFTWARE.
  *
  *****************************************************************************/
+#include "atomic_file.h"
 #include "star_detector.h"
 #include "allsky.h"
 #include <json-c/json.h>
@@ -204,26 +205,29 @@ static inline int in_circle(int x, int y, int cx, int cy, int r) {
   return dx * dx + dy * dy <= r * r;
 }
 
-/* Template matching using normalized cross-correlation (TM_CCOEFF_NORMED) */
+/* Template matching using normalized cross-correlation (TM_CCOEFF_NORMED).
+ *
+ * Two-pass approach:
+ *   Pass 1 (parallel): compute NCC correlation map for all pixels in the ROI.
+ *   Pass 2 (sequential): collect local maxima of the correlation map that
+ *     exceed both the correlation threshold and the minimum brightness.
+ *
+ * Non-Maximum Suppression (NMS) radius equals half the template width so that
+ * each physical star (which covers roughly one template footprint) produces
+ * exactly one detection. */
 int find_stars_template(const float *rgba, int width, int height,
                         const float *template_data, int tpl_width,
                         int tpl_height, int cx, int cy, int radius,
-                        float threshold, int max_stars,
+                        float threshold, float min_brightness, int max_stars,
                         star_position_t **stars_out, int *num_stars_out) {
   if (!rgba || !template_data || !stars_out || !num_stars_out)
     return 1;
 
-  star_position_t *stars =
-      allsky_safe_malloc(sizeof(star_position_t) * max_stars);
-  if (!stars)
-    return 2;
-
-  int count = 0;
   int half_tw = tpl_width / 2;
   int half_th = tpl_height / 2;
-  int min_dist = 8; // duplicate threshold
+  int n = tpl_width * tpl_height;
 
-  /* Compute template mean and stddev once */
+  /* Compute template statistics once */
   float tpl_sum = 0, tpl_sqsum = 0;
   for (int j = 0; j < tpl_height; j++) {
     for (int i = 0; i < tpl_width; i++) {
@@ -233,72 +237,100 @@ int find_stars_template(const float *rgba, int width, int height,
     }
   }
 
-  /* Compute template mean and stddev once */
-  float tpl_mean = tpl_sum / (tpl_width * tpl_height);
-  float tpl_var = tpl_sqsum - tpl_mean * tpl_sum;
-  float tpl_std = sqrtf(tpl_var);
+  float tpl_mean = tpl_sum / n;
+  /* fabsf guards against tiny negative values caused by floating-point error */
+  float tpl_std = sqrtf(fabsf(tpl_sqsum - tpl_mean * tpl_sum));
 
-#pragma omp parallel for collapse(2)
+  /* Pass 1: build correlation map (parallelised) */
+  float *corr_map = calloc(width * height, sizeof(float));
+  if (!corr_map)
+    return 2;
+
+#pragma omp parallel for collapse(2) schedule(dynamic, 32)
   for (int y = half_th; y < height - half_th; y++) {
     for (int x = half_tw; x < width - half_tw; x++) {
 
-      /* Skip if not in detection circle */
+      /* Skip pixels outside the circular detection area */
       if (!in_circle(x, y, cx, cy, radius))
         continue;
 
-      /* Compute local patch statistics */
+      /* Early-reject dark pixels before the expensive correlation computation.
+       * The centre pixel of the template footprint must exceed min_brightness. */
+      float peak = intensity(&rgba[(y * width + x) * CHANNELS]);
+      if (peak < min_brightness)
+        continue;
+
+      /* Compute local patch statistics for NCC */
       float img_sum = 0, img_sqsum = 0, cross = 0;
       for (int j = 0; j < tpl_height; j++) {
         for (int i = 0; i < tpl_width; i++) {
           int ix = x + i - half_tw;
           int iy = y + j - half_th;
-          int idx = (iy * width + ix) * CHANNELS;
-          float I = intensity(&rgba[idx]);
+          float I = intensity(&rgba[(iy * width + ix) * CHANNELS]);
           float T = template_data[j * tpl_width + i];
-
           img_sum += I;
           img_sqsum += I * I;
-          cross += (I * T);
+          cross += I * T;
         }
       }
 
-      float img_mean = img_sum / (tpl_width * tpl_height);
-      float img_var = img_sqsum - img_mean * img_sum;
-      float img_std = sqrtf(img_var);
+      float img_mean = img_sum / n;
+      float img_std = sqrtf(fabsf(img_sqsum - img_mean * img_sum));
 
       float denom = img_std * tpl_std;
-      float corr = 0;
       if (denom > 1e-5f)
-        corr = (cross - img_mean * tpl_sum) / denom;
+        corr_map[y * width + x] = (cross - img_mean * tpl_sum) / denom;
+    }
+  }
 
+  /* Pass 2: Non-Maximum Suppression — keep only local maxima.
+   * NMS window radius is half the template size, matching the star footprint. */
+  int nms_r = half_tw;
+
+  star_position_t *stars =
+      allsky_safe_malloc(sizeof(star_position_t) * max_stars);
+  if (!stars) {
+    free(corr_map);
+    return 3;
+  }
+
+  int count = 0;
+  for (int y = half_th; y < height - half_th && count < max_stars; y++) {
+    for (int x = half_tw; x < width - half_tw && count < max_stars; x++) {
+      float corr = corr_map[y * width + x];
       if (corr < threshold)
         continue;
+      if (!in_circle(x, y, cx, cy, radius))
+        continue;
 
-      /* Critical section for writing star */
-#pragma omp critical
-      {
-        int too_close = 0;
-        for (int i = 0; i < count; i++) {
-          int dx = stars[i].x - x;
-          int dy = stars[i].y - y;
-
-          /* Check if star is too close to another star */
-          if (dx * dx + dy * dy < min_dist * min_dist) {
-            too_close = 1;
-            break;
-          }
+      /* Check that this pixel is the maximum within the NMS window */
+      int is_max = 1;
+      for (int dy = -nms_r; dy <= nms_r && is_max; dy++) {
+        int ny = y + dy;
+        if (ny < 0 || ny >= height)
+          continue;
+        for (int dx = -nms_r; dx <= nms_r && is_max; dx++) {
+          if (dx == 0 && dy == 0)
+            continue;
+          int nx = x + dx;
+          if (nx < 0 || nx >= width)
+            continue;
+          if (corr_map[ny * width + nx] > corr)
+            is_max = 0;
         }
+      }
 
-        if (!too_close && count < max_stars) {
-          stars[count++] = (star_position_t){x, y};
+      if (is_max) {
+        stars[count++] = (star_position_t){x, y};
 #ifdef DEBUG
-          printf("[DEBUG] Star match at (%d,%d): corr=%.3f\n", x, y, corr);
+        printf("[DEBUG] Star at (%d,%d): corr=%.3f peak=%.3f\n", x, y, corr,
+               intensity(&rgba[(y * width + x) * CHANNELS]));
 #endif
-        }
       }
     }
   }
 
+  free(corr_map);
   *stars_out = stars;
   *num_stars_out = count;
 
@@ -334,17 +366,13 @@ int stars_to_json(const star_position_t *stars, int num_stars,
   /* Attach array to root */
   json_object_object_add(root, "stars", star_array);
 
-  /* Write to file */
-  FILE *fp = fopen(filename, "w");
-  if (!fp) {
+  /* Written atomically - the archive page reads these files (REL-05) */
+  const char *json_str =
+      json_object_to_json_string_ext(root, JSON_C_TO_STRING_PRETTY);
+  if (write_text_file_atomic(filename, json_str) != 0) {
     json_object_put(root); // free memory
     return 4;
   }
-
-  const char *json_str =
-      json_object_to_json_string_ext(root, JSON_C_TO_STRING_PRETTY);
-  fprintf(fp, "%s\n", json_str);
-  fclose(fp);
 
   json_object_put(root); // free all JSON memory
 
@@ -357,7 +385,7 @@ int estimate_sqm_from_star_count(int num_stars, float a, float b,
   if (num_stars < 1 || !sqm_out)
     return 1;
 
-  *sqm_out = a - b * log10f((float)num_stars);
+  *sqm_out = a + b * log10f((float)num_stars);
   return 0;
 }
 
@@ -378,6 +406,6 @@ int estimate_sqm_corrected(int num_stars, float exposure_s, float gain_db,
   float corrected_count = (float)num_stars / correction_factor;
 
   /* Compute corrected SQM value */
-  *sqm_out = a - b * log10f(corrected_count);
+  *sqm_out = a + b * log10f(corrected_count);
   return 0;
 }

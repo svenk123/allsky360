@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Allsky360 Statistics</title>
+  <title>Allsky360 – Statistics</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180" />
@@ -13,136 +13,231 @@
   <link rel="manifest" href="manifest.json" />
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Allsky360 Stats">
-  <meta name="theme-color" content="#111111" />
+  <meta name="theme-color" content="#0d1117" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="stylesheet" href="style.css">
-  <!-- Gridstack CSS -->
+
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@9.2.2/dist/gridstack.min.css">
-  
+
   <script src="js/allsky-common.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script
-    src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-  <script
-    src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0/dist/chartjs-plugin-annotation.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0/dist/chartjs-plugin-annotation.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
-  <!-- Gridstack JS (IIFE bundle: core + HTML5 drag&drop) -->
   <script src="https://cdn.jsdelivr.net/npm/gridstack@9.2.2/dist/gridstack-all.js" defer></script>
+
+  <link rel="stylesheet" href="allsky.css">
+  <style>
+    /* ── GRAPHS MAIN ────────────────────────────────────────────── */
+    #graphs-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #controls-bar { padding: 10px 10px 0; }
+
+    /* ── GRAPHS SCROLL ──────────────────────────────────────────── */
+    #graphs-scroll {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 8px 8px 20px;
+    }
+
+  </style>
 </head>
 
 <body>
-  <div id="header">
-    <div class="title-icon">
-      <img src="allsky360_256x256.png" alt="Allsky Icon" width="32" height="32" />
-      <h1>Allsky360 Statistics</h1>
+  <!-- allsky-common.js click handler requires these elements -->
+  <div id="nav-menu"           style="display:none;"></div>
+  <div id="hamburger-menu-btn" style="display:none;"></div>
+
+  <!-- ═══════════════════ HEADER ════════════════════════════════════ -->
+  <header id="app-header">
+    <a class="hdr-brand" href="dashboard.html">
+      <img src="allsky360_256x256.png" alt="Allsky360" width="30" height="30" />
+      <div class="hdr-brand-text">
+        <div class="hdr-title">Allsky360</div>
+        <div class="hdr-crumb">Statistics · Sensor Graphs</div>
+      </div>
+    </a>
+
+    <div class="hdr-badges">
+      <span class="badge badge-gray" id="hdr-date">–</span>
+      <button class="badge badge-gray" id="toggle-grid-btn" onclick="toggleGridInteraction()">🔒 Locked</button>
+      <button class="badge badge-gray" id="reset-layout-btn" onclick="resetGridLayout()">↺ Reset</button>
     </div>
-    <!-- Hamburger Menu Button -->
-    <button id="hamburger-menu-btn" class="hamburger-menu-btn" onclick="toggleHamburgerMenu()">
-      <span class="hamburger-line"></span>
-      <span class="hamburger-line"></span>
-      <span class="hamburger-line"></span>
-    </button>
-    
-    <!-- Navigation Menu -->
-    <nav id="nav-menu" class="nav-menu">
-      <ul class="nav-list">
-        <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
-        <li><a href="archive.html" class="nav-link">Archive</a></li>
-        <li><a href="videos.html" class="nav-link">Videos</a></li>
-        <li><a href="graphs.html" class="nav-link">Graphs</a></li>
-        <li><a href="meteo.html" class="nav-link">Weather</a></li>
-        <li><a href="aurora.html" class="nav-link">Aurora</a></li>
-        <li><a href="config.html" class="nav-link">Config</a></li>
-        <li><a href="calibration.html" class="nav-link">Calibration</a></li>
-        <li><a href="processing.html" class="nav-link">Processing</a></li>
-      </ul>
+  </header>
+
+  <!-- ═══════════════════ MAIN LAYOUT ═══════════════════════════════ -->
+  <div id="main-layout">
+
+    <!-- ── ICON NAV ─────────────────────────────────────────────── -->
+    <nav id="icon-nav">
+      <a href="index.html" class="nav-item" title="Home">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </a>
+      <a href="dashboard.html" class="nav-item" title="Dashboard">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+      </a>
+      <div class="nav-sep"></div>
+      <a href="archive.html" class="nav-item" title="Archive">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="21 8 21 21 3 21 3 8"></polyline>
+          <rect x="1" y="3" width="22" height="5"></rect>
+          <line x1="10" y1="12" x2="14" y2="12"></line>
+        </svg>
+      </a>
+      <a href="videos.html" class="nav-item" title="Videos">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="23 7 16 12 23 17 23 7"></polygon>
+          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+        </svg>
+      </a>
+      <a href="graphs.html" class="nav-item active" title="Graphs">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="20" x2="18" y2="10"></line>
+          <line x1="12" y1="20" x2="12" y2="4"></line>
+          <line x1="6"  y1="20" x2="6"  y2="14"></line>
+        </svg>
+      </a>
+      <a href="meteo.html" class="nav-item" title="Weather">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+        </svg>
+      </a>
+      <a href="aurora.html" class="nav-item" title="Aurora">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+      </a>
+      <div class="nav-sep"></div>
+      <a href="aircraft.html" class="nav-item" title="Aircraft">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 16l-4-4V6a2 2 0 0 0-4 0v6l-4 4H3l2 3h5l2-1 2 1h5l2-3z"></path>
+        </svg>
+      </a>
+      <a href="hdr.html" class="nav-item" title="HDR Debug">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </a>
+      <a href="config.html" class="nav-item" title="Config">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </a>
+      <a href="calibration.html" class="nav-item" title="Calibration">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8"  x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          <line x1="2"  y1="12" x2="22"  y2="12"></line>
+          <line x1="12" y1="2"  x2="12"  y2="22"></line>
+        </svg>
+      </a>
     </nav>
-  </div>
-  <div id="subheader">
-    <div class="settings-group">
-      <label style="display: flex; align-items: center; gap: 0.3rem;">
-        Select date:
-        <input type="date" id="datePicker">
-      </label>
-    </div>
-  </div>
 
-  <!-- Grid Layout -->
-  <div class="grid-stack" id="graphs-grid" style="margin: 8px;">
+    <!-- ── GRAPHS MAIN ────────────────────────────────────────────── -->
+    <main id="graphs-main">
 
-    <!-- Exposure Chart Widget -->
-    <div class="grid-stack-item" gs-id="chart-exposure" gs-x="0" gs-y="0" gs-w="6" gs-h="3">
-      <div class="grid-stack-item-content">
-        <canvas id="chartExposure"></canvas>
+      <!-- Controls -->
+      <div id="controls-bar">
+        <div class="ctrl-group">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8"  y1="2" x2="8"  y2="6"></line>
+            <line x1="3"  y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span class="ctrl-label-text">Date</span>
+          <input type="date" id="datePicker" class="ctrl-date" />
+        </div>
       </div>
-    </div>
 
-    <!-- Gain Chart Widget -->
-    <div class="grid-stack-item" gs-id="chart-gain" gs-x="6" gs-y="0" gs-w="6" gs-h="3">
-      <div class="grid-stack-item-content">
-        <canvas id="chartGain"></canvas>
+      <!-- GridStack -->
+      <div id="graphs-scroll">
+        <div class="grid-stack" id="graphs-grid">
+
+          <div class="grid-stack-item" gs-id="chart-exposure" gs-x="0" gs-y="0" gs-w="6" gs-h="3">
+            <div class="grid-stack-item-content">
+              <canvas id="chartExposure"></canvas>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-gain" gs-x="6" gs-y="0" gs-w="6" gs-h="3">
+            <div class="grid-stack-item-content">
+              <canvas id="chartGain"></canvas>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-noise" gs-x="0" gs-y="3" gs-w="6" gs-h="3">
+            <div class="grid-stack-item-content">
+              <canvas id="chartNoise"></canvas>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-sqm" gs-x="6" gs-y="3" gs-w="3" gs-h="3">
+            <div class="grid-stack-item-content">
+              <canvas id="chartSQM"></canvas>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-stars" gs-x="9" gs-y="3" gs-w="3" gs-h="3">
+            <div class="grid-stack-item-content">
+              <canvas id="chartStars"></canvas>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-hdr" gs-x="0" gs-y="6" gs-w="4" gs-h="3">
+            <div class="grid-stack-item-content">
+              <canvas id="chartHDR"></canvas>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-focus" gs-x="4" gs-y="6" gs-w="4" gs-h="3">
+            <div class="grid-stack-item-content">
+              <canvas id="chartFocus"></canvas>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-brightness" gs-x="8" gs-y="6" gs-w="4" gs-h="3">
+            <div class="grid-stack-item-content">
+              <canvas id="chartBrightness"></canvas>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-mean-brightness-rgb" gs-x="0" gs-y="9" gs-w="12" gs-h="3">
+            <div class="grid-stack-item-content">
+              <canvas id="chartMeanBrightnessRGB"></canvas>
+            </div>
+          </div>
+
+        </div>
       </div>
-    </div>
 
-    <!-- Noise Chart Widget -->
-    <div class="grid-stack-item" gs-id="chart-noise" gs-x="0" gs-y="3" gs-w="6" gs-h="3">
-      <div class="grid-stack-item-content">
-        <canvas id="chartNoise"></canvas>
-      </div>
-    </div>
+    </main>
 
-    <!-- SQM Chart Widget -->
-    <div class="grid-stack-item" gs-id="chart-sqm" gs-x="6" gs-y="3" gs-w="3" gs-h="3">
-      <div class="grid-stack-item-content">
-        <canvas id="chartSQM"></canvas>
-      </div>
-    </div>
-
-    <!-- Stars Chart Widget -->
-    <div class="grid-stack-item" gs-id="chart-stars" gs-x="9" gs-y="3" gs-w="3" gs-h="3">
-      <div class="grid-stack-item-content">
-        <canvas id="chartStars"></canvas>
-      </div>
-    </div>
-
-    <!-- HDR Chart Widget -->
-    <div class="grid-stack-item" gs-id="chart-hdr" gs-x="0" gs-y="6" gs-w="4" gs-h="3">
-      <div class="grid-stack-item-content">
-        <canvas id="chartHDR"></canvas>
-      </div>
-    </div>
-
-    <!-- Focus Chart Widget -->
-    <div class="grid-stack-item" gs-id="chart-focus" gs-x="4" gs-y="6" gs-w="4" gs-h="3">
-      <div class="grid-stack-item-content">
-        <canvas id="chartFocus"></canvas>
-      </div>
-    </div>
-
-    <!-- Brightness Chart Widget -->
-    <div class="grid-stack-item" gs-id="chart-brightness" gs-x="8" gs-y="6" gs-w="4" gs-h="3">
-      <div class="grid-stack-item-content">
-        <canvas id="chartBrightness"></canvas>
-      </div>
-    </div>
-
-    <!-- Mean Brightness RGB Chart Widget -->
-    <div class="grid-stack-item" gs-id="chart-mean-brightness-rgb" gs-x="0" gs-y="9" gs-w="12" gs-h="3">
-      <div class="grid-stack-item-content">
-        <canvas id="chartMeanBrightnessRGB"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <footer id="footer">
-    <div style="text-align:center; width:100%;">Copyright (c) 2025 Sven Kreiensen</div>
-    <button id="toggle-grid-btn" style="position:absolute; right:120px;" title="Widgets verschieben/vergrößern aktivieren/deaktivieren" onclick="toggleGridInteraction()">🔒 Locked</button>
-    <button id="reset-layout-btn" style="position:absolute; right:0;" title="Layout auf Standard zurücksetzen" onclick="resetGridLayout()">Reset layout</button>
-  </footer>
+  </div><!-- #main-layout -->
 
   <script>
-    let captureIntervalSec = 60; // fallback
-    let countdown = 60;
+    // ══════════════════════════════════════════════════════════════
+    //  CONFIG
+    // ══════════════════════════════════════════════════════════════
+    let captureIntervalSec = 60;
     let configLat = null;
     let configLon = null;
 
@@ -150,278 +245,260 @@
       try {
         const res = await fetch("api/config");
         if (res.ok) {
-          const config = await res.json();
-          if (typeof config.capture_interval === 'number') {
-            captureIntervalSec = config.capture_interval;
+          const cfg = await res.json();
+          if (typeof cfg.capture_interval === 'number') {
+            captureIntervalSec = cfg.capture_interval;
           }
-          if (typeof config.location_latitude === 'number' && typeof config.location_longitude === 'number') {
-            configLat = config.location_latitude;
-            configLon = config.location_longitude;
+          // Support both field name conventions
+          const lat = cfg.location_latitude  ?? cfg.latitude;
+          const lon = cfg.location_longitude ?? cfg.longitude;
+          if (typeof lat === 'number' && typeof lon === 'number') {
+            configLat = lat;
+            configLon = lon;
           }
         }
       } catch (e) {
-        console.warn("Using default values.");
+        console.warn("loadConfig: using defaults.", e);
       }
     }
 
+    // ══════════════════════════════════════════════════════════════
+    //  SUN TIMES
+    // ══════════════════════════════════════════════════════════════
     let sunTimes = {};
 
-    function getStartOfDayISO(dateString) {
-      const start = new Date(`${dateString}T00:00:00Z`);
-      return start.toISOString();
-    }
-
-    function updateSunTimes(dateStr, latitude, longitude) {
-      const date = new Date(dateStr + "T12:00:00"); // sicherstellen, dass der Tag stimmt
-
-      const todayTimes = SunCalc.getTimes(date, latitude, longitude);
+    function updateSunTimes(dateStr, lat, lon) {
+      const date = new Date(dateStr + "T12:00:00");
+      const today    = SunCalc.getTimes(date, lat, lon);
       const tomorrow = new Date(date);
       tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowTimes = SunCalc.getTimes(tomorrow, latitude, longitude);
+      const tmr = SunCalc.getTimes(tomorrow, lat, lon);
 
       sunTimes = {
-        startOfDay: getStartOfDayISO(dateStr),
-        dawnStart: todayTimes.nightEnd.toISOString(),
-        dawnEnd: todayTimes.sunrise.toISOString(),
-        duskStart: todayTimes.sunset.toISOString(),
-        duskEnd: todayTimes.night.toISOString(),
-        nextDawnStart: tomorrowTimes.nightEnd.toISOString()
+        startOfDay:    new Date(dateStr + "T00:00:00Z").toISOString(),
+        dawnStart:     today.nightEnd.toISOString(),
+        dawnEnd:       today.sunrise.toISOString(),
+        duskStart:     today.sunset.toISOString(),
+        duskEnd:       today.night.toISOString(),
+        nextDawnStart: tmr.nightEnd.toISOString()
       };
-
-      /*
-        console.log("Longitude: ", longitude);
-        console.log("Latitude: ", latitude);
-      */
     }
 
-    const charts = {};
+    function getSunPeriods() {
+      return [
+        { start: sunTimes.startOfDay,    end: sunTimes.dawnStart,    color: 'rgba(0,10,60,0.50)'      },
+        { start: sunTimes.dawnStart,     end: sunTimes.dawnEnd,      color: 'rgba(80,80,110,0.35)'    },
+        { start: sunTimes.dawnEnd,       end: sunTimes.duskStart,    color: 'rgba(96,160,255,0.18)'   },
+        { start: sunTimes.duskStart,     end: sunTimes.duskEnd,      color: 'rgba(80,80,110,0.35)'    },
+        { start: sunTimes.duskEnd,       end: sunTimes.nextDawnStart,color: 'rgba(0,10,60,0.50)'      }
+      ];
+    }
 
+    // ══════════════════════════════════════════════════════════════
+    //  BACKGROUND SUN PLUGIN
+    // ══════════════════════════════════════════════════════════════
     const backgroundSunPlugin = {
       id: 'backgroundSun',
-      beforeDatasetsDraw(chart, args, options) {
+      beforeDatasetsDraw(chart, _args, options) {
         if (!options || !options.periods) return;
-
         const { ctx, chartArea: area, scales } = chart;
-
         ctx.save();
-
-        for (const period of options.periods) {
-          const xMin = scales.x.getPixelForValue(new Date(period.start));
-          const xMax = scales.x.getPixelForValue(new Date(period.end));
-          ctx.fillStyle = period.color;
-          ctx.fillRect(xMin, area.top, xMax - xMin, area.bottom - area.top);
+        for (const p of options.periods) {
+          const x0 = scales.x.getPixelForValue(new Date(p.start));
+          const x1 = scales.x.getPixelForValue(new Date(p.end));
+          ctx.fillStyle = p.color;
+          ctx.fillRect(x0, area.top, x1 - x0, area.bottom - area.top);
         }
-
         ctx.restore();
       }
     };
 
-    function getBackgroundSunPeriods() {
-      return [
-        { start: sunTimes.startOfDay, end: sunTimes.dawnStart, color: 'rgba(0, 0, 100, 0.4)' },
-        { start: sunTimes.dawnStart, end: sunTimes.dawnEnd, color: 'rgba(128, 128, 128, 0.4)' },
-        { start: sunTimes.dawnEnd, end: sunTimes.duskStart, color: 'rgba(160, 190, 255, 0.4)' },
-        { start: sunTimes.duskStart, end: sunTimes.duskEnd, color: 'rgba(128, 128, 128, 0.4)' },
-        { start: sunTimes.duskEnd, end: sunTimes.nextDawnStart, color: 'rgba(0, 0, 100, 0.4)' }
-      ];
-    }
+    // ══════════════════════════════════════════════════════════════
+    //  CHART FACTORY
+    // ══════════════════════════════════════════════════════════════
+    const charts = {};
 
     function createChart(ctxId, label, datasets, type = "line", showLegend = false, logScale = false) {
-      /*
-        console.log("Start of day: ", sunTimes.startOfDay);
-        console.log("Dawn start: ", sunTimes.dawnStart);
-        console.log("Dawn end: ", sunTimes.dawnEnd);
-        console.log("Dusk start: ", sunTimes.duskStart);
-        console.log("Dusk end: ", sunTimes.duskEnd);
-        console.log("Next dawn start: ", sunTimes.nextDawnStart);
-      */
-
       const ctx = document.getElementById(ctxId).getContext('2d');
       return new Chart(ctx, {
         type,
-        data: {
-          labels: [],
-          datasets: datasets
-        },
+        data: { labels: [], datasets },
         options: {
           responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
           scales: {
             x: {
-              type: 'time', time: {
-                unit: 'minute', tooltipFormat: 'HH:mm',
+              type: 'time',
+              time: {
+                unit: 'minute',
+                tooltipFormat: 'HH:mm',
                 displayFormats: { hour: 'HH:mm', minute: 'HH:mm' }
               },
-              ticks: { color: 'white' },
-              grid: { color: '#444' }
+              ticks: { color: '#9ca3af', maxTicksLimit: 8, font: { size: 10 } },
+              grid: { color: 'rgba(255,255,255,0.06)' }
             },
             y: {
               type: logScale ? 'logarithmic' : 'linear',
               min: logScale ? 0.00001 : undefined,
-              beginAtZero: true,
+              beginAtZero: !logScale,
               ticks: {
-                color: 'white',
-                callback: function (v) {
-                  if (logScale) {
-                    return v.toFixed(6);
-                  } else {
-                    //        return Number.isInteger(v) ? v.toString() : v.toFixed(6);
-                    return v.toString();
-                  }
-                }
+                color: '#9ca3af',
+                font: { size: 10 },
+                callback: (v) => logScale ? v.toFixed(6) : v.toString()
               },
-              grid: { color: '#444' }
+              grid: { color: 'rgba(255,255,255,0.06)' }
             }
           },
           plugins: {
             title: {
               display: true,
               text: label,
-              color: "#ffffff"
+              color: '#e5e7eb',
+              font: { size: 12, weight: '600' },
+              padding: { top: 6, bottom: 4 }
             },
-            legend: { display: showLegend, labels: { color: 'white' } },
+            legend: {
+              display: showLegend,
+              labels: { color: '#9ca3af', boxWidth: 2, boxHeight: 2, font: { size: 11 } }
+            },
             backgroundSun: {
-              periods: [
-                { start: sunTimes.startOfDay, end: sunTimes.dawnStart, color: 'rgba(0, 0, 100, 0.4)' },
-                { start: sunTimes.dawnStart, end: sunTimes.dawnEnd, color: 'rgba(128,128,128,0.4)' },
-                { start: sunTimes.dawnEnd, end: sunTimes.duskStart, color: 'rgba(160, 190, 255, 0.4)' },
-                { start: sunTimes.duskStart, end: sunTimes.duskEnd, color: 'rgba(128,128,128,0.4)' },
-                { start: sunTimes.duskEnd, end: sunTimes.nextDawnStart, color: 'rgba(0, 0, 100, 0.4)' }
-              ]
+              periods: getSunPeriods()
             }
           }
         }
       });
     }
 
+    // ══════════════════════════════════════════════════════════════
+    //  DATA UPDATE / CLEAR
+    // ══════════════════════════════════════════════════════════════
     function updateCharts(data) {
-      const timestamps = data.map(p => new Date(p.timestamp * 1000));
+      const ts = data.map(p => new Date(p.timestamp * 1000));
 
-      charts.chartExposure.data.labels = timestamps;
+      charts.chartExposure.data.labels = ts;
       charts.chartExposure.data.datasets[0].data = data.map(p => p.exposure);
 
-      charts.chartGain.data.labels = timestamps;
+      charts.chartGain.data.labels = ts;
       charts.chartGain.data.datasets[0].data = data.map(p => p.gain);
 
-      charts.chartNoise.data.labels = timestamps;
+      charts.chartNoise.data.labels = ts;
       charts.chartNoise.data.datasets[0].data = data.map(p => p.noise);
 
-      charts.chartSQM.data.labels = timestamps;
+      charts.chartSQM.data.labels = ts;
       charts.chartSQM.data.datasets[0].data = data.map(p => p.sqm);
 
-      charts.chartStars.data.labels = timestamps;
+      charts.chartStars.data.labels = ts;
       charts.chartStars.data.datasets[0].data = data.map(p => p.stars);
 
-      charts.chartFocus.data.labels = timestamps;
+      charts.chartFocus.data.labels = ts;
       charts.chartFocus.data.datasets[0].data = data.map(p => p.focus);
 
-      charts.chartHDR.data.labels = timestamps;
+      charts.chartHDR.data.labels = ts;
       charts.chartHDR.data.datasets[0].data = data.map(p => p.hdr);
 
-      charts.chartBrightness.data.labels = timestamps;
+      charts.chartBrightness.data.labels = ts;
       charts.chartBrightness.data.datasets[0].data = data.map(p => p.brightness);
 
-      charts.chartMeanBrightnessRGB.data.labels = timestamps;
+      charts.chartMeanBrightnessRGB.data.labels = ts;
       charts.chartMeanBrightnessRGB.data.datasets[0].data = data.map(p => p.mean_r);
       charts.chartMeanBrightnessRGB.data.datasets[1].data = data.map(p => p.mean_g);
       charts.chartMeanBrightnessRGB.data.datasets[2].data = data.map(p => p.mean_b);
 
-      Object.values(charts).forEach(chart => chart.update());
+      Object.values(charts).forEach(c => c.update());
     }
 
     function clearAllCharts() {
-      Object.values(charts).forEach(chart => {
-        chart.data.labels = [];
-        chart.data.datasets.forEach(ds => ds.data = []);
-        chart.update();
+      Object.values(charts).forEach(c => {
+        c.data.labels = [];
+        c.data.datasets.forEach(ds => ds.data = []);
+        c.update();
       });
     }
 
+    // ══════════════════════════════════════════════════════════════
+    //  LOAD MEASUREMENTS
+    // ══════════════════════════════════════════════════════════════
     async function loadMeasurements() {
+      const date = document.getElementById("datePicker").value;
+      document.getElementById("hdr-date").textContent = date || '–';
       try {
-        const date = document.getElementById("datePicker").value;
         const res = await fetch(`/api/image?date=${date}`);
-
-        if (res.status === 404) {
-          console.warn("No data for this date. Clearing charts.");
-          clearAllCharts();
-          return;
-        }
-
-        if (!res.ok) throw new Error("Fetch error");
-
+        if (res.status === 404) { clearAllCharts(); return; }
+        if (!res.ok) throw new Error("HTTP " + res.status);
         const json = await res.json();
-        if (Array.isArray(json)) {
-          updateCharts(json);
-        } else {
-          clearAllCharts();
-        }
+        if (Array.isArray(json)) updateCharts(json);
+        else clearAllCharts();
       } catch (err) {
         console.error("Failed to load measurement data:", err);
         clearAllCharts();
       }
     }
 
+    // ══════════════════════════════════════════════════════════════
+    //  INIT
+    // ══════════════════════════════════════════════════════════════
     async function init() {
       const datePicker = document.getElementById("datePicker");
       const today = new Date().toISOString().slice(0, 10);
       datePicker.value = today;
+      document.getElementById("hdr-date").textContent = today;
 
       await loadConfig();
 
-      if (configLat && configLon) {
+      if (configLat !== null && configLon !== null) {
         updateSunTimes(datePicker.value, configLat, configLon);
       }
 
       Chart.register(backgroundSunPlugin);
 
       charts.chartExposure = createChart("chartExposure", "Exposure (s)", [
-        { label: "Exposure (s)", data: [], borderColor: "orange", fill: false, pointRadius: 0 },
+        { label: "Exposure", data: [], borderColor: "#f97316", fill: false, pointRadius: 0, tension: 0.15 }
       ], "line", false, true);
 
       charts.chartGain = createChart("chartGain", "Gain", [
-        { label: "Gain", data: [], borderColor: "blue", fill: false, pointRadius: 0 }
-      ], "line", false, 0, 350);
+        { label: "Gain", data: [], borderColor: "#60a5fa", fill: false, pointRadius: 0, tension: 0.15 }
+      ]);
 
-      charts.chartNoise = createChart("chartNoise", "Noise Level", [
-        { label: "Sigma noise", data: [], borderColor: "red", fill: false, pointRadius: 0 }
-      ], "line", false);
+      charts.chartNoise = createChart("chartNoise", "Noise Level (σ)", [
+        { label: "Noise", data: [], borderColor: "#f87171", fill: false, pointRadius: 0, tension: 0.15 }
+      ]);
 
-      charts.chartSQM = createChart("chartSQM", "SQM", [
-        { label: "SQM", data: [], borderColor: "green", backgroundColor: "green", fill: false, pointRadius: 0 }
-      ], "line", false, 0, 22);
+      charts.chartSQM = createChart("chartSQM", "Sky Quality (SQM)", [
+        { label: "SQM", data: [], borderColor: "#34d399", fill: false, pointRadius: 0, tension: 0.15 }
+      ]);
 
-      charts.chartStars = createChart("chartStars", "Stars count", [
-        { label: "Star count", data: [], borderColor: "yellow", backgroundColor: "yellow", fill: false, pointRadius: 0 }
-      ], "line", false);
+      charts.chartStars = createChart("chartStars", "Star Count", [
+        { label: "Stars", data: [], borderColor: "#fbbf24", fill: false, pointRadius: 0, tension: 0.15 }
+      ]);
 
-      charts.chartFocus = createChart("chartFocus", "Focus", [
-        { label: "Focus", data: [], borderColor: "orange", backgroundColor: "orange", fill: false, pointRadius: 0 }
-      ], "line", false);
+      charts.chartFocus = createChart("chartFocus", "Focus Score", [
+        { label: "Focus", data: [], borderColor: "#fb923c", fill: false, pointRadius: 0, tension: 0.15 }
+      ]);
 
-      charts.chartHDR = createChart("chartHDR", "HDR", [
-        { label: "HDR exposures", data: [], backgroundColor: "purple", fill: false, pointRadius: 0 }
-      ], "bar", false, 0, 5);
+      charts.chartHDR = createChart("chartHDR", "HDR Exposures", [
+        { label: "HDR frames", data: [], backgroundColor: "rgba(168,85,247,0.55)", borderColor: "rgba(168,85,247,0.85)", pointRadius: 0 }
+      ], "bar");
 
       charts.chartBrightness = createChart("chartBrightness", "Median Brightness (G)", [
-        { label: "Median (green)", data: [], borderColor: "lime", fill: false, pointRadius: 0 }
-      ], "line", false);
+        { label: "Brightness", data: [], borderColor: "#a3e635", fill: false, pointRadius: 0, tension: 0.15 }
+      ]);
 
       charts.chartMeanBrightnessRGB = createChart("chartMeanBrightnessRGB", "Mean Brightness (RGB)", [
-        { label: "Mean (red)", data: [], borderColor: "red", fill: false, pointRadius: 0 },
-        { label: "Mean (green)", data: [], borderColor: "green", fill: false, pointRadius: 0 },
-        { label: "Mean (blue)", data: [], borderColor: "blue", fill: false, pointRadius: 0 }
-      ], "line", false);
+        { label: "Red",   data: [], borderColor: "#f87171", fill: false, pointRadius: 0, tension: 0.15 },
+        { label: "Green", data: [], borderColor: "#34d399", fill: false, pointRadius: 0, tension: 0.15 },
+        { label: "Blue",  data: [], borderColor: "#60a5fa", fill: false, pointRadius: 0, tension: 0.15 }
+      ], "line", true);
 
       await loadMeasurements();
 
-      // Reload when new data is picked
       datePicker.addEventListener("change", () => {
-        if (configLat && configLon) {
+        document.getElementById("hdr-date").textContent = datePicker.value;
+        if (configLat !== null && configLon !== null) {
           updateSunTimes(datePicker.value, configLat, configLon);
-
-          Object.values(charts).forEach(chart => {
-            if (chart.options.plugins.backgroundSun) {
-              chart.options.plugins.backgroundSun.periods = getBackgroundSunPeriods();
+          Object.values(charts).forEach(c => {
+            if (c.options.plugins.backgroundSun) {
+              c.options.plugins.backgroundSun.periods = getSunPeriods();
             }
           });
         }
@@ -433,7 +510,9 @@
 
     document.addEventListener("DOMContentLoaded", init);
 
-    // Gridstack Initialisierung und Layout-Persistenz
+    // ══════════════════════════════════════════════════════════════
+    //  GRIDSTACK
+    // ══════════════════════════════════════════════════════════════
     document.addEventListener('DOMContentLoaded', () => {
       const gridEl = document.getElementById('graphs-grid');
       const grid = GridStack.init({
@@ -443,53 +522,49 @@
         resizable: { handles: 'all' }
       }, gridEl);
 
-      // Grid-Interaktion Status
-      let gridInteractionEnabled = false;
+      let gridUnlocked = false;
       const toggleBtn = document.getElementById('toggle-grid-btn');
 
-      // Widgets standardmäßig sperren
       grid.enableMove(false);
       grid.enableResize(false);
 
-      // Toggle-Funktion für Grid-Interaktion
-      window.toggleGridInteraction = function() {
-        gridInteractionEnabled = !gridInteractionEnabled;
-        
-        if (gridInteractionEnabled) {
-          // Aktiviert: Widgets können verschoben und vergrößert werden
+      window.toggleGridInteraction = function () {
+        gridUnlocked = !gridUnlocked;
+        if (gridUnlocked) {
           grid.enableMove(true);
           grid.enableResize(true);
           toggleBtn.textContent = '🔓 Unlocked';
-          toggleBtn.title = 'Widgets verschieben/vergrößern deaktivieren';
+          toggleBtn.classList.remove('badge-gray');
+          toggleBtn.classList.add('badge-blue');
         } else {
-          // Deaktiviert: Widgets sind gesperrt
           grid.enableMove(false);
           grid.enableResize(false);
           toggleBtn.textContent = '🔒 Locked';
-          toggleBtn.title = 'Widgets verschieben/vergrößern aktivieren';
+          toggleBtn.classList.remove('badge-blue');
+          toggleBtn.classList.add('badge-gray');
         }
       };
 
-      const LS_KEY = 'allsky360.graphs.layout.v1';
+      const LS_KEY = 'allsky360.graphs1.layout.v1';
       const defaultLayout = [
-        {"id":"chart-exposure","x":0,"y":0,"w":6,"h":3},
-        {"id":"chart-gain","x":6,"y":0,"w":6,"h":3},
-        {"id":"chart-noise","x":0,"y":3,"w":6,"h":3},
-        {"id":"chart-sqm","x":6,"y":3,"w":3,"h":3},
-        {"id":"chart-stars","x":9,"y":3,"w":3,"h":3},
-        {"id":"chart-hdr","x":0,"y":6,"w":4,"h":3},
-        {"id":"chart-focus","x":4,"y":6,"w":4,"h":3},
-        {"id":"chart-brightness","x":8,"y":6,"w":4,"h":3},
-        {"id":"chart-mean-brightness-rgb","x":0,"y":9,"w":12,"h":3}
+        { id: "chart-exposure",           x: 0, y: 0,  w: 6,  h: 3 },
+        { id: "chart-gain",               x: 6, y: 0,  w: 6,  h: 3 },
+        { id: "chart-noise",              x: 0, y: 3,  w: 6,  h: 3 },
+        { id: "chart-sqm",                x: 6, y: 3,  w: 3,  h: 3 },
+        { id: "chart-stars",              x: 9, y: 3,  w: 3,  h: 3 },
+        { id: "chart-hdr",                x: 0, y: 6,  w: 4,  h: 3 },
+        { id: "chart-focus",              x: 4, y: 6,  w: 4,  h: 3 },
+        { id: "chart-brightness",         x: 8, y: 6,  w: 4,  h: 3 },
+        { id: "chart-mean-brightness-rgb",x: 0, y: 9,  w: 12, h: 3 }
       ];
 
       function applyLayout(layout) {
-        const items = grid.engine.nodes; // current nodes
-        const byId = Object.fromEntries(items.map(n => [n.id || n.el.getAttribute('gs-id'), n]));
+        const byId = Object.fromEntries(
+          grid.engine.nodes.map(n => [n.id || n.el.getAttribute('gs-id'), n])
+        );
         layout.forEach(l => {
           const node = byId[l.id];
-          if (!node) return;
-          grid.update(node.el, { x: l.x, y: l.y, w: l.w, h: l.h });
+          if (node) grid.update(node.el, { x: l.x, y: l.y, w: l.w, h: l.h });
         });
       }
 
@@ -498,28 +573,28 @@
           const raw = localStorage.getItem(LS_KEY);
           if (!raw) return null;
           const parsed = JSON.parse(raw);
-          if (!Array.isArray(parsed)) return null;
-          return parsed;
-        } catch (e) { return null; }
+          return Array.isArray(parsed) ? parsed : null;
+        } catch { return null; }
       }
 
       function saveLayout() {
-        const data = grid.save(true).map(n => ({ id: n.id || n.el.getAttribute('gs-id'), x: n.x, y: n.y, w: n.w, h: n.h }));
+        const data = grid.save(true).map(n => ({
+          id: n.id || n.el.getAttribute('gs-id'),
+          x: n.x, y: n.y, w: n.w, h: n.h
+        }));
         try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch (_) {}
       }
 
-      window.resetGridLayout = function() {
+      window.resetGridLayout = function () {
         applyLayout(defaultLayout);
         try { localStorage.removeItem(LS_KEY); } catch (_) {}
-      }
+      };
 
-      // beim Start: gespeichertes Layout anwenden oder Default
-      const saved = loadLayout();
-      applyLayout(saved || defaultLayout);
-
+      applyLayout(loadLayout() || defaultLayout);
       grid.on('change', saveLayout);
     });
   </script>
+
 </body>
 
 </html>

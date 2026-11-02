@@ -65,13 +65,21 @@ typedef struct {
     double hdr_y_max_expected;
     double hdr_weight_sigma;
     double hdr_weight_clip_factor;
-    int hdr_chroma_mode;
+
     double hdr_contrast_weight_strength;
+    double hdr_noise_fusion_strength;
     int hdr_pyramid_levels_override;
     int hdr_weight_maps;
     int hdr_weight_stats;
     int hdr_save_exposures;
     int hdrmt;
+
+    int   spektrum_enabled;
+    int   spektrum_cx;
+    int   spektrum_cy;
+    int   spektrum_radius;
+    double spektrum_regularization;
+    char  spektrum_output_path[NAME_MAX + 1];
 
     int autostretch;
     double autostretch_min_val;
@@ -87,6 +95,18 @@ typedef struct {
     int acdnr_filter_chrom_iterations;
     int acdnr_filter_chrom_kernel_size;
     double gamma;
+    int auto_gamma;
+    double auto_gamma_target;
+    double auto_gamma_min;
+    double auto_gamma_max;
+
+    int reinhard_tonemap;
+    double reinhard_white_point;
+
+    int tone_curve;
+    double tone_curve_shadow_lift;
+    double tone_curve_midtone_contrast;
+
     double saturation;
 
     double dehaze_amount;
@@ -117,8 +137,11 @@ typedef struct {
 
     int sqm;
     double sqm_threshold;
+    double sqm_min_brightness;
     int sqm_max_stars;
     int sqm_radius;
+    int sqm_center_x;
+    int sqm_center_y;
     char sqm_template[500];
     int sqm_star_size;
     double sqm_star_sigma;
@@ -175,8 +198,23 @@ typedef struct {
     int location_altitude;
     char location_city[100];
     char location_owner[100];
+    /* 1 = publish exact coordinates in config.json, 0 = round to 2 decimals */
+    int publish_exact_location;
+
+    /* Hook scripts run by the daemon (empty = disabled) */
+    char postprocessing_script[NAME_MAX+1];
+    char endofnight_script[NAME_MAX+1];
+
+    /* Archive retention (see src/retention.c) */
+    int    retention;
+    int    retention_max_days;
+    double retention_max_size_gb;
+    int    retention_keep_days;
+    int    retention_dry_run;
+
     char working_directory[NAME_MAX+1];
     char image_directory[NAME_MAX+1];
+    char raw_dump_directory[NAME_MAX+1];
     char video_directory[NAME_MAX+1];
     char database_directory[NAME_MAX+1];
     int capture_interval;
@@ -184,6 +222,7 @@ typedef struct {
     char indigoserver[100];
     int indigoport;
     char indigocamera[100];
+    char indigomount[100];
     int indigo_capture_timeout;
 } config_t;
 

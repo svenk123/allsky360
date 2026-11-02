@@ -18,6 +18,8 @@
 #ifndef DAILY_DATABASE_H
 #define DAILY_DATABASE_H
 
+#include <time.h>
+
 /**
  * Create a new SQLite database file with the required table schema,
  * if the file does not already exist.

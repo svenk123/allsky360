@@ -4,181 +4,408 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Allsky360 Viewer</title>
+  <title>Allsky360 – Calibration</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180" />
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
-
   <link rel="manifest" href="manifest.json" />
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Allsky360 Viewer">
-  <meta name="theme-color" content="#111111" />
+  <meta name="apple-mobile-web-app-title" content="Allsky360 Calibration">
+  <meta name="theme-color" content="#0d1117" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="stylesheet" href="style.css">
+
   <script src="js/allsky-common.js"></script>
-  <script src="js/astronomia.bundle.min.js" defer onerror="var s=document.createElement('script'); s.defer=true;
-                 s.src='https://cdn.jsdelivr.net/npm/astronomia@1.12.0/build/astronomia.umd.min.js';
-                 document.head.appendChild(s);"></script>
+  <script src="js/astronomia.bundle.min.js" defer
+    onerror="var s=document.createElement('script'); s.defer=true;
+             s.src='https://cdn.jsdelivr.net/npm/astronomia@1.12.0/build/astronomia.umd.min.js';
+             document.head.appendChild(s);"></script>
+
+  <link rel="stylesheet" href="allsky.css">
+  <style>
+    /* calibration header uses tighter gap */
+    #app-header { gap: 10px; }
+
+    /* ── CALIB MAIN ─────────────────────────────────────────────── */
+    #calib-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── IMAGE AREA ─────────────────────────────────────────────── */
+    #image-container {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      position: relative;
+      background: #000;
+      cursor: crosshair;
+      display: flex;
+      align-items: flex-start;
+    }
+    #image-wrap {
+      position: relative;
+      width: 100%;
+    }
+    #image {
+      display: block;
+      width: 100%;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+    #overlay {
+      position: absolute;
+      top: 0; left: 0;
+      cursor: crosshair;
+    }
+
+    /* ── CONTROLS SIDEBAR ───────────────────────────────────────── */
+    #controls-sidebar {
+      width: 264px;
+      flex-shrink: 0;
+      background: rgba(13,17,23,0.98);
+      border-left: 1px solid rgba(255,255,255,0.06);
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* ── CALIBRATION CARDS ──────────────────────────────────────── */
+    .calib-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 11px 12px;
+    }
+    .calib-card-title {
+      font-size: 10px; font-weight: 700;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      margin-bottom: 9px;
+    }
+    .calib-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 3px 0;
+    }
+    .calib-label {
+      font-size: 11px; color: #9ca3af;
+      flex: 1; min-width: 0;
+    }
+    .calib-input {
+      width: 78px;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 7px;
+      padding: 4px 7px;
+      color: #e5e7eb;
+      font-size: 11px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+      -moz-appearance: textfield;
+    }
+    .calib-input::-webkit-inner-spin-button,
+    .calib-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+    .calib-input:focus { border-color: rgba(59,130,246,0.45); }
+
+    .calib-select {
+      width: 78px;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 7px;
+      padding: 4px 7px;
+      color: #e5e7eb;
+      font-size: 11px;
+      font-family: inherit;
+      outline: none;
+    }
+    .calib-select option { background: #161b22; color: #e5e7eb; }
+
+    .calib-check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+    }
+    .calib-check-row input[type="checkbox"] {
+      width: 14px; height: 14px;
+      accent-color: #3b82f6;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    .calib-check-row label {
+      font-size: 11px; color: #9ca3af;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .calib-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.06);
+      margin: 6px 0;
+    }
+
+    /* ── CONFIG OUTPUT ──────────────────────────────────────────── */
+    #configOutput {
+      width: 100%;
+      min-height: 130px;
+      background: rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: #a3e635;
+      font-family: 'Fira Mono', 'Consolas', monospace;
+      font-size: 10px;
+      line-height: 1.6;
+      resize: vertical;
+      outline: none;
+    }
+    .output-hint {
+      font-size: 10px; color: #4b5563;
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+  </style>
 </head>
 
 <body>
-  <div id="header">
-    <div class="title-icon">
-      <img src="allsky360_256x256.png" alt="Allsky Icon" width="32" height="32" />
-      <h1>Allsky360 Calibration</h1>
-    </div>
+  <!-- allsky-common.js click handler requires these elements -->
+  <div id="nav-menu"           style="display:none;"></div>
+  <div id="hamburger-menu-btn" style="display:none;"></div>
 
-    <!-- Hamburger Menu Button -->
-    <button id="hamburger-menu-btn" class="hamburger-menu-btn" onclick="toggleHamburgerMenu()">
-      <span class="hamburger-line"></span>
-      <span class="hamburger-line"></span>
-      <span class="hamburger-line"></span>
+  <!-- ═══════════════════ HEADER ════════════════════════════════════ -->
+  <header id="app-header">
+    <a class="hdr-brand" href="dashboard.html">
+      <img src="allsky360_256x256.png" alt="Allsky360" width="30" height="30" />
+      <div class="hdr-brand-text">
+        <div class="hdr-title">Allsky360</div>
+        <div class="hdr-crumb">Calibration · Image Overlay</div>
+      </div>
+    </a>
+
+    <div class="hdr-sep"></div>
+
+    <!-- Zoom controls -->
+    <button class="hdr-zoom-btn" onclick="zoomIn()" title="Zoom in">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="11" y1="8" x2="11" y2="14"></line>
+        <line x1="8"  y1="11" x2="14" y2="11"></line>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+    </button>
+    <button class="hdr-zoom-btn" onclick="zoomOut()" title="Zoom out">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="8" y1="11" x2="14" y2="11"></line>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+    </button>
+    <button class="hdr-zoom-btn" onclick="resetZoomAndPan()" title="Reset zoom">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="1 4 1 10 7 10"></polyline>
+        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+      </svg>
     </button>
 
-    <!-- Navigation Menu -->
-    <nav id="nav-menu" class="nav-menu">
-      <ul class="nav-list">
-        <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
-        <li><a href="archive.html" class="nav-link">Archive</a></li>
-        <li><a href="videos.html" class="nav-link">Videos</a></li>
-        <li><a href="graphs.html" class="nav-link">Graphs</a></li>
-        <li><a href="meteo.html" class="nav-link">Weather</a></li>
-        <li><a href="aurora.html" class="nav-link">Aurora</a></li>
-        <li><a href="config.html" class="nav-link">Config</a></li>
-        <li><a href="calibration.html" class="nav-link">Calibration</a></li>
-        <li><a href="processing.html" class="nav-link">Processing</a></li>
-      </ul>
+    <div class="hdr-badges">
+      <span class="badge badge-gray">↻ <span id="timer">–</span> s</span>
+    </div>
+  </header>
+
+  <!-- ═══════════════════ MAIN LAYOUT ═══════════════════════════════ -->
+  <div id="main-layout">
+
+    <!-- ── ICON NAV ─────────────────────────────────────────────── -->
+    <nav id="icon-nav">
+      <a href="index.html" class="nav-item" title="Home">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </a>
+      <a href="dashboard.html" class="nav-item" title="Dashboard">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+      </a>
+      <div class="nav-sep"></div>
+      <a href="archive.html" class="nav-item" title="Archive">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="21 8 21 21 3 21 3 8"></polyline>
+          <rect x="1" y="3" width="22" height="5"></rect>
+          <line x1="10" y1="12" x2="14" y2="12"></line>
+        </svg>
+      </a>
+      <a href="graphs1.html" class="nav-item" title="Graphs">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="20" x2="18" y2="10"></line>
+          <line x1="12" y1="20" x2="12" y2="4"></line>
+          <line x1="6"  y1="20" x2="6"  y2="14"></line>
+        </svg>
+      </a>
+      <a href="meteo1.html" class="nav-item" title="Weather">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+        </svg>
+      </a>
+      <a href="aurora1.html" class="nav-item" title="Aurora">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+      </a>
+      <div class="nav-sep"></div>
+      <a href="aircraft.html" class="nav-item" title="Aircraft">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 16l-4-4V6a2 2 0 0 0-4 0v6l-4 4H3l2 3h5l2-1 2 1h5l2-3z"></path>
+        </svg>
+      </a>
+      <a href="hdr.html" class="nav-item" title="HDR Debug">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </a>
+      <a href="config.html" class="nav-item" title="Config">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </a>
+      <a href="calibration.html" class="nav-item active" title="Calibration">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8"  x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          <line x1="2"  y1="12" x2="22"  y2="12"></line>
+          <line x1="12" y1="2"  x2="12"  y2="22"></line>
+        </svg>
+      </a>
     </nav>
-  </div>
-  <div id="subheader">
-    <div class="settings-group">
 
-      <button onclick="zoomIn()">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="11" y1="8" x2="11" y2="14"></line>
-          <line x1="8" y1="11" x2="14" y2="11"></line>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-      </button>
-      <button onclick="zoomOut()">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="8" y1="11" x2="14" y2="11"></line>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-      </button>
-      <button onclick="resetZoomAndPan()">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="1 4 1 10 7 10"></polyline>
-          <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-        </svg>
-      </button>
-    </div>
-  </div>
-  <div id="container">
-    <div id="image-container">
+    <!-- ── CALIB MAIN ─────────────────────────────────────────────── -->
+    <div id="calib-main">
 
-      <div style="position: relative;">
-        <img id="image" src="" alt="Allsky image" style="display: block; width: 100%;" />
-        <canvas id="overlay" style="position: absolute; top: 0; left: 0;"></canvas>
-      </div>
-      <div id="countdown">Next update in <span id="timer">10</span> s</div>
-
-    </div>
-    <div id="configdata">
-      <div class="metadata-section">
-        <h2>Black Mask</h2>
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <label for="image_mask_radius" style="min-width: 150px;">Mask radius (px):</label>
-            <input type="number" id="image_mask_radius" step="1" min="0" style="width: 100px;"
-              onchange="updateOverlayFromInputs()">
-          </div>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <label for="image_center_x" style="min-width: 150px;">Center X (px):</label>
-            <input type="number" id="image_center_x" step="1" min="0" style="width: 100px;"
-              onchange="updateOverlayFromInputs()">
-          </div>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <label for="image_center_y" style="min-width: 150px;">Center Y (px):</label>
-            <input type="number" id="image_center_y" step="1" min="0" style="width: 100px;"
-              onchange="updateOverlayFromInputs()">
-          </div>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <input type="checkbox" id="showMaskCheckbox" onchange="toggleMaskOverlay()">
-            <label for="showMaskCheckbox">Show mask</label>
-          </div>
+      <!-- Image viewer -->
+      <div id="image-container">
+        <div id="image-wrap">
+          <img id="image" src="" alt="Allsky image" draggable="false" />
+          <canvas id="overlay"></canvas>
         </div>
       </div>
-      <div class="metadata-section">
-        <h2>Azimuthal Grid</h2>
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <label for="image_horizon_radius" style="min-width: 150px;">Horizon radius (px):</label>
-            <input type="number" id="image_horizon_radius" step="1" min="0" style="width: 100px;"
+
+      <!-- Controls sidebar -->
+      <aside id="controls-sidebar">
+
+        <!-- Black Mask -->
+        <div class="calib-card">
+          <div class="calib-card-title">Black Mask</div>
+          <div class="calib-row">
+            <span class="calib-label">Mask radius (px)</span>
+            <input type="number" id="image_mask_radius" class="calib-input" step="1" min="0"
               onchange="updateOverlayFromInputs()">
           </div>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <label for="image_zenith_x" style="min-width: 150px;">Zenith X (px):</label>
-            <input type="number" id="image_zenith_x" step="1" min="0" style="width: 100px;"
+          <div class="calib-row">
+            <span class="calib-label">Center X (px)</span>
+            <input type="number" id="image_center_x" class="calib-input" step="1" min="0"
               onchange="updateOverlayFromInputs()">
           </div>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <label for="image_zenith_y" style="min-width: 150px;">Zenith Y (px):</label>
-            <input type="number" id="image_zenith_y" step="1" min="0" style="width: 100px;"
+          <div class="calib-row">
+            <span class="calib-label">Center Y (px)</span>
+            <input type="number" id="image_center_y" class="calib-input" step="1" min="0"
               onchange="updateOverlayFromInputs()">
           </div>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <label for="crosshair_rotation" style="min-width: 150px;">North direction (°):</label>
-            <input type="number" id="crosshair_rotation" step="0.1" min="-360" max="360" style="width: 100px;"
+          <div class="calib-divider"></div>
+          <div class="calib-check-row">
+            <input type="checkbox" id="showMaskCheckbox" onchange="toggleMaskOverlay()">
+            <label for="showMaskCheckbox">Show mask overlay</label>
+          </div>
+        </div>
+
+        <!-- Azimuthal Grid -->
+        <div class="calib-card">
+          <div class="calib-card-title">Azimuthal Grid</div>
+          <div class="calib-row">
+            <span class="calib-label">Horizon radius (px)</span>
+            <input type="number" id="image_horizon_radius" class="calib-input" step="1" min="0"
               onchange="updateOverlayFromInputs()">
           </div>
-          <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="calib-row">
+            <span class="calib-label">Zenith X (px)</span>
+            <input type="number" id="image_zenith_x" class="calib-input" step="1" min="0"
+              onchange="updateOverlayFromInputs()">
+          </div>
+          <div class="calib-row">
+            <span class="calib-label">Zenith Y (px)</span>
+            <input type="number" id="image_zenith_y" class="calib-input" step="1" min="0"
+              onchange="updateOverlayFromInputs()">
+          </div>
+          <div class="calib-row">
+            <span class="calib-label">North direction (°)</span>
+            <input type="number" id="crosshair_rotation" class="calib-input" step="0.1" min="-360" max="360"
+              onchange="updateOverlayFromInputs()">
+          </div>
+          <div class="calib-divider"></div>
+          <div class="calib-check-row">
             <input type="checkbox" id="azimutalGridCheckbox" onchange="toggleAzimutalGridOverlay()">
-            <label for="azimutalGridCheckbox">Show grid</label>
+            <label for="azimutalGridCheckbox">Show azimuthal grid</label>
           </div>
-          <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="calib-check-row">
             <input type="checkbox" id="cardinalDirectionsCheckbox" onchange="toggleCardinalDirectionsOverlay()">
             <label for="cardinalDirectionsCheckbox">Show cardinal directions</label>
           </div>
         </div>
-      </div>
-       <div class="metadata-section">
-         <h2>Equatorial Grid</h2>
-         <div style="display: flex; flex-direction: column; gap: 10px;">
-           <div style="display: flex; align-items: center; gap: 10px;">
-             <input type="checkbox" id="equatorialGridCheckbox" onchange="toggleEquatorialGridOverlay()">
-             <label for="equatorialGridCheckbox">Show grid</label>
-           </div>
-           <div style="display: flex; align-items: center; gap: 10px;">
-             <label for="projectionTypeSelect" style="min-width: 150px;">Projection type:</label>
-             <select id="projectionTypeSelect" style="width: 100px;" onchange="updateProjectionType()">
-               <option value="linear">Linear</option>
-               <option value="sinus">Sinus</option>
-             </select>
-           </div>
-         </div>
-       </div>
-        <div class="metadata-section">
-         <h2>Config</h2>
-         <i>Put the following values into your config.ini</i>
-         <div style="margin-top: 10px;">
-           <textarea id="configOutput" readonly style="width: 100%; height: 200px; font-family: monospace; font-size: 12px; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px; resize: vertical;"></textarea>
-         </div>
-         </div>
-    </div>
-  </div>
+
+        <!-- Equatorial Grid -->
+        <div class="calib-card">
+          <div class="calib-card-title">Equatorial Grid</div>
+          <div class="calib-check-row">
+            <input type="checkbox" id="equatorialGridCheckbox" onchange="toggleEquatorialGridOverlay()">
+            <label for="equatorialGridCheckbox">Show equatorial grid</label>
+          </div>
+          <div class="calib-row" style="margin-top:6px;">
+            <span class="calib-label">Projection type</span>
+            <select id="projectionTypeSelect" class="calib-select" onchange="updateProjectionType()">
+              <option value="linear">Linear</option>
+              <option value="sinus">Sinus</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Config output -->
+        <div class="calib-card">
+          <div class="calib-card-title">Config Output</div>
+          <p class="output-hint">Copy these values into your config.ini:</p>
+          <textarea id="configOutput" readonly spellcheck="false"></textarea>
+        </div>
+
+        <!-- Dynamic metadata placeholder (may be cleared by JS) -->
+        <div id="configdata"></div>
+
+      </aside>
+
+    </div><!-- #calib-main -->
+
+  </div><!-- #main-layout -->
 
   <script>
-    const imageEl = document.getElementById("image");
+    const imageEl     = document.getElementById("image");
     const configdataEl = document.getElementById("configdata");
-    const timerEl = document.getElementById("timer");
+    const timerEl     = document.getElementById("timer");
 
     let latestImagePath = "";
     let refreshInterval = 10;
@@ -186,7 +413,6 @@
     let loadingConfig = false;
     let lastImageLoadTime = Date.now();
     let timerTimeout = null;
-
 
     let showCardinalDirections = false;
 
@@ -199,37 +425,34 @@
     let dragStartX = 0;
     let dragStartY = 0;
 
-    // Crosshair-Kreis-Overlay-Einstellungen
-    let crosshairRadius = 1090;              // in Pixel
-    let crosshairCenterX = 1180;             // X-Koordinate des Zenits
-    let crosshairCenterY = 1187;             // Y-Koordinate des Zenits
-    let crosshairRotation = -1.5;              // Winkel in Grad (0 = Süden unten)
+    let crosshairRadius  = 1090;
+    let crosshairCenterX = 1180;
+    let crosshairCenterY = 1187;
+    let crosshairRotation = -1.5;
 
-    // Mask-Overlay-Einstellungen
-    let maskRadius = 1090;                   // Radius der schwarzen Maske
-    let maskCenterX = 1180;                  // X-Koordinate des Mask-Zentrums
-    let maskCenterY = 1187;                  // Y-Koordinate des Mask-Zentrums
-    let showMask = false;                    // Maske anzeigen/ausblenden
-    let longitude = 0.0;
-    let latitude = 0.0;
-    let altitude = 0;
-    let isSouthernHemisphere = false;       // true = Südhalbkugel (Beschriftung gegen Uhrzeigersinn)
-    let showAzimutalGrid = false;
-    let maxVisibleElevation = 90; // in Grad, z. B. nur bis 75° statt bis 90° (Horizont)
-    let projectionType = "linear";
-    let originalImageSrc = "";
+    let maskRadius  = 1090;
+    let maskCenterX = 1180;
+    let maskCenterY = 1187;
+    let showMask    = false;
+    let longitude   = 0.0;
+    let latitude    = 0.0;
+    let altitude    = 0;
+    let isSouthernHemisphere = false;
+    let showAzimutalGrid     = false;
+    let maxVisibleElevation  = 90;
+    let projectionType       = "linear";
+    let originalImageSrc     = "";
 
     let showEquatorialGrid = false;
-    let imageTimestamp = 0;
+    let imageTimestamp     = 0;
 
-    const img = document.getElementById("image");
+    const img       = document.getElementById("image");
     const container = document.getElementById("image-container");
 
-    // #1: Overlay redraw throttling for mouse-move on canvas
-    let overlayRafId = 0;
-    let pendingMouse = null;
+    // Overlay redraw throttling
+    let overlayRafId  = 0;
+    let pendingMouse  = null;
     function scheduleOverlayRedraw() {
-      // schedule a redraw at most once per frame
       if (overlayRafId) return;
       overlayRafId = requestAnimationFrame(() => {
         overlayRafId = 0;
@@ -243,13 +466,13 @@
       });
     }
 
-    // #2: Pan/zoom redraw throttling for dragging in container
+    // Pan/zoom redraw throttling
     let panRafId = 0;
     function schedulePanRedraw() {
       if (panRafId) return;
       panRafId = requestAnimationFrame(() => {
         panRafId = 0;
-        updateZoomAndPan(); // calls updateOverlay() internally
+        updateZoomAndPan();
       });
     }
 
@@ -267,13 +490,8 @@
       }
     }, { passive: true });
 
-    container.addEventListener("mouseup", () => {
-      isDragging = false;
-    });
-
-    container.addEventListener("mouseleave", () => {
-      isDragging = false;
-    });
+    container.addEventListener("mouseup",    () => { isDragging = false; });
+    container.addEventListener("mouseleave", () => { isDragging = false; });
 
     function updateZoomAndPan() {
       const img = document.getElementById("image");
@@ -286,12 +504,12 @@
       zoomFactor *= 1.2;
       if (zoomFactor != 1.0) {
         showCardinalDirections = false;
-        showAzimutalGrid = false;
-        showEquatorialGrid = false;
+        showAzimutalGrid       = false;
+        showEquatorialGrid     = false;
       } else {
         showCardinalDirections = true;
-        showAzimutalGrid = azimutalGridCheckbox.checked;
-        showEquatorialGrid = equatorialGridCheckbox.checked;
+        showAzimutalGrid       = azimutalGridCheckbox.checked;
+        showEquatorialGrid     = equatorialGridCheckbox.checked;
       }
       updateZoomAndPan();
     }
@@ -300,12 +518,12 @@
       zoomFactor /= 1.2;
       if (zoomFactor != 1.0) {
         showCardinalDirections = false;
-        showAzimutalGrid = false;
-        showEquatorialGrid = false;
+        showAzimutalGrid       = false;
+        showEquatorialGrid     = false;
       } else {
         showCardinalDirections = true;
-        showAzimutalGrid = azimutalGridCheckbox.checked;
-        showEquatorialGrid = equatorialGridCheckbox.checked;
+        showAzimutalGrid       = azimutalGridCheckbox.checked;
+        showEquatorialGrid     = equatorialGridCheckbox.checked;
       }
       updateZoomAndPan();
     }
@@ -318,32 +536,27 @@
     }
 
     function toggleAzimutalGridOverlay() {
-      const overlayCheckbox = document.getElementById("azimutalGridCheckbox");
-      showAzimutalGrid = overlayCheckbox.checked;
+      showAzimutalGrid = document.getElementById("azimutalGridCheckbox").checked;
       updateOverlay();
     }
 
     function toggleEquatorialGridOverlay() {
-      const overlayCheckbox = document.getElementById("equatorialGridCheckbox");
-      showEquatorialGrid = overlayCheckbox.checked;
+      showEquatorialGrid = document.getElementById("equatorialGridCheckbox").checked;
       updateOverlay();
     }
 
     function toggleMaskOverlay() {
-      const maskCheckbox = document.getElementById("showMaskCheckbox");
-      showMask = maskCheckbox.checked;
+      showMask = document.getElementById("showMaskCheckbox").checked;
       updateOverlay();
     }
 
     function toggleCardinalDirectionsOverlay() {
-      const cardinalDirectionsCheckbox = document.getElementById("cardinalDirectionsCheckbox");
-      showCardinalDirections = cardinalDirectionsCheckbox.checked;
+      showCardinalDirections = document.getElementById("cardinalDirectionsCheckbox").checked;
       updateOverlay();
     }
 
     function updateProjectionType() {
-      const projectionTypeSelect = document.getElementById("projectionTypeSelect");
-      projectionType = projectionTypeSelect.value;
+      projectionType = document.getElementById("projectionTypeSelect").value;
       updateOverlay();
       updateConfigOutput();
     }
@@ -351,8 +564,8 @@
     function updateConfigOutput() {
       const configOutput = document.getElementById("configOutput");
       if (!configOutput) return;
-
-      const configText = `# Overlay calibration parameters
+      configOutput.value =
+`# Overlay calibration parameters
 image_horizon_radius=${crosshairRadius}
 image_zenith_x=${crosshairCenterX}
 image_zenith_y=${crosshairCenterY}
@@ -365,40 +578,24 @@ image_center_y=${maskCenterY}
 
 # Projection type
 projection_type=${projectionType}`;
-
-      configOutput.value = configText;
     }
 
     function updateOverlayFromInputs() {
-      const horizonRadiusInput = document.getElementById("image_horizon_radius");
-      const zenithXInput = document.getElementById("image_zenith_x");
-      const zenithYInput = document.getElementById("image_zenith_y");
-      const crosshairRotationInput = document.getElementById("crosshair_rotation");
-      const maskRadiusInput = document.getElementById("image_mask_radius");
-      const maskCenterXInput = document.getElementById("image_center_x");
-      const maskCenterYInput = document.getElementById("image_center_y");
+      const horizonRadiusInput    = document.getElementById("image_horizon_radius");
+      const zenithXInput          = document.getElementById("image_zenith_x");
+      const zenithYInput          = document.getElementById("image_zenith_y");
+      const crosshairRotationInput= document.getElementById("crosshair_rotation");
+      const maskRadiusInput       = document.getElementById("image_mask_radius");
+      const maskCenterXInput      = document.getElementById("image_center_x");
+      const maskCenterYInput      = document.getElementById("image_center_y");
 
-      if (horizonRadiusInput && horizonRadiusInput.value !== "") {
-        crosshairRadius = parseInt(horizonRadiusInput.value);
-      }
-      if (zenithXInput && zenithXInput.value !== "") {
-        crosshairCenterX = parseInt(zenithXInput.value);
-      }
-      if (zenithYInput && zenithYInput.value !== "") {
-        crosshairCenterY = parseInt(zenithYInput.value);
-      }
-      if (crosshairRotationInput && crosshairRotationInput.value !== "") {
-        crosshairRotation = parseFloat(crosshairRotationInput.value);
-      }
-      if (maskRadiusInput && maskRadiusInput.value !== "") {
-        maskRadius = parseInt(maskRadiusInput.value);
-      }
-      if (maskCenterXInput && maskCenterXInput.value !== "") {
-        maskCenterX = parseInt(maskCenterXInput.value);
-      }
-      if (maskCenterYInput && maskCenterYInput.value !== "") {
-        maskCenterY = parseInt(maskCenterYInput.value);
-      }
+      if (horizonRadiusInput     && horizonRadiusInput.value !== "")     crosshairRadius  = parseInt(horizonRadiusInput.value);
+      if (zenithXInput           && zenithXInput.value !== "")           crosshairCenterX = parseInt(zenithXInput.value);
+      if (zenithYInput           && zenithYInput.value !== "")           crosshairCenterY = parseInt(zenithYInput.value);
+      if (crosshairRotationInput && crosshairRotationInput.value !== "") crosshairRotation= parseFloat(crosshairRotationInput.value);
+      if (maskRadiusInput        && maskRadiusInput.value !== "")        maskRadius       = parseInt(maskRadiusInput.value);
+      if (maskCenterXInput       && maskCenterXInput.value !== "")       maskCenterX      = parseInt(maskCenterXInput.value);
+      if (maskCenterYInput       && maskCenterYInput.value !== "")       maskCenterY      = parseInt(maskCenterYInput.value);
 
       updateOverlay();
       updateConfigOutput();
@@ -411,68 +608,59 @@ projection_type=${projectionType}`;
       const configData = await fetchConfig();
       if (!configData) { loadingConfig = false; return; }
 
-      crosshairRadius = configData.image_horizon_radius;
+      crosshairRadius  = configData.image_horizon_radius;
       crosshairCenterX = configData.image_zenith_x;
       crosshairCenterY = configData.image_zenith_y;
-      crosshairRotation = configData.image_north_angle;
+      crosshairRotation= configData.image_north_angle;
 
-      // Mask-Werte aus der Konfiguration laden
-      maskRadius = configData.image_mask_radius || crosshairRadius;
-      maskCenterX = configData.image_center_x || crosshairCenterX;
-      maskCenterY = configData.image_center_y || crosshairCenterY;
+      maskRadius  = configData.image_mask_radius  || crosshairRadius;
+      maskCenterX = configData.image_center_x     || crosshairCenterX;
+      maskCenterY = configData.image_center_y     || crosshairCenterY;
 
-      latitude = configData.location_latitude;
-      longitude = configData.location_longitude;
-      altitude = configData.location_altitude;
+      // Support both field name conventions
+      latitude  = configData.location_latitude  ?? configData.latitude  ?? 0.0;
+      longitude = configData.location_longitude ?? configData.longitude ?? 0.0;
+      altitude  = configData.location_altitude  ?? configData.altitude  ?? 0;
       isSouthernHemisphere = latitude < 0.0;
 
-      // Eingabefelder mit den Konfigurationswerten füllen
-      const horizonRadiusInput = document.getElementById("image_horizon_radius");
-      const zenithXInput = document.getElementById("image_zenith_x");
-      const zenithYInput = document.getElementById("image_zenith_y");
-      const crosshairRotationInput = document.getElementById("crosshair_rotation");
-      const maskRadiusInput = document.getElementById("image_mask_radius");
-      const maskCenterXInput = document.getElementById("image_center_x");
-      const maskCenterYInput = document.getElementById("image_center_y");
-      const projectionTypeSelect = document.getElementById("projectionTypeSelect");
+      const horizonRadiusInput    = document.getElementById("image_horizon_radius");
+      const zenithXInput          = document.getElementById("image_zenith_x");
+      const zenithYInput          = document.getElementById("image_zenith_y");
+      const crosshairRotationInput= document.getElementById("crosshair_rotation");
+      const maskRadiusInput       = document.getElementById("image_mask_radius");
+      const maskCenterXInput      = document.getElementById("image_center_x");
+      const maskCenterYInput      = document.getElementById("image_center_y");
+      const projectionTypeSelect  = document.getElementById("projectionTypeSelect");
 
-      if (horizonRadiusInput) horizonRadiusInput.value = crosshairRadius;
-      if (zenithXInput) zenithXInput.value = crosshairCenterX;
-      if (zenithYInput) zenithYInput.value = crosshairCenterY;
+      if (horizonRadiusInput)     horizonRadiusInput.value     = crosshairRadius;
+      if (zenithXInput)           zenithXInput.value           = crosshairCenterX;
+      if (zenithYInput)           zenithYInput.value           = crosshairCenterY;
       if (crosshairRotationInput) crosshairRotationInput.value = crosshairRotation;
-      if (maskRadiusInput) maskRadiusInput.value = maskRadius;
-      if (maskCenterXInput) maskCenterXInput.value = maskCenterX;
-      if (maskCenterYInput) maskCenterYInput.value = maskCenterY;
-      if (projectionTypeSelect) projectionTypeSelect.value = projectionType;
+      if (maskRadiusInput)        maskRadiusInput.value        = maskRadius;
+      if (maskCenterXInput)       maskCenterXInput.value       = maskCenterX;
+      if (maskCenterYInput)       maskCenterYInput.value       = maskCenterY;
+      if (projectionTypeSelect)   projectionTypeSelect.value   = projectionType;
 
-      // Konfigurationsausgabe aktualisieren
       updateConfigOutput();
-
       loadingConfig = false;
     }
 
     async function loadLatestImage() {
-      if (loading)
-        return;  // Verhindert parallele Ladeversuche
+      if (loading) return;
       loading = true;
 
-      const latestImagePath = 'api/latest_image';
-      let latestImageData = null;
       try {
-        const latestImageResponse = await fetch(latestImagePath, { cache: "no-cache" });
-        latestImageData = await latestImageResponse.json();
-        const todayStr = latestImageData.date;
-        const imageTimeStr = latestImageData.image;
-        const hdrTimeStr = latestImageData.hdr;
-        const imageFiletype = latestImageData.filetype;
-        const imageDateTime = `${todayStr}${imageTimeStr}`;
-        imageTimestamp = latestImageData.image_timestamp;
+        const latestImageResponse = await fetch('api/latest_image', { cache: "no-cache" });
+        const latestImageData     = await latestImageResponse.json();
+        const todayStr       = latestImageData.date;
+        const imageTimeStr   = latestImageData.image;
+        const imageFiletype  = latestImageData.filetype;
+        const imageDateTime  = `${todayStr}${imageTimeStr}`;
+        imageTimestamp       = latestImageData.image_timestamp;
 
         originalImageSrc = `images/${todayStr}/image-${imageDateTime}.${imageFiletype}`;
         imageEl.src = originalImageSrc;
-        //imageEl.src = latestImagePath;
 
-        // Bild-Metadaten laden
         const imageMetaPath = `images/${todayStr}/image-${imageDateTime}.json`;
         let imageMeta = null;
         try {
@@ -483,16 +671,17 @@ projection_type=${projectionType}`;
         }
 
         imageEl.onload = () => {
-          updateOverlay();
           loading = false;
+          lastImageLoadTime = Date.now();
+          updateOverlay();
         };
 
         imageEl.onerror = () => {
-          console.error("❌ Image load error:", latestImagePath);
+          console.error("❌ Image load error:", originalImageSrc);
           loading = false;
+          lastImageLoadTime = Date.now();
         };
 
-        // Wenn keine Bildmetadaten vorhanden sind, keine weitere Anzeige
         if (!imageMeta) {
           configdataEl.innerHTML = "";
           return;
@@ -504,21 +693,19 @@ projection_type=${projectionType}`;
           ? Math.round(imageMeta.capture_interval)
           : 10;
 
-        lastImageLoadTime = Date.now();
         timerEl.textContent = refreshInterval;
         restartTimer();
 
       } catch (err) {
         console.error("⚠️ Unexpected load error:", err);
         loading = false;
+        lastImageLoadTime = Date.now();
       }
     }
 
     function tick() {
-      const now = Date.now();
-      const elapsedSeconds = Math.floor((now - lastImageLoadTime) / 1000);
-
-      const remaining = Math.max(refreshInterval - elapsedSeconds, 0);
+      const elapsed   = Math.floor((Date.now() - lastImageLoadTime) / 1000);
+      const remaining = Math.max(refreshInterval - elapsed, 0);
       timerEl.textContent = remaining;
 
       if (remaining <= 0 && !loading) {
@@ -526,359 +713,228 @@ projection_type=${projectionType}`;
         lastImageLoadTime = Date.now();
       }
 
-      // Nächsten Tick anfordern
       timerTimeout = setTimeout(tick, 1000);
     }
 
     function restartTimer() {
-      if (timerTimeout !== null) {
-        clearTimeout(timerTimeout);
-      }
+      if (timerTimeout !== null) clearTimeout(timerTimeout);
       lastImageLoadTime = Date.now();
       tick();
     }
 
-    // Hilfsfunktion um zu prüfen, ob ein Punkt innerhalb des Mask-Bereichs liegt
-    // Erweitert um 20px Toleranz außerhalb der Maske
     function isPointInsideMask(x, y) {
-      const scaleX = img.clientWidth / img.naturalWidth;
+      const scaleX = img.clientWidth  / img.naturalWidth;
       const scaleY = img.clientHeight / img.naturalHeight;
 
       const maskCenterXScaled = maskCenterX * scaleX * zoomFactor + panX;
       const maskCenterYScaled = maskCenterY * scaleY * zoomFactor + panY;
-      const maskRadiusScaled = maskRadius * scaleX * zoomFactor;
+      const maskRadiusScaled  = maskRadius  * scaleX * zoomFactor;
+      const effectiveRadius   = maskRadiusScaled + 20;
 
-      // 20px Toleranz hinzufügen
-      const tolerance = 20;
-      const effectiveRadius = maskRadiusScaled + tolerance;
-
-      const distance = Math.sqrt((x - maskCenterXScaled) ** 2 + (y - maskCenterYScaled) ** 2);
-      return distance <= effectiveRadius;
+      return Math.sqrt((x - maskCenterXScaled) ** 2 + (y - maskCenterYScaled) ** 2) <= effectiveRadius;
     }
 
     function updateOverlay() {
       const canvas = document.getElementById("overlay");
-      const img = document.getElementById("image");
+      const img    = document.getElementById("image");
 
-      canvas.width = img.clientWidth;
+      canvas.width  = img.clientWidth;
       canvas.height = img.clientHeight;
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const scaleX = img.clientWidth / img.naturalWidth;
+      const scaleX = img.clientWidth  / img.naturalWidth;
       const scaleY = img.clientHeight / img.naturalHeight;
 
-      // Schwarze Maske zeichnen (falls aktiviert)
+      // Black mask
       if (showMask) {
-        const maskCenterXScaled = maskCenterX * scaleX * zoomFactor + panX;
-        const maskCenterYScaled = maskCenterY * scaleY * zoomFactor + panY;
-        const maskRadiusScaled = maskRadius * scaleX * zoomFactor;
-
+        const mCX = maskCenterX * scaleX * zoomFactor + panX;
+        const mCY = maskCenterY * scaleY * zoomFactor + panY;
+        const mR  = maskRadius  * scaleX * zoomFactor;
         ctx.save();
-        ctx.fillStyle = "rgba(50, 50, 50, 0.8)";
-
-        // Ganze Canvas mit schwarzer Farbe füllen
+        ctx.fillStyle = "rgba(50,50,50,0.8)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Kreis ausschneiden (transparent machen)
         ctx.globalCompositeOperation = "destination-out";
         ctx.beginPath();
-        ctx.arc(maskCenterXScaled, maskCenterYScaled, maskRadiusScaled, 0, 2 * Math.PI);
+        ctx.arc(mCX, mCY, mR, 0, 2 * Math.PI);
         ctx.fill();
-
         ctx.restore();
       }
 
-      // Raster/Gitter zeichnen (immer sichtbar, unter anderen Overlays)
+      // Pixel grid
       ctx.save();
-      ctx.strokeStyle = "rgba(128, 128, 128, 1.0)";
+      ctx.strokeStyle = "rgba(128,128,128,1.0)";
       ctx.lineWidth = 0.5;
-
-      const gridSpacing = 100; // 100 Pixel Abstand
-
-      // Vertikale Linien
-      for (let x = 0; x < canvas.width; x += gridSpacing) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
+      for (let x = 0; x < canvas.width; x += 100) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
       }
-
-      // Horizontale Linien
-      for (let y = 0; y < canvas.height; y += gridSpacing) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
+      for (let y = 0; y < canvas.height; y += 100) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
       }
-
       ctx.restore();
 
-      const centerX = (crosshairCenterX) * scaleX * zoomFactor + panX;
-      const centerY = (crosshairCenterY) * scaleY * zoomFactor + panY;
-      const radius = crosshairRadius * scaleX * zoomFactor;
+      const centerX = crosshairCenterX * scaleX * zoomFactor + panX;
+      const centerY = crosshairCenterY * scaleY * zoomFactor + panY;
+      const radius  = crosshairRadius  * scaleX * zoomFactor;
 
+      // Cardinal directions
       if (showCardinalDirections) {
         ctx.save();
-        ctx.strokeStyle = "rgba(255, 0, 0, 0.8)";
+        ctx.strokeStyle = "rgba(255,0,0,0.8)";
         ctx.lineWidth = 1;
-
-        // Kreis
         ctx.beginPath();
         ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
         ctx.stroke();
 
-        // Richtungsmarken
-        const directions = ["N", "NW", "W", "SW", "S", "SE", "E", "NE"];
+        const directions = ["N","NW","W","SW","S","SE","E","NE"];
         const total = directions.length;
-
         for (let i = 0; i < total; i++) {
-          const idx = isSouthernHemisphere ? total - 1 - i : i;
-          const angleDeg = crosshairRotation + (360 / total) * i;
-          const angleRad = angleDeg * Math.PI / 180;
-
+          const idx      = isSouthernHemisphere ? total - 1 - i : i;
+          const angleRad = (crosshairRotation + (360 / total) * i) * Math.PI / 180;
           const x = centerX + Math.sin(angleRad) * radius;
           const y = centerY - Math.cos(angleRad) * radius;
-
-          // Nur zeichnen wenn der Punkt innerhalb des Mask-Bereichs liegt
           if (isPointInsideMask(x, y)) {
-            // Marker
-            ctx.beginPath();
-            ctx.arc(x, y, 3, 0, 2 * Math.PI);
-            ctx.fillStyle = "red";
-            ctx.fill();
-
-            // Beschriftung (nicht für 0° und 90°)
+            ctx.beginPath(); ctx.arc(x, y, 3, 0, 2 * Math.PI);
+            ctx.fillStyle = "red"; ctx.fill();
             const tx = centerX + Math.sin(angleRad) * (radius + 14);
             const ty = centerY - Math.cos(angleRad) * (radius + 14);
-
-            // Beschriftung nur zeichnen wenn sie auch innerhalb des Mask-Bereichs liegt
             if (isPointInsideMask(tx, ty)) {
               ctx.fillStyle = "red";
               ctx.font = "12px sans-serif";
-              ctx.textAlign = "center";
-              ctx.textBaseline = "middle";
+              ctx.textAlign = "center"; ctx.textBaseline = "middle";
               ctx.fillText(directions[idx], tx, ty);
             }
           }
         }
 
-        // Marker für Zenith (Mittelpunkt) - nur wenn innerhalb des Mask-Bereichs
         if (isPointInsideMask(centerX, centerY)) {
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, 2, 0, 2 * Math.PI);
-          ctx.fillStyle = "red";
-          ctx.fill();
-
-          const zenithLabelX = centerX + 6;
-          const zenithLabelY = centerY + 6;
-          if (isPointInsideMask(zenithLabelX, zenithLabelY)) {
+          ctx.beginPath(); ctx.arc(centerX, centerY, 2, 0, 2 * Math.PI);
+          ctx.fillStyle = "red"; ctx.fill();
+          const zlx = centerX + 6, zly = centerY + 6;
+          if (isPointInsideMask(zlx, zly)) {
             ctx.fillStyle = "red";
             ctx.font = "12px sans-serif";
-            ctx.textAlign = "left";
-            ctx.textBaseline = "top";
-            ctx.fillText("Zenith", zenithLabelX, zenithLabelY);
+            ctx.textAlign = "left"; ctx.textBaseline = "top";
+            ctx.fillText("Zenith", zlx, zly);
           }
         }
-
         ctx.restore();
       }
 
-
+      // Equatorial grid
       if (showEquatorialGrid) {
-        const lat = latitude;
-        const lon = longitude;
-        const timestamp = imageTimestamp;
-
+        const lat = latitude, lon = longitude, ts = imageTimestamp;
         ctx.save();
-
-        // Clipping-Pfad setzen, um nur innerhalb des Mask-Bereichs zu zeichnen
-        const maskCenterXScaled = maskCenterX * scaleX * zoomFactor + panX;
-        const maskCenterYScaled = maskCenterY * scaleY * zoomFactor + panY;
-        const maskRadiusScaled = maskRadius * scaleX * zoomFactor;
-
-        ctx.beginPath();
-        ctx.arc(maskCenterXScaled, maskCenterYScaled, maskRadiusScaled, 0, 2 * Math.PI);
-        ctx.clip();
+        const mCX = maskCenterX * scaleX * zoomFactor + panX;
+        const mCY = maskCenterY * scaleY * zoomFactor + panY;
+        const mR  = maskRadius  * scaleX * zoomFactor;
+        ctx.beginPath(); ctx.arc(mCX, mCY, mR, 0, 2 * Math.PI); ctx.clip();
 
         ctx.strokeStyle = "rgba(0,255,0,0.4)";
         ctx.lineWidth = 1;
         ctx.fillStyle = "lime";
         ctx.font = "10px sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
 
-        // Deklinationskreise (-60° bis +60° in 30°-Schritten)
         for (let dec = -60; dec <= 60; dec += 15) {
           let points = [];
           for (let ra = 0; ra < 360; ra += 5) {
-            const { azimuth, altitude } = raDecToAzAlt(ra, dec, lat, lon, timestamp);
+            const { azimuth, altitude } = raDecToAzAlt(ra, dec, lat, lon, ts);
             if (altitude >= 0 && altitude <= 90) {
               const { x, y } = azAltToImageXY(azimuth, altitude);
-              // Nur Punkte hinzufügen, die innerhalb des Mask-Bereichs liegen
-              if (isPointInsideMask(x, y)) {
-                points.push({ x, y });
-              }
+              if (isPointInsideMask(x, y)) points.push({ x, y });
             }
           }
           if (points.length > 1) {
-            ctx.beginPath();
-            ctx.moveTo(points[0].x, points[0].y);
-            for (let i = 1; i < points.length; i++) {
-              ctx.lineTo(points[i].x, points[i].y);
-            }
+            ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
             ctx.stroke();
           }
         }
 
-        // Rektaszensionslinien (jede Stunde = 15°)
         for (let ra = 0; ra < 360; ra += 15) {
           let points = [];
           for (let dec = -80; dec <= 80; dec += 5) {
-            const { azimuth, altitude } = raDecToAzAlt(ra, dec, lat, lon, timestamp);
+            const { azimuth, altitude } = raDecToAzAlt(ra, dec, lat, lon, ts);
             if (altitude >= 0 && altitude <= 90) {
               const { x, y } = azAltToImageXY(azimuth, altitude);
-              // Nur Punkte hinzufügen, die innerhalb des Mask-Bereichs liegen
-              if (isPointInsideMask(x, y)) {
-                points.push({ x, y });
-              }
+              if (isPointInsideMask(x, y)) points.push({ x, y });
             }
           }
           if (points.length > 1) {
-            ctx.beginPath();
-            ctx.moveTo(points[0].x, points[0].y);
-            for (let i = 1; i < points.length; i++) {
-              ctx.lineTo(points[i].x, points[i].y);
-            }
+            ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
             ctx.stroke();
-
-            // Beschriftung bei Deklination = 0° - nur wenn innerhalb des Mask-Bereichs
             const { x, y } = points[Math.floor(points.length / 2)];
-            if (isPointInsideMask(x, y)) {
-              const raHour = (ra / 15) % 24;
-              ctx.fillText(`${raHour}h`, x, y);
-            }
+            if (isPointInsideMask(x, y)) ctx.fillText(`${(ra / 15) % 24}h`, x, y);
           }
         }
-
-
         ctx.restore();
       }
 
+      // Azimuthal grid
       if (showAzimutalGrid) {
         ctx.save();
+        const mCX = maskCenterX * scaleX * zoomFactor + panX;
+        const mCY = maskCenterY * scaleY * zoomFactor + panY;
+        const mR  = maskRadius  * scaleX * zoomFactor;
+        ctx.beginPath(); ctx.arc(mCX, mCY, mR, 0, 2 * Math.PI); ctx.clip();
 
-        // Clipping-Pfad setzen, um nur innerhalb des Mask-Bereichs zu zeichnen
-        const maskCenterXScaled = maskCenterX * scaleX * zoomFactor + panX;
-        const maskCenterYScaled = maskCenterY * scaleY * zoomFactor + panY;
-        const maskRadiusScaled = maskRadius * scaleX * zoomFactor;
-
-        ctx.beginPath();
-        ctx.arc(maskCenterXScaled, maskCenterYScaled, maskRadiusScaled, 0, 2 * Math.PI);
-        ctx.clip();
-
-        // Azimutale Linien (15°, 30°, 45°, 60°, 75°)
-        ctx.strokeStyle = "rgba(255, 0, 0, 0.9)";
+        ctx.strokeStyle = "rgba(255,0,0,0.9)";
         ctx.lineWidth = 1;
-        const zenithX = centerX;
-        const zenithY = centerY;
-        const baseRadius = crosshairRadius * scaleX; // für Skalierung X und Y gleich angenommen
-
+        const baseRadius = crosshairRadius * scaleX;
         ctx.font = "10px sans-serif";
-        ctx.fillStyle = "rgba(255, 0, 0, 0.9)";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
+        ctx.fillStyle = "rgba(255,0,0,0.9)";
+        ctx.textAlign = "left"; ctx.textBaseline = "middle";
 
         [15, 30, 45, 60, 75].forEach((elevation) => {
           let r = baseRadius * (90 - elevation) / 90;
-          if (projectionType === "sinus") {
-            r = baseRadius * Math.sin((90 - elevation) * Math.PI / 180);
-          }
-
-          // Kreis zeichnen
-          ctx.beginPath();
-          ctx.arc(zenithX, zenithY, r, 0, 2 * Math.PI);
-          ctx.stroke();
-
-          // Beschriftung bei Azimut = 90° (Osten) - nur wenn innerhalb des Mask-Bereichs
-          const labelX = zenithX + r + 4; // 4px Abstand
-          const labelY = zenithY;
-          if (isPointInsideMask(labelX, labelY)) {
-            ctx.fillText(`${elevation}°`, labelX, labelY - 1); // kleiner vertikaler Offset
-          }
+          if (projectionType === "sinus") r = baseRadius * Math.sin((90 - elevation) * Math.PI / 180);
+          ctx.beginPath(); ctx.arc(centerX, centerY, r, 0, 2 * Math.PI); ctx.stroke();
+          const labelX = centerX + r + 4;
+          if (isPointInsideMask(labelX, centerY)) ctx.fillText(`${elevation}°`, labelX, centerY - 1);
         });
 
-        // Azimut-Richtungen (N, NE, E, SE, S, SW, W, NW)
         for (let i = 0; i < 8; i++) {
-          let angle = i * 45 + crosshairRotation;
-          const rad = angle * Math.PI / 180;
-
-          const x = zenithX + baseRadius * Math.cos(rad);
-          const y = zenithY + baseRadius * Math.sin(rad);
-
-          // Linie zeichnen
-          ctx.beginPath();
-          ctx.moveTo(zenithX, zenithY);
-          ctx.lineTo(x, y);
-          ctx.stroke();
+          const rad = (i * 45 + crosshairRotation) * Math.PI / 180;
+          const x = centerX + baseRadius * Math.cos(rad);
+          const y = centerY + baseRadius * Math.sin(rad);
+          ctx.beginPath(); ctx.moveTo(centerX, centerY); ctx.lineTo(x, y); ctx.stroke();
         }
-
         ctx.restore();
       }
 
-
-
-      // Mauskoordinaten anzeigen
-      // Mauskoordinaten anzeigen
+      // Mouse coordinates + Az/El/RA/Dec readout
       if (mouseX !== null && mouseY !== null) {
-        const scaleX = img.clientWidth / img.naturalWidth;
-        const scaleY = img.clientHeight / img.naturalHeight;
-
-        // Bild-Pixelkoordinaten (nur Anzeige) – optional präziser mit pan/zoom:
         const imageX = (mouseX - panX) / (scaleX * zoomFactor);
         const imageY = (mouseY - panY) / (scaleY * zoomFactor);
-
-        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
         ctx.font = "12px sans-serif";
-        ctx.textAlign = "right";
-        ctx.textBaseline = "top";
+        ctx.textAlign = "right"; ctx.textBaseline = "top";
         ctx.fillText(`X: ${Math.round(imageX)}, Y: ${Math.round(imageY)}`, canvas.width - 10, 10);
 
-        // --- Az/El aus SCREEN-Koordinaten berechnen (wie gezeichnet!) ---
         const dxScreen = mouseX - centerX;
         const dyScreen = mouseY - centerY;
-        const rScreen = Math.hypot(dxScreen, dyScreen);
+        const rScreen  = Math.hypot(dxScreen, dyScreen);
 
-        const radiusScreen = radius; // = crosshairRadius * scaleX * zoomFactor (oben berechnet)
-        if (rScreen <= radiusScreen) {
-          const dNorm = rScreen / radiusScreen;
-
-          // Elevation aus Projektion
+        if (rScreen <= radius) {
+          const dNorm = rScreen / radius;
           let elevation;
           if (projectionType === "sinus") {
             elevation = 90 - Math.asin(Math.min(1, Math.max(0, dNorm))) * (180 / Math.PI);
           } else {
             elevation = 90 - dNorm * 90;
           }
-
-          // Azimut (0° = oben/Nord), inkl. Bildrotation
           let azimuthDisp = Math.atan2(dxScreen, -dyScreen) * (180 / Math.PI);
           azimuthDisp = (azimuthDisp - crosshairRotation + 360) % 360;
-
-          // Falls das Overlay horizontal gespiegelt gezeichnet wird, für RA/Dec zurückspiegeln
-          const MIRROR = true; // auf false setzen, wenn du nicht spiegelst
+          const MIRROR = true;
           const azimuthTrue = MIRROR ? (360 - azimuthDisp) % 360 : azimuthDisp;
 
-          // Ausgabe Az/El
           ctx.fillText(`Az: ${azimuthDisp.toFixed(1)}°, El: ${elevation.toFixed(1)}°`, canvas.width - 10, 28);
-
-          // RA/Dec aus Az/El (Zeit/Ort)
           const { raDeg, decDeg } = azAltToRaDec(latitude, longitude, azimuthTrue, elevation, imageTimestamp);
           ctx.fillText(`RA: ${formatRaHMS(raDeg)}, Dec: ${formatDecDMS(decDeg)}`, canvas.width - 10, 44);
         }
       }
-
-
     }
 
     const canvas = document.getElementById("overlay");
@@ -890,25 +946,25 @@ projection_type=${projectionType}`;
     }, { passive: true });
 
     canvas.addEventListener("mouseleave", () => {
-      mouseX = null;
-      mouseY = null;
+      mouseX = null; mouseY = null;
       scheduleOverlayRedraw();
     }, { passive: true });
 
-
-    // Reagiere auf Fenster-Resize → Overlay anpassen
     window.addEventListener("resize", updateOverlay);
 
+    // Mousewheel zoom
+    container.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      zoomFactor *= e.deltaY < 0 ? 1.15 : (1 / 1.15);
+      if (zoomFactor < 1.0) { zoomFactor = 1.0; panX = 0; panY = 0; }
+      updateZoomAndPan();
+    }, { passive: false });
 
-    // Initialer Start
     loadConfig();
     loadLatestImage();
     restartTimer();
   </script>
 
-  <footer id="footer">
-    <div class="copyright">Copyright (c) 2025 Sven Kreiensen</div>
-  </footer>
 </body>
 
 </html>

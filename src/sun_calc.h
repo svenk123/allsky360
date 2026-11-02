@@ -39,6 +39,19 @@ int is_sun_below_18_degrees(time_t timestamp, double longitude, double latitude)
 int is_sun_below_6_degrees(time_t timestamp, double longitude, double latitude);
 
 /**
+ * Checks whether the sun is below a caller-supplied altitude.
+ * This is what the day/night switch uses, driven by nighttime_sunangle from
+ * config.ini; is_sun_below_6_degrees() is the -6.0 special case of it.
+ * @param timestamp: Current time as time_t.
+ * @param longitude: Longitude of the location (in degrees).
+ * @param latitude: Latitude of the location (in degrees).
+ * @param angle_deg: Threshold in degrees, negative below the horizon (e.g. -6.0).
+ * @return: 1 if the sun is below the given altitude, otherwise 0.
+ */
+int is_sun_below_angle(time_t timestamp, double longitude, double latitude,
+                       double angle_deg);
+
+/**
  * Calculates the current solar altitude (elevation) in degrees.
  * @param timestamp: Current time as time_t.
  * @param longitude: Longitude of the location (in degrees).

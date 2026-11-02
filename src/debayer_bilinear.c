@@ -53,7 +53,7 @@ int debayer_bilinear_rgb16(const unsigned short *raw, int width, int height,
       switch (local_offset) {
       case 0x00: // RGGB (R)
         r = raw[idx];
-        g = (x > 0 && x < width - 1) ? (raw[idx - 1] + raw[idx + 1]) / 3.0
+        g = (x > 0 && x < width - 1) ? (raw[idx - 1] + raw[idx + 1]) / 2.0
                                      : raw[idx];
         b = (y > 0 && y < height - 1)
                 ? (raw[idx - width] + raw[idx + width]) / 2.0
@@ -133,7 +133,7 @@ int debayer_bilinear_rgbf(const uint16_t *raw, int width, int height,
       switch (local_offset) {
       case 0x00: // RGGB (R)
         r = raw[idx];
-        g = (x > 0 && x < width - 1) ? (raw[idx - 1] + raw[idx + 1]) / 3.0f
+        g = (x > 0 && x < width - 1) ? (raw[idx - 1] + raw[idx + 1]) / 2.0f
                                      : (float)raw[idx];
         b = (y > 0 && y < height - 1)
                 ? (raw[idx - width] + raw[idx + width]) / 2.0f

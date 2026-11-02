@@ -6,7 +6,7 @@
  * You can use this software under the terms of the MIT license
  * (see LICENSE.md).
  *
- * THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
@@ -26,25 +26,28 @@ static inline int iclamp(int v, int lo, int hi) {
   return v < lo ? lo : (v > hi ? hi : v);
 }
 
-/* Simple midtones transfer (PixInsight-like midtones balance).
- * m in [0,1], x in [0,1]. m=0.5 -> identity.
+/* PixInsight midtones transfer function.
+ * Maps: f(0)=0, f(m)=0.5, f(1)=1
+ * m < 0.5: brightens midtones
+ * m = 0.5: identity
+ * m > 0.5: darkens midtones
+ * Formula: f(x) = (m-1)*x / ((2m-1)*x - m)
  */
 static inline float midtones_xfer(float x, float m) {
-  if (m <= 0.0f)
-    return (x <= 0.0f) ? 0.0f : 1.0f;
+  if (x <= 0.0f) return 0.0f;
+  if (x >= 1.0f) return 1.0f;
+  if (m <= 0.0f) return 0.0f;
+  if (m >= 1.0f) return 1.0f;
 
-  if (m >= 1.0f)
+  /* At m=0.5 the formula degenerates; return identity */
+  if (fabsf(m - 0.5f) < 1e-6f)
     return x;
 
-  float num = (x - m);
-  float den = (1.0f - 2.0f * m);
-
-  if (fabsf(den) < 1e-6f)
+  float denom = (2.0f * m - 1.0f) * x - m;
+  if (fabsf(denom) < 1e-9f)
     return x;
 
-  float y = (num / den + 0.5f);
-
-  return clampf1(y);
+  return clampf1((m - 1.0f) * x / denom);
 }
 
 /* À trous separable B3-spline blur (dilated by 'step'). */
@@ -102,19 +105,16 @@ static inline float compress_curve(float v, float k) {
   return (a > 0.0f) ? v / (1.0f + k * a) : v;
 }
 
-/* Shadow/Highlight protection blend factor in [0,1] */
+/* Shadow/Highlight protection blend factor in [0,1].
+ * pf=0: fully protected (no compression), pf=1: full compression.
+ * For dark pixels (y≈0) with sh_prot=1: pf_sh≈0 → no compression.
+ * For bright pixels (y≈1) with hi_prot=1: pf_hi≈0 → no compression.
+ */
 static inline float protection_factor(float y, float sh, float hi) {
   float pf_sh = 1.0f - sh * (1.0f - y);
-  float pf_hi = 1.0f - hi * (y);
-  float pf = pf_sh * pf_hi;
-
-  if (pf < 0.0f)
-    pf = 0.0f;
-
-  if (pf > 1.0f)
-    pf = 1.0f;
-
-  return pf;
+  float pf_hi = 1.0f - hi * y;
+  float pf    = pf_sh * pf_hi;
+  return pf < 0.0f ? 0.0f : (pf > 1.0f ? 1.0f : pf);
 }
 
 int hdrmt_rgbf1(float *rgb, int width, int height, int levels, int start_level,
@@ -137,13 +137,13 @@ int hdrmt_rgbf1(float *rgb, int width, int height, int levels, int start_level,
     return 5;
 
   const size_t pixel_count = (size_t)width * height;
-  
+
   printf("HDR multiscale transform: levels: %d, start_level: %d, strength: %f, "
          "strength_boost: %f, midtones: %f, shadow_protect: %f, "
          "highlight_protect: %f, epsilon: %f, gain_cap: %f\n",
          levels, start_level, strength, strength_boost, midtones,
          shadow_protect, highlight_protect, epsilon, gain_cap);
-  
+
   printf("Processing image: %dx%d pixels (%zu total)\n", width, height, pixel_count);
 
   float *Y = (float *)allsky_safe_malloc(pixel_count * sizeof(float));
@@ -202,7 +202,7 @@ int hdrmt_rgbf1(float *rgb, int width, int height, int levels, int start_level,
     int step = 1 << l;
     atrous_pass(A, B, width, height, step);
 
-/* D_l = A - B */
+/* D_l = A_l - A_{l+1} (detail band at scale l) */
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < pixel_count; ++i) {
       D[l][i] = A[i] - B[i];
@@ -212,13 +212,13 @@ int hdrmt_rgbf1(float *rgb, int width, int height, int levels, int start_level,
     allsky_safe_free(B);
     printf("Completed level %d/%d\n", l + 1, levels);
   }
-  /* A is coarse residual */
+  /* A is now the coarse residual (lowest-frequency approximation) */
 
-  const float base_k = clampf1(strength);
-  const float boost = clampf1(strength_boost);
-  const float mt = clampf1(midtones);
-  const float sh_prot = clampf1(shadow_protect);
-  const float hi_prot = clampf1(highlight_protect);
+  const float base_k   = clampf1(strength);
+  const float boost    = clampf1(strength_boost);
+  const float mt       = clampf1(midtones);
+  const float sh_prot  = clampf1(shadow_protect);
+  const float hi_prot  = clampf1(highlight_protect);
 
   float *Yp = (float *)allsky_safe_malloc(pixel_count * sizeof(float));
   if (!Yp) {
@@ -230,55 +230,51 @@ int hdrmt_rgbf1(float *rgb, int width, int height, int levels, int start_level,
     return 10;
   }
 
-/* Start from compressed residual */
+  /* Initialize Yp from the coarse residual, applying only the midtones
+   * transfer. The residual represents large-scale brightness and should NOT
+   * be compressed with the local-contrast curve — that would incorrectly
+   * flatten the global brightness structure on top of the detail compression. */
 #pragma omp parallel for schedule(static)
   for (size_t i = 0; i < pixel_count; ++i) {
-    float a = A[i];
-    float t = midtones_xfer(clampf1(a), mt);
-    float delta_mid = t - clampf1(a);
-    float k_res = base_k * (1.0f + 0.5f * boost);
-    float pf = protection_factor(clampf1(Y[i]), sh_prot, hi_prot);
-    float a_comp = compress_curve(a, k_res * pf);
-    Yp[i] = a_comp + 0.3f * delta_mid;
+    Yp[i] = midtones_xfer(clampf1(A[i]), mt);
   }
 
-  /* Add detail bands back (compressed from start_level upwards) */
+  /* Add detail bands back.
+   * Bands below start_level (fine detail) are added uncompressed.
+   * Bands from start_level onward (coarser scales) are compressed;
+   * the compression strength increases with scale via strength_boost. */
   printf("Adding detail bands back...\n");
   for (int l = 0; l < levels; ++l) {
-    const int apply = (l >= start_level);
-    float scale = (levels > 1) ? ((float)l / (float)(levels - 1)) : 1.0f;
-    float k = base_k * (apply ? (1.0f + boost * scale) : 0.0f);
-
-    if (!apply || k <= 0.0f) {
+    if (l < start_level) {
+      /* Fine detail: add uncompressed */
 #pragma omp parallel for schedule(static)
       for (size_t i = 0; i < pixel_count; ++i) {
         Yp[i] += D[l][i];
       }
     } else {
+      /* Coarser detail: compress local contrast.
+       * scale goes from 0 (finest) to 1 (coarsest), so boost applies
+       * progressively stronger compression toward large scales. */
+      float scale = (levels > 1) ? ((float)l / (float)(levels - 1)) : 1.0f;
+      float k = base_k * (1.0f + boost * scale);
+
 #pragma omp parallel for schedule(static)
       for (size_t i = 0; i < pixel_count; ++i) {
         float pf = protection_factor(clampf1(Y[i]), sh_prot, hi_prot);
-        float d = D[l][i];
-        float dc = compress_curve(d, k * pf);
-        Yp[i] += dc;
+        Yp[i] += compress_curve(D[l][i], k * pf);
       }
     }
   }
 
-  /* Apply luminance gain to RGB */
+  /* Apply luminance gain to RGB:
+   * gain = Yp / Y, clamped to [1/gain_cap, gain_cap] */
   printf("Applying luminance gain to RGB...\n");
-  const float eps = epsilon;
   const float cap = (gain_cap >= 1.0f) ? gain_cap : 0.0f;
 
 #pragma omp parallel for schedule(static)
   for (size_t i = 0; i < pixel_count; ++i) {
     int idx = i * CHANNELS;
-    float y = Y[i];
-    float yp = Yp[i];
-    float denom = y + eps;
-    if (denom < eps)
-      denom = eps;
-    float gain = yp / denom;
+    float gain = Yp[i] / (Y[i] + epsilon);
 
     if (cap >= 1.0f) {
       if (gain > cap)
@@ -287,15 +283,11 @@ int hdrmt_rgbf1(float *rgb, int width, int height, int levels, int start_level,
         gain = 1.0f / cap;
     }
 
-    float r = rgb[idx + 0] * gain;
-    float g = rgb[idx + 1] * gain;
-    float b = rgb[idx + 2] * gain;
-
-    rgb[idx + 0] = clampf1(r);
-    rgb[idx + 1] = clampf1(g);
-    rgb[idx + 2] = clampf1(b);
+    rgb[idx + 0] = clampf1(rgb[idx + 0] * gain);
+    rgb[idx + 1] = clampf1(rgb[idx + 1] * gain);
+    rgb[idx + 2] = clampf1(rgb[idx + 2] * gain);
   }
-  
+
   printf("HDR multiscale transform: ok\n");
 
   /* Cleanup */

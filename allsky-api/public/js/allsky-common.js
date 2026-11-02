@@ -100,7 +100,7 @@ function cloudCoverToRGB(percent) {
     }
   }
 
-  // Fallback (sollte nie erreicht werden)
+  // Fallback
   return "rgb(240,240,200)";
 }
 
@@ -552,12 +552,13 @@ function updateRGBHistogram(img, canvas) {
   }
   
   try {
-    // Canvas-Größe anpassen
-    const container = canvas.parentElement;
-    const displayWidth = container ? (container.clientWidth - 32) : 512;
+    // Feste Buffer-Größe; CSS width:100% skaliert den Canvas auf den Container.
+    // clientWidth wird bewusst NICHT gemessen – das verursacht Timing-Probleme
+    // wenn das Layout beim ersten Render-Frame noch nicht berechnet ist.
+    const displayWidth  = 512;
     const displayHeight = 100;
-    
-    if (canvas.width !== displayWidth) canvas.width = displayWidth;
+
+    if (canvas.width  !== displayWidth)  canvas.width  = displayWidth;
     if (canvas.height !== displayHeight) canvas.height = displayHeight;
 
     const ctx = canvas.getContext('2d');

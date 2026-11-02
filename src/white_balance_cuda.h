@@ -20,6 +20,16 @@
 
 #include "white_balance.h"
 
+typedef enum {
+  SCENE_NIGHT_CLEAR  = 0,
+  SCENE_NIGHT_MOON   = 1,
+  SCENE_NIGHT_AURORA = 2,
+  SCENE_NIGHT_CLOUDY = 3,
+  SCENE_DAY_CLEAR    = 4,
+  SCENE_DAY_CLOUDY   = 5,
+  SCENE_TWILIGHT     = 6,
+} SceneType;
+
 /* CUDA-White-Balance-Function (C-compatible) */
 #ifdef __cplusplus
 extern "C" {
@@ -27,6 +37,7 @@ extern "C" {
 
 int auto_color_calibration_rgbf1_cuda(float *rgba, int width, int height, float subframe_percent);
 int auto_color_calibration_rgbf1_cuda_Wrapper(float *rgba, int width, int height, float subframe_percent);
+SceneType detect_scene_rgbf1_cuda(float *d_rgba, int width, int height, int *errcode);
 
 #ifdef __cplusplus
 }

@@ -20,11 +20,22 @@
 #include <jpeglib.h>
 #include <math.h>
 #include <omp.h>
+#include <setjmp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+/* Custom libjpeg error handler — uses longjmp instead of exit() */
+struct allsky_jpeg_err_mgr {
+  struct jpeg_error_mgr pub;
+  jmp_buf setjmp_buf;
+};
 
+static void allsky_jpeg_error_exit(j_common_ptr cinfo) {
+  struct allsky_jpeg_err_mgr *err = (struct allsky_jpeg_err_mgr *)cinfo->err;
+  (*cinfo->err->output_message)(cinfo);
+  longjmp(err->setjmp_buf, 1);
+}
 
 int save_jpeg_rgbf1(const float *rgba, int width, int height,
                     int compression_ratio, float scale, const char *filename) {
@@ -75,9 +86,18 @@ int save_jpeg_rgbf1(const float *rgba, int width, int height,
   }
 
   struct jpeg_compress_struct cinfo;
-  struct jpeg_error_mgr jerr;
+  struct allsky_jpeg_err_mgr jerr;
 
-  cinfo.err = jpeg_std_error(&jerr);
+  cinfo.err = jpeg_std_error(&jerr.pub);
+  jerr.pub.error_exit = allsky_jpeg_error_exit;
+
+  if (setjmp(jerr.setjmp_buf)) {
+    jpeg_destroy_compress(&cinfo);
+    fclose(outfile);
+    allsky_safe_free(rgb8);
+    return 5;
+  }
+
   jpeg_create_compress(&cinfo);
   jpeg_stdio_dest(&cinfo, outfile);
 
@@ -104,7 +124,6 @@ int save_jpeg_rgbf1(const float *rgba, int width, int height,
   allsky_safe_free(rgb8);
 
   printf("Save JPEG: ok, filename: %s\n", filename);
-
   return 0;
 }
 
@@ -161,9 +180,18 @@ int save_jpeg_rgbf16(const float *rgba, int width, int height,
   }
 
   struct jpeg_compress_struct cinfo;
-  struct jpeg_error_mgr jerr;
+  struct allsky_jpeg_err_mgr jerr;
 
-  cinfo.err = jpeg_std_error(&jerr);
+  cinfo.err = jpeg_std_error(&jerr.pub);
+  jerr.pub.error_exit = allsky_jpeg_error_exit;
+
+  if (setjmp(jerr.setjmp_buf)) {
+    jpeg_destroy_compress(&cinfo);
+    fclose(outfile);
+    allsky_safe_free(rgb8);
+    return 5;
+  }
+
   jpeg_create_compress(&cinfo);
   jpeg_stdio_dest(&cinfo, outfile);
 
@@ -190,7 +218,6 @@ int save_jpeg_rgbf16(const float *rgba, int width, int height,
   allsky_safe_free(rgb8);
 
   printf("Save JPEG: ok, filename: %s\n", filename);
-
   return 0;
 }
 

@@ -1,0 +1,15 @@
+# CUDA Device Permissions for Jetson Orin
+# Place this file in /etc/udev/rules.d/99-cuda-permissions.rules
+
+# NVIDIA GPU devices
+KERNEL=="nvidia*", MODE="0666", GROUP="video"
+
+# NVIDIA host devices
+KERNEL=="nvhost-*", MODE="0666", GROUP="video"
+
+# CUDA devices
+KERNEL=="nvidiactl", MODE="0666", GROUP="video"
+KERNEL=="nvidia-uvm", MODE="0666", GROUP="video"
+
+# Jetson-specific devices
+KERNEL=="tegra*", MODE="0666", GROUP="video"

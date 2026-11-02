@@ -43,7 +43,7 @@ static float compute_laplace(const float *luminance, int x, int y, int width,
 }
 
 static void box_blur(float *channel, int width, int height, int radius,
-                     float amount) {
+                     float amount, const float *mask) {
   float *temp = (float *)allsky_safe_malloc(width * height * sizeof(float));
   if (!temp)
     return;
@@ -68,8 +68,9 @@ static void box_blur(float *channel, int width, int height, int radius,
         }
       }
       float blurred = sum / count;
+      float effective_amount = (mask != NULL) ? mask[y * width + x] * amount : amount;
       channel[y * width + x] =
-          (1.0f - amount) * temp[y * width + x] + amount * blurred;
+          (1.0f - effective_amount) * temp[y * width + x] + effective_amount * blurred;
     }
   }
 
@@ -127,15 +128,15 @@ printf("ACDNR Filter: stddev_l=%f, amount_l=%f, iterations_l=%d, structure_size_
       }
     }
 
-    box_blur(Y, width, height, structure_size_l, amount_l);
+    box_blur(Y, width, height, structure_size_l, amount_l, mask);
 
     allsky_safe_free(mask);
   }
 
   /* Chrominance filter */
   for (int it = 0; it < iterations_c; it++) {
-    box_blur(U, width, height, structure_size_c, amount_c);
-    box_blur(V, width, height, structure_size_c, amount_c);
+    box_blur(U, width, height, structure_size_c, amount_c, NULL);
+    box_blur(V, width, height, structure_size_c, amount_c, NULL);
   }
 
 /* YUV -> RGB */

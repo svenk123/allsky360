@@ -31,16 +31,24 @@ int free_rgbf_on_device_Wrapper(float *rgba_device) {
     return free_rgbf_on_device(rgba_device);
 }
 
-void alloc_rgbf_on_host_Wrapper(size_t size, int pinned) {
-    return alloc_rgbf_on_host(size, pinned);
+void* alloc_rgbf_on_host_Wrapper(size_t size, int mode) {
+    return alloc_rgbf_on_host(size, mode);
 }
 
-void free_rgbf_on_host_Wrapper(void* ptr, int pinned) {
-    return free_rgbf_on_host(ptr, pinned);
+void free_rgbf_on_host_Wrapper(void* ptr, int mode) {
+    free_rgbf_on_host(ptr, mode);
+}
+
+int get_device_ptr_from_mapped_Wrapper(float *host_ptr, float **device_ptr) {
+    return get_device_ptr_from_mapped(host_ptr, device_ptr);
+}
+
+int allsky_cuda_init_Wrapper(void) {
+    return allsky_cuda_init();
 }
 
 #else
-// Use dummy function
+// CPU-only stubs
 int upload_rgbf_to_device_Wrapper(const float *rgba_host, int width, int height, float **rgba_device) {
     (void)rgba_host;
     (void)width;
@@ -65,17 +73,28 @@ int free_rgbf_on_device_Wrapper(float *rgba_device) {
     return 1;
 }
 
-void alloc_rgbf_on_host_Wrapper(size_t size, int pinned) {
+void* alloc_rgbf_on_host_Wrapper(size_t size, int mode) {
     (void)size;
-    (void)pinned;
-    fprintf(stderr, "Alloc RGBF on host CUDA is disabled! Falling back to CPU implementation.\n");
-    return;
+    (void)mode;
+    fprintf(stderr, "alloc_rgbf_on_host: CUDA disabled, use malloc instead.\n");
+    return NULL;
 }
 
-void free_rgbf_on_host_Wrapper(void* ptr, int pinned) {
+void free_rgbf_on_host_Wrapper(void* ptr, int mode) {
     (void)ptr;
-    (void)pinned;
-    fprintf(stderr, "Free RGBF on host CUDA is disabled! Falling back to CPU implementation.\n");
-    return;
+    (void)mode;
+    fprintf(stderr, "free_rgbf_on_host: CUDA disabled.\n");
+}
+
+int get_device_ptr_from_mapped_Wrapper(float *host_ptr, float **device_ptr) {
+    (void)host_ptr;
+    (void)device_ptr;
+    fprintf(stderr, "get_device_ptr_from_mapped: CUDA disabled.\n");
+    return 1;
+}
+
+int allsky_cuda_init_Wrapper(void) {
+    fprintf(stderr, "allsky_cuda_init: CUDA disabled.\n");
+    return 1;
 }
 #endif

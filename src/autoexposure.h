@@ -31,7 +31,7 @@
  * The formula:
  * t(index) = t0 / powf(2.0f, index * ev_steps)
  */
-float calc_exposure_time(float t0, int ev_steps, int index);
+float calc_exposure_time(float t0, float ev_steps, int index);
 
 /**
  * Automatic exposure control calculates the exposure time and gain value based on image brightness.

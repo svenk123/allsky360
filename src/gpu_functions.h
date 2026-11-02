@@ -27,8 +27,10 @@
     #define upload_rgbf_to_device(rgba_host, width, height, rgba_device) upload_rgbf_to_device_Wrapper(rgba_host, width, height, rgba_device)
     #define download_rgbf_from_device(rgba_device, width, height, rgba_host) download_rgbf_from_device_Wrapper(rgba_device, width, height, rgba_host)
     #define free_rgbf_on_device(rgba_device) free_rgbf_on_device_Wrapper(rgba_device)
-    #define alloc_rgbf_on_host(size, pinned) alloc_rgbf_on_host_Wrapper(size, pinned)
-    #define free_rgbf_on_host(ptr, pinned) free_rgbf_on_host_Wrapper(ptr, pinned)
+    #define alloc_rgbf_on_host(size, mode) alloc_rgbf_on_host_Wrapper(size, mode)
+    #define free_rgbf_on_host(ptr, mode) free_rgbf_on_host_Wrapper(ptr, mode)
+    #define get_device_ptr_from_mapped(host_ptr, device_ptr) get_device_ptr_from_mapped_Wrapper(host_ptr, device_ptr)
+    #define allsky_cuda_init() allsky_cuda_init_Wrapper()
 #else
 
     #define CHANNELS	4

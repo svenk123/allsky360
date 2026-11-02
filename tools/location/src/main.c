@@ -128,11 +128,11 @@ int main(int argc, const char *argv[]) {
 
     json_object *jout = json_object_new_object();
 
-    json_object_object_add(jout, "longitude", json_object_new_double(longitude));
+    json_object_object_add(jout, "location_longitude", json_object_new_double(longitude));
     json_object_object_add(jout, "location_latitude", json_object_new_double(latitude));
-    json_object_object_add(jout, "altitude", json_object_new_double(altitude));
+    json_object_object_add(jout, "location_altitude", json_object_new_double(altitude));
     json_object_object_add(jout, "magnetic_declination", json_object_new_double(decl));
-    json_object_object_add(jout, "city", json_object_new_string(config.location_city));
+    json_object_object_add(jout, "location_city", json_object_new_string(config.location_city));
 
     const char *json_str = json_object_to_json_string_ext(jout, JSON_C_TO_STRING_PRETTY);
     if (outfile) {

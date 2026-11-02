@@ -16,32 +16,6 @@ body {
 
 #footer { 
   border-top: 1px solid #444;
-  position: relative;
-}
-
-#footer .copyright {
-  text-align: center;
-  width: 100%;
-}
-
-#footer #widget-config-btn {
-  position: absolute;
-  right: 360px;
-}
-
-#footer #export-layout-btn {
-  position: absolute;
-  right: 240px;
-}
-
-#footer #toggle-grid-btn {
-  position: absolute;
-  right: 120px;
-}
-
-#footer #reset-layout-btn {
-  position: absolute;
-  right: 0;
 }
 
 .title-icon {
@@ -53,28 +27,6 @@ body {
 .title-icon img {
   width: 32px;
   height: 32px;
-}
-
-/* Subheader Styles */
-#subheader, #subheader-additional {
-  background: #222;
-  padding: 1rem;
-  border-radius: 0.5rem;
-  margin-bottom: 1rem;
-  border: 1px solid #444;
-}
-
-.settings-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: center;
-}
-
-.settings-group label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 
 button {
@@ -223,7 +175,7 @@ button:hover {
   max-width: 500px;
   min-height: 100px;
   background: #222;
-  padding: 1rem;
+  //padding: 1rem;
   border-radius: 0.5rem;
   font-size: 0.9rem;
   line-height: 1.5;
@@ -235,17 +187,8 @@ button:hover {
   border: 1px solid #444;
 }
 
-#histogram {
+.histogram-stats {
   margin-top: 0.5rem;
-  background: #222;
-  border: 1px solid #444;
-  width: 100%;
-}
-
-#histogram-stats {
-  font-size: 0.8rem;
-  color: #aaa;
-  margin-top: 0.3rem;
 }
 
 .grid-stack { 
@@ -349,40 +292,6 @@ button:hover {
   max-height: 90vh;
   overflow-y: auto;
   padding-right: 0.5rem;
-}
-
-/* Widget Configuration Modal Styles */
-.widget-config-modal h3 {
-  margin-top: 0;
-  color: #4CAF50;
-}
-
-.widget-config-spacing {
-  margin-bottom: 15px;
-}
-
-.widget-config-buttons {
-  margin-top: 20px;
-  text-align: right;
-}
-
-.widget-config-button {
-  margin-right: 10px;
-  padding: 8px 16px;
-  background: #666;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.widget-config-button-primary {
-  padding: 8px 16px;
-  background: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
 }
 
 .exposure-gallery {
@@ -505,38 +414,4 @@ button:hover {
   #histogram {
     height: 60px !important;
   }
-}
-
-/* Widget Configuration Modal Styles */
-.widget-config-modal h3 {
-  margin-top: 0;
-  color: #4CAF50;
-}
-
-.widget-config-spacing {
-  margin-bottom: 15px;
-}
-
-.widget-config-buttons {
-  margin-top: 20px;
-  text-align: right;
-}
-
-.widget-config-button {
-  margin-right: 10px;
-  padding: 8px 16px;
-  background: #666;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.widget-config-button-primary {
-  padding: 8px 16px;
-  background: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
 }

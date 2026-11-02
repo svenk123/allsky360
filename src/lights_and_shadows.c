@@ -156,6 +156,10 @@ int adjust_black_point_rgbf1(float *rgbf, int width, int height,
   const float black_point = (float)(min_val + black_shift_pct * range);
   const float denom = (float)(range * (1.0 - black_shift_pct));
 
+  /* Guard: nothing to stretch when all pixels have the same luminance */
+  if (denom < 1e-7f)
+    return 0;
+
 #pragma omp parallel for
   for (int i = 0; i < pixel_count; i++) {
     float *px = &rgbf[i * CHANNELS];

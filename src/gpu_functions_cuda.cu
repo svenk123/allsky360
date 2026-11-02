@@ -20,7 +20,8 @@
 #include <stdlib.h>
 #include <stddef.h>
 
-#define CHANNELS 4
+#include "allsky.h"
+#include "gpu_functions_cuda.h"
 
 extern "C" int upload_rgbf_to_device(const float *rgba_host,
     int width, int height,
@@ -159,12 +160,23 @@ extern "C" int free_rgbf_on_device(float *rgba_device) {
     return 0;
 }
 
-extern "C" void* alloc_rgbf_on_host(size_t size, int pinned) {
-    if (pinned) {
-        float *ptr = NULL;
-        cudaError_t st = cudaMallocHost((void**)&ptr, size);
+extern "C" void* alloc_rgbf_on_host(size_t size, int mode) {
+    if (mode == ALLSKY_HOST_ALLOC_MAPPED) {
+        void *ptr = NULL;
+        cudaError_t st = cudaHostAlloc(&ptr, size, cudaHostAllocMapped);
         if (st != cudaSuccess) {
-            printf("alloc_rgbf_on_host: CUDA malloc failed: %s\n", cudaGetErrorString(st));
+            printf("alloc_rgbf_on_host: cudaHostAlloc (mapped) failed: %s\n",
+                   cudaGetErrorString(st));
+            return NULL;
+        }
+        return ptr;
+    }
+    if (mode == ALLSKY_HOST_ALLOC_PINNED) {
+        void *ptr = NULL;
+        cudaError_t st = cudaMallocHost(&ptr, size);
+        if (st != cudaSuccess) {
+            printf("alloc_rgbf_on_host: cudaMallocHost failed: %s\n",
+                   cudaGetErrorString(st));
             return NULL;
         }
         return ptr;
@@ -172,15 +184,77 @@ extern "C" void* alloc_rgbf_on_host(size_t size, int pinned) {
     return (void*)allsky_safe_malloc(size);
 }
 
-extern "C" void free_rgbf_on_host(void* ptr, int pinned) {
+extern "C" void free_rgbf_on_host(void* ptr, int mode) {
     if (!ptr) {
         printf("free_rgbf_on_host: Invalid parameter (NULL pointer)\n");
         return;
     }
-
-    if (pinned) {
+    if (mode == ALLSKY_HOST_ALLOC_MAPPED || mode == ALLSKY_HOST_ALLOC_PINNED) {
         cudaFreeHost(ptr);
         return;
     }
     allsky_safe_free((void*)ptr);
+}
+
+extern "C" int get_device_ptr_from_mapped(float *host_ptr, float **device_ptr) {
+    if (!host_ptr || !device_ptr) {
+        printf("get_device_ptr_from_mapped: Invalid parameters\n");
+        return 1;
+    }
+    cudaError_t st = cudaHostGetDevicePointer((void**)device_ptr, host_ptr, 0);
+    if (st != cudaSuccess) {
+        printf("get_device_ptr_from_mapped: cudaHostGetDevicePointer failed: %s\n",
+               cudaGetErrorString(st));
+        return 1;
+    }
+    return 0;
+}
+
+extern "C" int allsky_cuda_init(void) {
+    cudaError_t st;
+
+    /* cudaSetDeviceFlags must be called before the first CUDA context is
+     * created. cudaDeviceMapHost is required for zero-copy mapped allocations
+     * (cudaHostAllocMapped / cudaHostGetDevicePointer). */
+    st = cudaSetDeviceFlags(cudaDeviceMapHost);
+    if (st != cudaSuccess && st != cudaErrorSetOnActiveProcess) {
+        printf("allsky_cuda_init: cudaSetDeviceFlags failed: %s\n",
+               cudaGetErrorString(st));
+        return 1;
+    }
+
+    st = cudaSetDevice(0);
+    if (st != cudaSuccess) {
+        printf("allsky_cuda_init: cudaSetDevice(0) failed: %s\n",
+               cudaGetErrorString(st));
+        return 1;
+    }
+
+    /* Warm up the CUDA context */
+    st = cudaFree(0);
+    if (st != cudaSuccess) {
+        printf("allsky_cuda_init: CUDA context warm-up failed: %s\n",
+               cudaGetErrorString(st));
+        return 1;
+    }
+
+    cudaDeviceProp prop;
+    st = cudaGetDeviceProperties(&prop, 0);
+    if (st != cudaSuccess) {
+        printf("allsky_cuda_init: cudaGetDeviceProperties failed: %s\n",
+               cudaGetErrorString(st));
+        return 1;
+    }
+
+    printf("allsky_cuda_init: Device '%s' (sm_%d%d), %zu MB, canMapHostMemory=%d\n",
+           prop.name, prop.major, prop.minor,
+           prop.totalGlobalMem / (1024 * 1024),
+           prop.canMapHostMemory);
+
+    if (!prop.canMapHostMemory) {
+        printf("allsky_cuda_init: ERROR - device does not support mapped host memory\n");
+        return 1;
+    }
+
+    return 0;
 }

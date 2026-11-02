@@ -191,13 +191,29 @@ extern "C" int auto_color_calibration_rgbf1_cuda(float *rgba, int width,
   }
 
   // Initialize device memory
-  cudaMemset(d_sum_r, 0, sizeof(double));
-  cudaMemset(d_sum_g, 0, sizeof(double));
-  cudaMemset(d_sum_b, 0, sizeof(double));
-  cudaMemset(d_sum_r2, 0, sizeof(double));
-  cudaMemset(d_sum_g2, 0, sizeof(double));
-  cudaMemset(d_sum_b2, 0, sizeof(double));
-  cudaMemset(d_count, 0, sizeof(int));
+  err = cudaMemset(d_sum_r, 0, sizeof(double));
+  if (err != cudaSuccess) goto wb_cuda_stats_cleanup;
+  err = cudaMemset(d_sum_g, 0, sizeof(double));
+  if (err != cudaSuccess) goto wb_cuda_stats_cleanup;
+  err = cudaMemset(d_sum_b, 0, sizeof(double));
+  if (err != cudaSuccess) goto wb_cuda_stats_cleanup;
+  err = cudaMemset(d_sum_r2, 0, sizeof(double));
+  if (err != cudaSuccess) goto wb_cuda_stats_cleanup;
+  err = cudaMemset(d_sum_g2, 0, sizeof(double));
+  if (err != cudaSuccess) goto wb_cuda_stats_cleanup;
+  err = cudaMemset(d_sum_b2, 0, sizeof(double));
+  if (err != cudaSuccess) goto wb_cuda_stats_cleanup;
+  err = cudaMemset(d_count, 0, sizeof(int));
+  if (err != cudaSuccess) goto wb_cuda_stats_cleanup;
+  goto wb_cuda_stats_ok;
+
+wb_cuda_stats_cleanup:
+  printf("cudaMemset failed: %s\n", cudaGetErrorString(err));
+  cudaFree(d_sum_r); cudaFree(d_sum_g); cudaFree(d_sum_b);
+  cudaFree(d_sum_r2); cudaFree(d_sum_g2); cudaFree(d_sum_b2);
+  cudaFree(d_count);
+  return 1;
+wb_cuda_stats_ok:;
 
   // Launch kernel to compute statistics
   int threads = 256;
@@ -383,7 +399,18 @@ extern "C" int auto_color_calibration_rgbf1_cuda(float *rgba, int width,
   }
 
   // Synchronize to ensure all kernels have completed
-  cudaDeviceSynchronize();
+  err = cudaDeviceSynchronize();
+  if (err != cudaSuccess) {
+    printf("cudaDeviceSynchronize failed: %s\n", cudaGetErrorString(err));
+    cudaFree(d_sum_r);
+    cudaFree(d_sum_g);
+    cudaFree(d_sum_b);
+    cudaFree(d_sum_r2);
+    cudaFree(d_sum_g2);
+    cudaFree(d_sum_b2);
+    cudaFree(d_count);
+    return 1;
+  }
 
   // Cleanup
   cudaFree(d_sum_r);

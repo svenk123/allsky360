@@ -39,8 +39,8 @@
   "hdr_y_max_expected": {"description": "Expected maximum luminance value for HDR processing", "unit": "float", "range": "0-65535", "default": "65535"},
   "hdr_weight_sigma": {"description": "Sigma parameter for Gaussian weight curve in HDR fusion (controls width of bell curve, smaller=sharper, larger=broader)", "unit": "float", "range": "0.1-0.5", "default": "0.25"},
   "hdr_weight_clip_factor": {"description": "Clipping factor for HDR weight calculation (fraction of clipping_threshold where weight reduction starts)", "unit": "float", "range": "0.5-1.0", "default": "0.90"},
-  "hdr_chroma_mode": {"description": "Chroma preservation mode for HDR (0=disabled, 1=linear, 2=best-weighted)", "unit": "integer", "range": "0-2", "default": "2"},
   "hdr_contrast_weight_strength": {"description": "Contrast weighting strength for HDR fusion", "unit": "float", "range": "0-10", "default": "1.0"},
+  "hdr_noise_fusion_strength": {"description": "Downweight short HDR frames where signal is within measured background noise (sigma_noise); 0=off", "unit": "float", "range": "0-1", "default": "1.0"},
   "hdr_pyramid_levels_override": {"description": "Override pyramid levels for HDR (0=auto, 1-10=manual)", "unit": "integer", "range": "0-10", "default": "0"},
   "hdr_weight_maps": {"description": "Enable HDR weight map visualization (1=enabled, 0=disabled)", "unit": "boolean", "range": "0-1", "default": "0"},
   "hdr_weight_stats": {"description": "Show HDR weight statistics (1=enabled, 0=disabled)", "unit": "boolean", "range": "0-1", "default": "0"},
@@ -145,5 +145,6 @@
   "indigoserver": {"description": "IP address or hostname of Indigo server", "unit": "string", "range": "IP address or hostname", "default": "localhost"},
   "indigoport": {"description": "Port number for Indigo server", "unit": "integer", "range": "1-65535", "default": "7624"},
   "indigocamera": {"description": "Name of Indigo camera device", "unit": "string", "range": "text", "default": ""},
+  "indigomount": {"description": "Name of Indigo mount device", "unit": "string", "range": "text", "default": ""},
   "indigo_capture_timeout": {"description": "Timeout for Indigo capture in seconds", "unit": "seconds", "range": "1-300", "default": "60"}
 }

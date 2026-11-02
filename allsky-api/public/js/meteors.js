@@ -2,13 +2,24 @@ function isShowerActive(shower, now) {
   const [startMonth, startDay] = shower.date[0];
   const [endMonth, endDay] = shower.date[1];
   const year = now.getUTCFullYear();
+  const month = now.getUTCMonth() + 1;
 
-  const startDate = new Date(Date.UTC(
-    startMonth > endMonth ? year - 1 : year,
-    startMonth - 1, startDay
-  ));
-
-  const endDate = new Date(Date.UTC(year, endMonth - 1, endDay, 23, 59, 59));
+  let startDate, endDate;
+  if (startMonth > endMonth) {
+    // Crosses year boundary (e.g. Dec → Jan)
+    if (month >= startMonth) {
+      // We are in the start month (e.g. December): shower ends next year
+      startDate = new Date(Date.UTC(year,     startMonth - 1, startDay));
+      endDate   = new Date(Date.UTC(year + 1, endMonth - 1,   endDay, 23, 59, 59));
+    } else {
+      // We are in or before the end month (e.g. January): shower started last year
+      startDate = new Date(Date.UTC(year - 1, startMonth - 1, startDay));
+      endDate   = new Date(Date.UTC(year,     endMonth - 1,   endDay, 23, 59, 59));
+    }
+  } else {
+    startDate = new Date(Date.UTC(year, startMonth - 1, startDay));
+    endDate   = new Date(Date.UTC(year, endMonth - 1,   endDay, 23, 59, 59));
+  }
 
   return now >= startDate && now <= endDate;
 }

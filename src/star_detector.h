@@ -60,6 +60,8 @@ float *load_template_image(const char *filename, int *width_out, int *height_out
  * @param cy: Y-coordinate of the circular ROI center.
  * @param radius: radius of the circular ROI; stars outside are ignored.
  * @param threshold: correlation threshold (0.0–1.0); only matches above this are counted.
+ * @param min_brightness: minimum peak intensity (0.0–1.0) a candidate pixel must have;
+ *                        filters out noise-induced false positives in dark image regions.
  * @param max_stars: maximum number of stars to detect and return.
  * @param stars_out: pointer to store the resulting array of star positions (allocated inside).
  * @param num_stars_out: pointer to store the number of stars found (≤ max_stars).
@@ -67,7 +69,7 @@ float *load_template_image(const char *filename, int *width_out, int *height_out
  */
 int find_stars_template(const float *rgba, int width, int height,
                         const float *template_data, int tpl_width, int tpl_height,
-                        int cx, int cy, int radius, float threshold,
+                        int cx, int cy, int radius, float threshold, float min_brightness,
                         int max_stars, star_position_t **stars_out, int *num_stars_out);
 
 /**

@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Allsky360 – HDR Debug</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Allsky360">
+  <meta name="theme-color" content="#0d1117" />
+
+  <script src="js/allsky-common.js"></script>
+
+  <link rel="stylesheet" href="allsky.css">
+  <style>
+    /* ── SIDEBAR WIDTH ──────────────────────────────────────────── */
+    #left-sidebar { width: 280px; border-right: 1px solid rgba(255,255,255,0.06); }
+
+    /* ── CENTER AREA ────────────────────────────────────────────── */
+    #center-area {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      gap: 9px;
+      overflow: hidden;
+      background: #0d1117;
+    }
+
+    /* ── ALLSKY IMAGE ───────────────────────────────────────────── */
+    #allsky-wrap {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      overflow: hidden;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.02);
+    }
+    #allsky-wrap .pano-label {
+      position: absolute; top: 8px; left: 10px;
+      font-size: 10px; font-weight: 700; color: #6b7280;
+      text-transform: uppercase; letter-spacing: 0.09em;
+      z-index: 2; pointer-events: none;
+    }
+    #image {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .allsky-zoom-controls {
+      position: absolute; top: 6px; right: 8px;
+      display: flex; gap: 4px; z-index: 3;
+    }
+
+    /* ── BOTTOM ROW ─────────────────────────────────────────────── */
+    #bottom-row {
+      display: flex;
+      gap: 9px;
+      flex-shrink: 0;
+      height: 210px;
+    }
+
+    /* ── HDR EXPOSURES CARD ─────────────────────────────────────── */
+    #exposures-card {
+      flex-shrink: 0;
+      padding: 10px 12px;
+    }
+    #exposures-card h3 {
+      font-size: 10px; font-weight: 700; color: #6b7280;
+      text-transform: uppercase; letter-spacing: 0.09em;
+      margin-bottom: 7px;
+    }
+    .exposure-gallery {
+      display: flex;
+      gap: 5px;
+      height: 155px;
+    }
+    .exposure-gallery .exp-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+    .exposure-gallery img {
+      height: 130px;
+      width: auto;
+      border-radius: 6px;
+      object-fit: cover;
+      border: 1px solid rgba(255,255,255,0.1);
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .exposure-gallery img:hover {
+      border-color: rgba(59,130,246,0.6);
+    }
+    .exp-label {
+      font-size: 9px; color: #6b7280; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+
+    /* ── WEIGHT MAPS CARD ───────────────────────────────────────── */
+    #weightmaps-card {
+      flex: 1;
+      min-width: 0;
+      padding: 10px 12px;
+      overflow: hidden;
+    }
+    #weightmaps-card h3 {
+      font-size: 10px; font-weight: 700; color: #6b7280;
+      text-transform: uppercase; letter-spacing: 0.09em;
+      margin-bottom: 7px;
+    }
+    .weightmap-gallery {
+      display: flex;
+      gap: 5px;
+      height: 155px;
+      overflow-x: auto;
+    }
+    .weightmap-gallery .wm-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      flex-shrink: 0;
+    }
+    .weightmap-gallery img {
+      height: 130px;
+      width: auto;
+      border-radius: 6px;
+      object-fit: cover;
+      border: 1px solid rgba(255,255,255,0.1);
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .weightmap-gallery img:hover {
+      border-color: rgba(168,85,247,0.6);
+    }
+    .wm-label {
+      font-size: 9px; color: #6b7280; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    #wm-unavailable {
+      display: none;
+      font-size: 11px; color: #4b5563;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ── ANIMATIONS ─────────────────────────────────────────────── */
+    @keyframes fadeInUp {
+      from { opacity:0; transform:translateY(10px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .card { animation: fadeInUp 0.35s ease-out both; }
+  </style>
+</head>
+
+<body>
+  <div id="nav-menu"           style="display:none;"></div>
+  <div id="hamburger-menu-btn" style="display:none;"></div>
+
+  <!-- ═══════════════════ HEADER ═══════════════════════════════════ -->
+  <header id="app-header">
+    <a class="hdr-brand" href="dashboard.html">
+      <img src="allsky360_256x256.png" alt="Allsky360" width="30" height="30" />
+      <div class="hdr-brand-text">
+        <div class="hdr-title">Allsky360</div>
+        <div class="hdr-crumb">HDR Debug</div>
+      </div>
+    </a>
+
+    <div class="hdr-badges">
+      <span class="badge badge-green">
+        <span class="badge-dot live-pulse"></span>LIVE
+      </span>
+      <span class="badge badge-blue"   id="hdr-timer">-- s</span>
+      <span class="badge badge-orange" id="hdr-mode">--</span>
+      <span class="badge badge-violet" id="hdr-count">-- HDR</span>
+    </div>
+  </header>
+
+  <!-- ═══════════════════ MAIN LAYOUT ══════════════════════════════ -->
+  <div id="main-layout">
+
+    <!-- ── ICON NAV ─────────────────────────────────────────────── -->
+    <nav id="icon-nav">
+      <a href="dashboard.html" class="nav-item" title="Dashboard">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+      </a>
+      <div class="nav-sep"></div>
+      <a href="archive.html" class="nav-item" title="Archive">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="21 8 21 21 3 21 3 8"></polyline>
+          <rect x="1" y="3" width="22" height="5"></rect>
+          <line x1="10" y1="12" x2="14" y2="12"></line>
+        </svg>
+      </a>
+      <a href="videos.html" class="nav-item" title="Videos">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="23 7 16 12 23 17 23 7"></polygon>
+          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+        </svg>
+      </a>
+      <a href="graphs.html" class="nav-item" title="Graphs">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="20" x2="18" y2="10"></line>
+          <line x1="12" y1="20" x2="12" y2="4"></line>
+          <line x1="6"  y1="20" x2="6"  y2="14"></line>
+        </svg>
+      </a>
+      <a href="meteo.html" class="nav-item" title="Weather">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+        </svg>
+      </a>
+      <a href="aurora.html" class="nav-item" title="Aurora">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+      </a>
+      <div class="nav-sep"></div>
+      <a href="aircraft.html" class="nav-item" title="Aircraft">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 16l-4-4V6a2 2 0 0 0-4 0v6l-4 4H3l2 3h5l2-1 2 1h5l2-3z"></path>
+        </svg>
+      </a>
+      <a href="hdr.html" class="nav-item active" title="HDR Debug">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </a>
+      <a href="config.html" class="nav-item" title="Config">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </a>
+    </nav>
+
+    <!-- ── LEFT SIDEBAR ──────────────────────────────────────────── -->
+    <aside id="left-sidebar" class="sidebar">
+
+      <!-- Capture Parameters -->
+      <div class="card">
+        <div id="capture-params"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
+      </div>
+
+      <!-- HDR Configuration -->
+      <div class="card">
+        <div id="hdr-config"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
+      </div>
+
+    </aside>
+
+    <!-- ── CENTER AREA ───────────────────────────────────────────── -->
+    <main id="center-area">
+
+      <!-- Current image -->
+      <div id="allsky-wrap">
+        <div class="pano-label">Live Camera</div>
+        <div class="allsky-zoom-controls">
+          <button class="pano-zoom-btn" onclick="zoomIn()"          title="Zoom in">+</button>
+          <button class="pano-zoom-btn" onclick="zoomOut()"         title="Zoom out">−</button>
+          <button class="pano-zoom-btn" onclick="resetZoomAndPan()" title="Reset">⟳</button>
+        </div>
+        <img id="image" src="" alt="Current allsky image" />
+      </div>
+
+      <!-- Bottom row: exposures + weight maps -->
+      <div id="bottom-row">
+
+        <div class="card" id="exposures-card">
+          <h3>HDR Exposures</h3>
+          <div id="exposure-gallery" class="exposure-gallery"></div>
+        </div>
+
+        <div class="card" id="weightmaps-card">
+          <h3>HDR Weight Maps</h3>
+          <div id="wm-unavailable">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            Enable <code>hdr_weight_maps=1</code> in config.ini
+          </div>
+          <div class="weightmap-gallery" id="weightmap-gallery"></div>
+        </div>
+
+      </div><!-- #bottom-row -->
+
+    </main><!-- #center-area -->
+
+  </div><!-- #main-layout -->
+
+  <script>
+    // ══════════════════════════════════════════════════════════════
+    //  STATE
+    // ══════════════════════════════════════════════════════════════
+    const imageEl        = document.getElementById("image");
+    const captureParamsEl = document.getElementById("capture-params");
+    const hdrConfigEl    = document.getElementById("hdr-config");
+    const exposureGallery = document.getElementById("exposure-gallery");
+    const wmGallery      = document.getElementById("weightmap-gallery");
+    const wmUnavail      = document.getElementById("wm-unavailable");
+
+    let loading          = false;
+    let refreshInterval  = 10;
+    let lastImageLoadTime = Date.now();
+    let timerTimeout     = null;
+    let maxHdrImages     = 1;
+    let hdrWeightMapsEnabled = false;
+
+    const exposureImgs   = [];
+    const wmImgs         = [];
+    const WM_COUNT       = 3;
+
+    let zoomFactor = 1.0;
+    let panX = 0, panY = 0;
+    let isDragging = false, dragStartX = 0, dragStartY = 0;
+
+    const wrap = document.getElementById("allsky-wrap");
+    wrap.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.2 : (1 / 1.2);
+      zoomFactor = Math.max(1.0, zoomFactor * factor);
+      if (zoomFactor === 1.0) { panX = 0; panY = 0; }
+      applyZoom();
+    }, { passive: false });
+    wrap.addEventListener("mousedown", (e) => {
+      isDragging = true;
+      dragStartX = e.clientX - panX;
+      dragStartY = e.clientY - panY;
+    });
+    wrap.addEventListener("mousemove", (e) => {
+      if (!isDragging) return;
+      panX = e.clientX - dragStartX;
+      panY = e.clientY - dragStartY;
+      applyZoom();
+    }, { passive: true });
+    wrap.addEventListener("mouseup",    () => { isDragging = false; });
+    wrap.addEventListener("mouseleave", () => { isDragging = false; });
+
+    function applyZoom() {
+      imageEl.style.transformOrigin = "center center";
+      imageEl.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomFactor})`;
+    }
+    function zoomIn()  { zoomFactor *= 1.2; applyZoom(); }
+    function zoomOut() { zoomFactor = Math.max(1.0, zoomFactor / 1.2); if (zoomFactor === 1.0) { panX = 0; panY = 0; } applyZoom(); }
+    function resetZoomAndPan() { zoomFactor = 1.0; panX = 0; panY = 0; applyZoom(); }
+
+    // ══════════════════════════════════════════════════════════════
+    //  CONFIG
+    // ══════════════════════════════════════════════════════════════
+    async function loadHdrConfig() {
+      const cfg = await fetchConfig();
+      if (!cfg) {
+        hdrConfigEl.innerHTML = '<div style="color:#4b5563;font-size:11px;">Config not available</div>';
+        return;
+      }
+
+      hdrWeightMapsEnabled = parseInt(cfg.hdr_weight_maps) === 1;
+
+      function row(label, val) {
+        if (val === undefined || val === null) return '';
+        return `<div>${label} <span>${val}</span></div>`;
+      }
+
+      hdrConfigEl.innerHTML = `<div class="metadata-section">
+        <h2>HDR Configuration</h2>
+        ${row('HDR exposures', cfg.hdr)}
+        ${row('Day exposure factor', cfg.daytime_hdr_exposure_factor)}
+        ${row('Night exposure factor', cfg.nighttime_hdr_exposure_factor)}
+        <h2>Merge</h2>
+        ${row('Clipping threshold', cfg.hdr_clipping_threshold)}
+        ${row('Min clipped pixels', cfg.hdr_min_clipped_pixels)}
+        ${row('Y max expected', cfg.hdr_y_max_expected)}
+        ${row('Weight sigma', cfg.hdr_weight_sigma)}
+        ${row('Weight clip factor', cfg.hdr_weight_clip_factor)}
+        ${row('Contrast weight strength', cfg.hdr_contrast_weight_strength)}
+        ${row('Noise fusion strength', cfg.hdr_noise_fusion_strength)}
+        ${row('Pyramid levels override', cfg.hdr_pyramid_levels_override)}
+        <h2>Debug Output</h2>
+        ${row('Weight maps', cfg.hdr_weight_maps)}
+        ${row('Weight stats', cfg.hdr_weight_stats)}
+        ${row('Save exposures', cfg.hdr_save_exposures)}
+        <h2>HDR MT</h2>
+        ${row('hdrmt', cfg.hdrmt)}
+      </div>`;
+
+      updateWeightMapsVisibility();
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  LATEST IMAGE
+    // ══════════════════════════════════════════════════════════════
+    async function loadLatestImage() {
+      if (loading) return;
+      loading = true;
+
+      try {
+        const res = await fetch('api/latest_image', { cache: "no-cache" });
+        if (!res.ok) throw new Error("latest_image fetch failed");
+        const latestImageData = await res.json();
+
+        const todayStr      = latestImageData.date;
+        const imageTimeStr  = latestImageData.image;
+        const imageFiletype = latestImageData.filetype;
+        const imageDateTime = `${todayStr}${imageTimeStr}`;
+
+        imageEl.src = `images/${todayStr}/image-${imageDateTime}.${imageFiletype}`;
+
+        // Image metadata
+        let imageMeta = null;
+        try {
+          const r = await fetch(`images/${todayStr}/image-${imageDateTime}.json`, { cache: "no-cache" });
+          imageMeta = await r.json();
+        } catch { /* optional */ }
+
+        if (imageMeta) {
+          maxHdrImages   = imageMeta.hdr ?? 1;
+          refreshInterval = (typeof imageMeta.capture_interval === "number" && imageMeta.capture_interval > 0)
+            ? Math.round(imageMeta.capture_interval) : 10;
+
+          updateHeaderBadges(imageMeta);
+          updateCaptureParams(imageMeta);
+        }
+
+        updateExposureGallery();
+        updateWeightMapsVisibility();
+
+      } catch (err) {
+        console.error("Load error:", err);
+      } finally {
+        loading = false;
+        lastImageLoadTime = Date.now();
+        restartTimer();
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  WIDGETS
+    // ══════════════════════════════════════════════════════════════
+    function updateHeaderBadges(imageMeta) {
+      const modeEl  = document.getElementById('hdr-mode');
+      const countEl = document.getElementById('hdr-count');
+      if (modeEl)  modeEl.textContent  = imageMeta.night_mode ? '🌙 Night' : '☀️ Day';
+      if (countEl) countEl.textContent = `${imageMeta.hdr ?? '?'} HDR`;
+    }
+
+    function updateCaptureParams(imageMeta) {
+      function row(label, val) {
+        if (val === undefined || val === null) return '';
+        return `<div>${label} <span>${val}</span></div>`;
+      }
+      function rowFix(label, val, digits) {
+        if (val === undefined || val === null) return '';
+        return `<div>${label} <span>${(+val).toFixed(digits)}</span></div>`;
+      }
+
+      let html = `<div class="metadata-section">
+        <h2>Capture Parameters</h2>
+        <div>Timestamp <span>${formatTimestamp(imageMeta.timestamp, imageMeta.timezone_offset)}</span></div>
+        ${rowFix('Exposure t0 (s)', imageMeta.exposure_t0, 5)}`;
+      if (imageMeta.hdr > 1) html += rowFix('Exposure t1 (s)', imageMeta.exposure_t1, 5);
+      if (imageMeta.hdr > 2) html += rowFix('Exposure t2 (s)', imageMeta.exposure_t2, 5);
+      if (imageMeta.hdr > 3) html += rowFix('Exposure t3 (s)', imageMeta.exposure_t3, 5);
+      if (imageMeta.hdr > 4) html += rowFix('Exposure t4 (s)', imageMeta.exposure_t4, 5);
+      html += `${rowFix('Gain', imageMeta.gain, 1)}`;
+      if (imageMeta.night_mode) {
+        html += `<h2>Background Noise</h2>`;
+        html += rowFix('BG noise t0', imageMeta.sigma_noise_t0, 8);
+        html += rowFix('BG noise t1', imageMeta.sigma_noise_t1, 8);
+        html += rowFix('BG noise t2', imageMeta.sigma_noise_t2, 8);
+        html += rowFix('BG noise t3', imageMeta.sigma_noise_t3, 8);
+        html += rowFix('BG noise t4', imageMeta.sigma_noise_t4, 8);
+      }
+      html += `<h2>Image Info</h2>
+        ${row('Width',  imageMeta.width  ? imageMeta.width  + ' px' : null)}
+        ${row('Height', imageMeta.height ? imageMeta.height + ' px' : null)}
+        ${rowFix('Sensor temp (°C)', imageMeta.sensor_temperature, 1)}
+        ${rowFix('Mean brightness', imageMeta.mean_brightness, 3)}
+        ${rowFix('Target brightness', imageMeta.target_brightness, 3)}
+        ${rowFix('Focus', imageMeta.focus, 2)}`;
+      if (imageMeta.night_mode) {
+        html += `${row('Stars', imageMeta.stars)}
+          ${rowFix('SQM (mag/arcs²)', imageMeta.sqm, 1)}`;
+      }
+      html += `${row('Interval (s)', imageMeta.capture_interval)}
+        <div>Night mode <span>${imageMeta.night_mode ? '🌙' : '☀️'}</span></div>
+        ${row('HDR exposures', imageMeta.hdr)}
+      </div>`;
+
+      captureParamsEl.innerHTML = html;
+    }
+
+    function updateExposureGallery() {
+      // Remove extra images
+      while (exposureImgs.length > maxHdrImages) {
+        const item = exposureImgs.pop();
+        if (item.parentNode) item.parentNode.remove();
+      }
+      // Add missing images
+      while (exposureImgs.length < maxHdrImages) {
+        const idx = exposureImgs.length;
+        const item = document.createElement("div");
+        item.className = "exp-item";
+        const img = document.createElement("img");
+        img.alt = `t${idx}`;
+        img.title = `Exposure t${idx}`;
+        const lbl = document.createElement("div");
+        lbl.className = "exp-label";
+        lbl.textContent = `t${idx}`;
+        item.appendChild(img);
+        item.appendChild(lbl);
+        exposureGallery.appendChild(item);
+        exposureImgs.push(img);
+      }
+      // Refresh sources with cache-busting
+      const ts = Date.now();
+      for (let i = 0; i < maxHdrImages; i++) {
+        exposureImgs[i].src = `images/latest_image_t${i}.jpg?t=${ts}`;
+      }
+    }
+
+    function updateWeightMapsVisibility() {
+      // Build weight map images once
+      if (wmImgs.length === 0) {
+        for (let i = 0; i < WM_COUNT; i++) {
+          const item = document.createElement("div");
+          item.className = "wm-item";
+          const img = document.createElement("img");
+          img.alt = `Weight map ${i}`;
+          img.title = `HDR Weight Map img${i}`;
+          const lbl = document.createElement("div");
+          lbl.className = "wm-label";
+          lbl.textContent = `img${i}`;
+          item.appendChild(img);
+          item.appendChild(lbl);
+          wmGallery.appendChild(item);
+          wmImgs.push(img);
+        }
+      }
+
+      const ts = Date.now();
+      if (hdrWeightMapsEnabled) {
+        wmUnavail.style.display = 'none';
+        wmGallery.style.display = 'flex';
+        for (let i = 0; i < WM_COUNT; i++) {
+          wmImgs[i].src = `images/hdr_weight_map_img${i}.jpg?t=${ts}`;
+        }
+      } else {
+        wmUnavail.style.display = 'flex';
+        wmGallery.style.display = 'none';
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  TIMER
+    // ══════════════════════════════════════════════════════════════
+    function tick() {
+      const elapsed   = Math.floor((Date.now() - lastImageLoadTime) / 1000);
+      const remaining = Math.max(refreshInterval - elapsed, 0);
+      const timerEl   = document.getElementById('hdr-timer');
+      if (timerEl) timerEl.textContent = `${remaining} s`;
+      if (remaining <= 0 && !loading) loadLatestImage();
+      timerTimeout = setTimeout(tick, 1000);
+    }
+
+    function restartTimer() {
+      if (timerTimeout !== null) clearTimeout(timerTimeout);
+      lastImageLoadTime = Date.now();
+      tick();
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  INIT
+    // ══════════════════════════════════════════════════════════════
+    loadHdrConfig();
+    loadLatestImage();
+  </script>
+</body>
+
+</html>

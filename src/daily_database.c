@@ -32,7 +32,19 @@ int create_daily_database(const char *db_filename) {
     int rc = sqlite3_open(db_filename, &db);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
         return 1;
+    }
+
+
+    /* WAL once per database instead of on every insert: it writes to the
+     * database header and is itself subject to locking. */
+    sqlite3_busy_timeout(db, 5000);
+    rc = sqlite3_exec(db, "PRAGMA journal_mode=WAL;", NULL, NULL, NULL);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Failed to set WAL mode: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return 3;
     }
 
     const char *sql = "CREATE TABLE IF NOT EXISTS image ("
@@ -86,16 +98,14 @@ int insert_measurement(
     int rc = sqlite3_open(db_filename, &db);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
         return 1;
     }
 
-    // Enable WAL mode for crash resilience
-    rc = sqlite3_exec(db, "PRAGMA journal_mode=WAL;", NULL, NULL, NULL);
-    if (rc != SQLITE_OK) {
-	fprintf(stderr, "Failed to set WAL mode: %s\n", sqlite3_errmsg(db));
-	sqlite3_close(db);
-	return 3;
-    }
+    /* Four processes write to the same daily database (camera daemon, aurora,
+     * meteo, location). Without a busy timeout a concurrent writer turns into
+     * SQLITE_BUSY immediately and the measurement is lost (review.md, REL-07). */
+    sqlite3_busy_timeout(db, 5000);
 
     const char *sql = "INSERT INTO image (timestamp, timezone_offset, exposure, gain, brightness, mean_r, mean_g, mean_b, noise, hdr, night_mode, stars, sqm, focus) "
                       "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
@@ -122,7 +132,21 @@ int insert_measurement(
     sqlite3_bind_double(stmt, 13, sqm);
     sqlite3_bind_double(stmt, 14, focus);
 
-    rc = sqlite3_step(stmt);
+    /* Retry a few times: busy_timeout already waits, but a writer that gives up
+     * the lock late can still surface as SQLITE_BUSY here. */
+    int attempt = 0;
+    do {
+        rc = sqlite3_step(stmt);
+        if (rc != SQLITE_BUSY && rc != SQLITE_LOCKED)
+            break;
+        attempt++;
+        fprintf(stderr, "Database busy, retrying insert (%d/3)\n", attempt);
+        sqlite3_reset(stmt);
+    } while (attempt < 3);
+
+    if (rc != SQLITE_DONE)
+        fprintf(stderr, "Insert failed: %s (code %d)\n", sqlite3_errmsg(db), rc);
+
     sqlite3_finalize(stmt);
     sqlite3_close(db);
 

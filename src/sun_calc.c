@@ -22,17 +22,13 @@
 #include <libnova/julian_day.h>
 #include <libnova/transform.h>
 
+#include "sun_calc.h"
+
 int is_sun_below_18_degrees(time_t timestamp, double longitude, double latitude) {
     struct ln_date date;
     struct ln_equ_posn equatorial;
     struct ln_hrz_posn horizontal;
     struct ln_lnlat_posn observer; // Correct structure for the observer position
-
-    /* Optimization: if latitude > 54° or < -54°, sun may never reach -18° */
-    if (latitude > 54.0 || latitude < -54.0) {
-        printf("Latitude |%.2f| > 54° → Sun may never go below -18°.\n", latitude);
-        return 0;
-    }
 
     /* Convert time_t to julian date */
     struct tm *utc_time = gmtime(&timestamp);
@@ -60,43 +56,19 @@ int is_sun_below_18_degrees(time_t timestamp, double longitude, double latitude)
     }
 }
 
+int is_sun_below_angle(time_t timestamp, double longitude, double latitude,
+                       double angle_deg) {
+    double altitude = sun_altitude(timestamp, longitude, latitude);
+    int below = (altitude < angle_deg) ? 1 : 0;
+
+    printf("Sun altitude: %.3f deg, threshold: %.3f deg -> %s\n",
+           altitude, angle_deg, below ? "night" : "day");
+
+    return below;
+}
 
 int is_sun_below_6_degrees(time_t timestamp, double longitude, double latitude) {
-    struct ln_date date;
-    struct ln_equ_posn equatorial;
-    struct ln_hrz_posn horizontal;
-    struct ln_lnlat_posn observer; // Correct structure for the observer position
-
-    /* Latitude optimization: If latitude > 60° or < -60° => sun can never go below -6° */
-    if (latitude > 60.0 || latitude < -60.0) {
-        printf("Latitude is outside the critical range (|%.2f| > 60°). Calculation not required.\n", latitude);
-        return 0; // Sonne geht nie mehr als 6° unter
-    }
-
-    /* Convert time_t to julian date */
-    struct tm *utc_time = gmtime(&timestamp);
-    ln_get_date_from_tm(utc_time, &date);
-    double jd = ln_get_julian_day(&date);
-    printf("Julian date: %.5f\n", jd);
-
-    /* Sun position */
-    ln_get_solar_equ_coords(jd, &equatorial);
-    printf("Solar equatorial (RA, Dec): %.5f, %.5f\n", equatorial.ra, equatorial.dec);
-
-    observer.lat = latitude;
-    observer.lng = longitude;
-
-    /* Convert to horizontal coordinates */
-    ln_get_hrz_from_equ(&equatorial, &observer, jd, &horizontal);
-    printf("Sun altitude: %.5f, azimuth: %.5f\n", horizontal.alt, horizontal.az);
-
-    if (horizontal.alt < -6.0) {
-        printf("The sun is more than 6 degrees below the horizon.\n");
-        return 1;
-    } else {
-        printf("The sun is not yet 6 degrees below the horizon.\n");
-        return 0;
-    }
+    return is_sun_below_angle(timestamp, longitude, latitude, -6.0);
 }
 
 double sun_altitude(time_t timestamp, double longitude, double latitude) {
@@ -151,7 +123,7 @@ int calculate_civil_twilight(int year, int month, int day, double longitude, dou
     struct tm tm_dawn, tm_dusk;
 
     /* Begin of civil twilight (dawn) */
-    ln_get_date(jd + rst.rise, &date);
+    ln_get_date(rst.rise, &date);
     tm_dawn.tm_year = date.years - 1900;
     tm_dawn.tm_mon = date.months - 1;
     tm_dawn.tm_mday = date.days;
@@ -162,7 +134,7 @@ int calculate_civil_twilight(int year, int month, int day, double longitude, dou
     *dawn = timegm(&tm_dawn);
 
     /* End of civil twilight (dusk) */
-    ln_get_date(jd + rst.set, &date);
+    ln_get_date(rst.set, &date);
     tm_dusk.tm_year = date.years - 1900;
     tm_dusk.tm_mon = date.months - 1;
     tm_dusk.tm_mday = date.days;

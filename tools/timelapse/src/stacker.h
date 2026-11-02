@@ -43,6 +43,7 @@ typedef struct {
     float *accum;     // Akkumulierte Daten (float RGB)
     float *accum2;    // Für Sigma-Clipping: quadrierte Werte
     float *background;
+    uint8_t *median_bg;  // Vorberechneter Median-Hintergrund (extern verwaltet)
     size_t count;     // Anzahl gestackter Bilder
     int width;
     int height;
@@ -58,6 +59,14 @@ void update_stack(stack_context_t *ctx, const uint8_t *rgb_data);
 void export_stacked_rgb(const stack_context_t *ctx, uint8_t *rgb_out);
 
 void free_stack_context(stack_context_t *ctx);
+
+// Aktualisiert das Per-Pixel-Histogramm mit einem Frame (uint8 RGB).
+// hist: n_pixels * 256 uint16_t-Werte (hist[pixel*256 + value]).
+void update_pixel_histogram(uint16_t *hist, const uint8_t *rgb, size_t n_pixels);
+
+// Berechnet pixelweisen Median aus einem vorberechneten Histogramm.
+// n_frames: Gesamtanzahl der eingeflossenen Frames (fuer den Median-Schwellwert).
+void build_median_from_histogram(const uint16_t *hist, int n_frames, size_t n_pixels, uint8_t *out);
 
 #ifdef __cplusplus
 }

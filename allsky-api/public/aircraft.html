@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Allsky360 – Aircraft</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Allsky360">
+  <meta name="theme-color" content="#0d1117" />
+
+  <script src="js/allsky-common.js"></script>
+
+  <link rel="stylesheet" href="allsky.css">
+  <style>
+    /* ── SIDEBAR WIDTH ──────────────────────────────────────────── */
+    #left-sidebar { width: 260px; border-right: 1px solid rgba(255,255,255,0.06); }
+
+    /* ── CENTER AREA ────────────────────────────────────────────── */
+    #center-area {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      gap: 9px;
+      overflow: hidden;
+      background: #0d1117;
+    }
+
+    /* ── ALLSKY IMAGE ───────────────────────────────────────────── */
+    #allsky-wrap {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      overflow: hidden;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.02);
+    }
+    #allsky-wrap .pano-label {
+      position: absolute; top: 8px; left: 10px;
+      font-size: 10px; font-weight: 700; color: #6b7280;
+      text-transform: uppercase; letter-spacing: 0.09em;
+      z-index: 2; pointer-events: none;
+    }
+    #image {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .allsky-zoom-controls {
+      position: absolute; top: 6px; right: 8px;
+      display: flex; gap: 4px; z-index: 3;
+    }
+
+    /* ── AIRCRAFT TABLE CARD ────────────────────────────────────── */
+    #aircraft-card {
+      flex-shrink: 0;
+      height: 240px;
+      padding: 10px 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    #aircraft-card h3 {
+      font-size: 10px; font-weight: 700; color: #6b7280;
+      text-transform: uppercase; letter-spacing: 0.09em;
+      margin-bottom: 7px; flex-shrink: 0;
+      display: flex; align-items: center; gap: 8px;
+    }
+    #unit-toggle {
+      font-size: 9px; font-weight: 700; letter-spacing: 0.05em;
+      padding: 2px 7px; border-radius: 4px; cursor: pointer;
+      background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.35);
+      color: #60a5fa; text-transform: none;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    #unit-toggle:hover {
+      background: rgba(59,130,246,0.28); border-color: rgba(59,130,246,0.6);
+    }
+    #aircraft-table-wrap {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: auto;
+    }
+    #aircraft-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    #aircraft-table thead th {
+      position: sticky; top: 0;
+      background: #161b22;
+      color: #6b7280;
+      font-weight: 700;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 4px 8px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    #aircraft-table tbody tr {
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background 0.1s;
+    }
+    #aircraft-table tbody tr:hover { background: rgba(255,255,255,0.04); }
+    #aircraft-table tbody tr.no-pos { opacity: 0.45; }
+    #aircraft-table td {
+      padding: 4px 8px;
+      color: #d1d5db;
+      font-family: monospace;
+    }
+    #aircraft-table td.flight { color: #60a5fa; font-weight: 700; font-family: inherit; }
+    #aircraft-table td.hex    { color: #9ca3af; }
+    #aircraft-table td.alt-cl { color: #34d399; }
+    #aircraft-table td.alt-desc { color: #f87171; }
+    #aircraft-table td.alt-lvl  { color: #d1d5db; }
+    #aircraft-table td.seen-fresh { color: #34d399; }
+    #aircraft-table td.seen-old   { color: #6b7280; }
+    #aircraft-empty {
+      color: #4b5563; font-size: 12px;
+      padding: 20px; text-align: center;
+    }
+
+    /* ── PROCESS STATUS WIDGET ──────────────────────────────────── */
+    .proc-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 0 4px;
+    }
+    .proc-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .proc-dot.running  { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.6); }
+    .proc-dot.stopped  { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.6); }
+    .proc-dot.unknown  { background: #6b7280; }
+    .proc-label.running { color: #22c55e; }
+    .proc-label.stopped { color: #ef4444; }
+    .proc-label.unknown { color: #6b7280; }
+    .proc-name { color: #9ca3af; font-size: 10px; font-weight: 400; }
+
+    /* ── STATS ROWS ─────────────────────────────────────────────── */
+    #sidebar-stats .metadata-section div { display: flex; justify-content: space-between; }
+    #sidebar-stats .metadata-section span { color: #e5e7eb; font-weight: 500; }
+
+    /* ── ANIMATIONS ─────────────────────────────────────────────── */
+    @keyframes fadeInUp {
+      from { opacity:0; transform:translateY(10px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .card { animation: fadeInUp 0.35s ease-out both; }
+  </style>
+</head>
+
+<body>
+  <div id="nav-menu"           style="display:none;"></div>
+  <div id="hamburger-menu-btn" style="display:none;"></div>
+
+  <!-- ═══════════════════ HEADER ═══════════════════════════════════ -->
+  <header id="app-header">
+    <a class="hdr-brand" href="dashboard.html">
+      <img src="allsky360_256x256.png" alt="Allsky360" width="30" height="30" />
+      <div class="hdr-brand-text">
+        <div class="hdr-title">Allsky360</div>
+        <div class="hdr-crumb">Aircraft</div>
+      </div>
+    </a>
+
+    <div class="hdr-badges">
+      <span class="badge badge-green">
+        <span class="badge-dot live-pulse"></span>LIVE
+      </span>
+      <span class="badge badge-blue"   id="ac-count">-- AC</span>
+      <span class="badge badge-violet" id="ac-messages">-- MSG</span>
+      <span class="badge badge-orange" id="ac-updated">--</span>
+    </div>
+  </header>
+
+  <!-- ═══════════════════ MAIN LAYOUT ══════════════════════════════ -->
+  <div id="main-layout">
+
+    <!-- ── ICON NAV ─────────────────────────────────────────────── -->
+    <nav id="icon-nav">
+      <a href="dashboard.html" class="nav-item" title="Dashboard">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+      </a>
+      <div class="nav-sep"></div>
+      <a href="archive.html" class="nav-item" title="Archive">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="21 8 21 21 3 21 3 8"></polyline>
+          <rect x="1" y="3" width="22" height="5"></rect>
+          <line x1="10" y1="12" x2="14" y2="12"></line>
+        </svg>
+      </a>
+      <a href="videos.html" class="nav-item" title="Videos">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="23 7 16 12 23 17 23 7"></polygon>
+          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+        </svg>
+      </a>
+      <a href="graphs.html" class="nav-item" title="Graphs">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="20" x2="18" y2="10"></line>
+          <line x1="12" y1="20" x2="12" y2="4"></line>
+          <line x1="6"  y1="20" x2="6"  y2="14"></line>
+        </svg>
+      </a>
+      <a href="meteo.html" class="nav-item" title="Weather">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+        </svg>
+      </a>
+      <a href="aurora.html" class="nav-item" title="Aurora">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+      </a>
+      <div class="nav-sep"></div>
+      <a href="aircraft.html" class="nav-item active" title="Aircraft">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 16l-4-4V6a2 2 0 0 0-4 0v6l-4 4H3l2 3h5l2-1 2 1h5l2-3z"></path>
+        </svg>
+      </a>
+      <a href="hdr.html" class="nav-item" title="HDR Debug">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </a>
+      <a href="config.html" class="nav-item" title="Config">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </a>
+    </nav>
+
+    <!-- ── LEFT SIDEBAR ──────────────────────────────────────────── -->
+    <aside id="left-sidebar" class="sidebar">
+
+      <!-- dump1090 Process Status -->
+      <div class="card">
+        <div class="metadata-section">
+          <h2>ADS-B Receiver</h2>
+          <div class="proc-status" id="proc-status">
+            <div class="proc-dot unknown" id="proc-dot"></div>
+            <span class="proc-label unknown" id="proc-label">Checking…</span>
+          </div>
+          <div class="proc-name" id="proc-name">dump1090-mutability</div>
+        </div>
+      </div>
+
+      <!-- Location -->
+      <div class="card">
+        <div id="location-widget"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
+      </div>
+
+      <!-- Statistics -->
+      <div class="card" id="sidebar-stats">
+        <div id="stats-content"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
+      </div>
+
+    </aside>
+
+    <!-- ── CENTER AREA ───────────────────────────────────────────── -->
+    <main id="center-area">
+
+      <!-- Current live image -->
+      <div id="allsky-wrap">
+        <div class="pano-label">Live Camera</div>
+        <div class="allsky-zoom-controls">
+          <button class="pano-zoom-btn" onclick="zoomIn()"          title="Zoom in">+</button>
+          <button class="pano-zoom-btn" onclick="zoomOut()"         title="Zoom out">−</button>
+          <button class="pano-zoom-btn" onclick="resetZoomAndPan()" title="Reset">⟳</button>
+        </div>
+        <img id="image" src="" alt="Current allsky image" />
+        <canvas id="compass-canvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:2;"></canvas>
+      </div>
+
+      <!-- Aircraft table -->
+      <div class="card" id="aircraft-card">
+        <h3>Received Aircraft
+          <button id="unit-toggle" onclick="toggleUnits()" title="Toggle units">ft / kt</button>
+        </h3>
+        <div id="aircraft-table-wrap">
+          <div id="aircraft-empty" style="display:none;">No aircraft data available.</div>
+          <table id="aircraft-table">
+            <thead>
+              <tr>
+                <th>Flight</th>
+                <th>ICAO</th>
+                <th>Squawk</th>
+                <th id="th-alt">Alt (m)</th>
+                <th id="th-spd">Spd (km/h)</th>
+                <th>Track (°)</th>
+                <th>Distance</th>
+                <th>V/S (fpm)</th>
+                <th>Cat</th>
+                <th>RSSI</th>
+                <th>Seen (s)</th>
+                <th>Msgs</th>
+              </tr>
+            </thead>
+            <tbody id="aircraft-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </main><!-- #center-area -->
+
+  </div><!-- #main-layout -->
+
+  <script>
+    // ══════════════════════════════════════════════════════════════
+    //  STATE
+    // ══════════════════════════════════════════════════════════════
+    const imageEl    = document.getElementById('image');
+    const tbody      = document.getElementById('aircraft-tbody');
+    const emptyEl    = document.getElementById('aircraft-empty');
+    const tableEl    = document.getElementById('aircraft-table');
+    const procDot    = document.getElementById('proc-dot');
+    const procLabel  = document.getElementById('proc-label');
+
+    // true  = metric:   altitude in m,    speed in km/h
+    // false = imperial: altitude in ft,   speed in kt
+    let useMetric = true;
+
+    // Station coordinates loaded from api/config
+    let locationLat = null;
+    let locationLon = null;
+
+    // Compass / image mask config
+    let imageMaskRadius = null;
+    let imageZenithX    = null;
+    let imageZenithY    = null;
+    let imageNorthAngle = 0;
+
+    let imageLoading     = false;
+    let refreshInterval  = 10;
+    let lastImageLoadTime = Date.now();
+    let timerTimeout     = null;
+
+    let zoomFactor = 1.0;
+    let panX = 0, panY = 0;
+    let isDragging = false, dragStartX = 0, dragStartY = 0;
+
+    const wrap = document.getElementById('allsky-wrap');
+    wrap.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.2 : (1 / 1.2);
+      zoomFactor = Math.max(1.0, zoomFactor * factor);
+      if (zoomFactor === 1.0) { panX = 0; panY = 0; }
+      applyZoom();
+    }, { passive: false });
+    wrap.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      dragStartX = e.clientX - panX;
+      dragStartY = e.clientY - panY;
+    });
+    wrap.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      panX = e.clientX - dragStartX;
+      panY = e.clientY - dragStartY;
+      applyZoom();
+    }, { passive: true });
+    wrap.addEventListener('mouseup',    () => { isDragging = false; });
+    wrap.addEventListener('mouseleave', () => { isDragging = false; });
+
+    function applyZoom() {
+      imageEl.style.transformOrigin = 'center center';
+      imageEl.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomFactor})`;
+      drawCompass();
+    }
+    function zoomIn()  { zoomFactor *= 1.2; applyZoom(); }
+    function zoomOut() { zoomFactor = Math.max(1.0, zoomFactor / 1.2); if (zoomFactor === 1.0) { panX = 0; panY = 0; } applyZoom(); }
+    function resetZoomAndPan() { zoomFactor = 1.0; panX = 0; panY = 0; applyZoom(); }
+
+    // ══════════════════════════════════════════════════════════════
+    //  LIVE IMAGE
+    // ══════════════════════════════════════════════════════════════
+    async function loadLatestImage() {
+      if (imageLoading) return;
+      imageLoading = true;
+      try {
+        const res = await fetch('api/latest_image', { cache: 'no-cache' });
+        if (!res.ok) throw new Error('latest_image fetch failed');
+        const d = await res.json();
+        imageEl.src = `images/${d.date}/image-${d.date}${d.image}.${d.filetype}`;
+
+        let meta = null;
+        try {
+          const r = await fetch(`images/${d.date}/image-${d.date}${d.image}.json`, { cache: 'no-cache' });
+          meta = await r.json();
+        } catch { /* optional */ }
+
+        if (meta && typeof meta.capture_interval === 'number' && meta.capture_interval > 0) {
+          refreshInterval = Math.round(meta.capture_interval);
+        }
+      } catch (err) {
+        console.error('Image load error:', err);
+      } finally {
+        imageLoading = false;
+        lastImageLoadTime = Date.now();
+        restartTimer();
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  TIMER (countdown to next image refresh)
+    // ══════════════════════════════════════════════════════════════
+    function tick() {
+      const elapsed   = Math.floor((Date.now() - lastImageLoadTime) / 1000);
+      const remaining = Math.max(refreshInterval - elapsed, 0);
+      const timerEl   = document.getElementById('ac-updated');
+      if (timerEl) timerEl.textContent = `${remaining} s`;
+      if (remaining <= 0 && !imageLoading) loadLatestImage();
+      timerTimeout = setTimeout(tick, 1000);
+    }
+    function restartTimer() {
+      if (timerTimeout !== null) clearTimeout(timerTimeout);
+      lastImageLoadTime = Date.now();
+      tick();
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  DUMP1090 PROCESS STATUS
+    // ══════════════════════════════════════════════════════════════
+    async function checkProcessStatus() {
+      try {
+        const res = await fetch('api/aircraft/status', { cache: 'no-cache' });
+        const d   = await res.json();
+        setProcessStatus(d.running);
+      } catch {
+        setProcessStatus(null);
+      }
+    }
+
+    function setProcessStatus(running) {
+      procDot.className   = 'proc-dot '   + (running === true ? 'running' : running === false ? 'stopped' : 'unknown');
+      procLabel.className = 'proc-label ' + (running === true ? 'running' : running === false ? 'stopped' : 'unknown');
+      procLabel.textContent = running === true ? 'Running' : running === false ? 'Not running' : 'Unknown';
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  AIRCRAFT DATA
+    // ══════════════════════════════════════════════════════════════
+    async function loadAircraft() {
+      try {
+        const res = await fetch('api/aircraft', { cache: 'no-cache' });
+        if (!res.ok) throw new Error('api/aircraft not available');
+        const d = await res.json();
+        renderAircraft(d);
+      } catch (err) {
+        console.warn('Aircraft data unavailable:', err.message);
+        showEmpty();
+      }
+    }
+
+    function renderAircraft(data) {
+      const aircraft = data.aircraft || [];
+
+      // Update header badges
+      const countEl    = document.getElementById('ac-count');
+      const messagesEl = document.getElementById('ac-messages');
+      if (countEl)    countEl.textContent    = `${aircraft.length} AC`;
+      if (messagesEl) messagesEl.textContent = data.messages ? `${data.messages.toLocaleString()} MSG` : '-- MSG';
+
+      // Update sidebar stats
+      const withPos    = aircraft.filter(a => a.lat !== undefined).length;
+      const statsEl    = document.getElementById('stats-content');
+      statsEl.innerHTML = `<div class="metadata-section">
+        <h2>Statistics</h2>
+        <div>Total aircraft <span>${aircraft.length}</span></div>
+        <div>With position <span>${withPos}</span></div>
+        <div>Total messages <span>${(data.messages || 0).toLocaleString()}</span></div>
+        <div>Last update <span>${formatNow(data.now)}</span></div>
+      </div>`;
+
+      if (aircraft.length === 0) {
+        showEmpty();
+        return;
+      }
+
+      emptyEl.style.display  = 'none';
+      tableEl.style.display  = '';
+
+      // Sort: with position first, then by seen ascending
+      const sorted = [...aircraft].sort((a, b) => {
+        const aPos = a.lat !== undefined ? 0 : 1;
+        const bPos = b.lat !== undefined ? 0 : 1;
+        if (aPos !== bPos) return aPos - bPos;
+        return (a.seen ?? 999) - (b.seen ?? 999);
+      });
+
+      updateTableHeaders();
+
+      tbody.innerHTML = sorted.map(a => {
+        const hasPos  = a.lat !== undefined;
+        const flight  = (a.flight || '').trim();
+        const altFt   = a.altitude;
+        const vr      = a.vert_rate;
+
+        const altDisplay = altFt !== undefined
+          ? (useMetric ? Math.round(altFt * 0.3048).toLocaleString() : altFt.toLocaleString())
+          : null;
+
+        const spdDisplay = a.speed !== undefined
+          ? (useMetric ? Math.round(a.speed * 1.852) : a.speed)
+          : null;
+
+        let altClass = 'alt-lvl';
+        if (vr !== undefined) {
+          if (vr > 128)       altClass = 'alt-cl';
+          else if (vr < -128) altClass = 'alt-desc';
+        }
+
+        const seenClass = (a.seen !== undefined && a.seen < 10) ? 'seen-fresh' : 'seen-old';
+
+        return `<tr class="${hasPos ? '' : 'no-pos'}">
+          <td class="flight">${flight ? escHtml(flight) : '<span style="color:#4b5563">—</span>'}</td>
+          <td class="hex">${escHtml(a.hex || '')}</td>
+          <td>${a.squawk ? escHtml(a.squawk) : '<span style="color:#4b5563">—</span>'}</td>
+          <td class="${altClass}">${altDisplay !== null ? altDisplay : '<span style="color:#4b5563">—</span>'}</td>
+          <td>${spdDisplay !== null ? spdDisplay : '<span style="color:#4b5563">—</span>'}</td>
+          <td>${a.track !== undefined ? a.track + '°' : '<span style="color:#4b5563">—</span>'}</td>
+          <td>${(() => {
+            if (hasPos &&
+                locationLat !== null && locationLon !== null &&
+                isFinite(a.lat) && isFinite(a.lon)) {
+              const d = haversineKm(locationLat, locationLon, a.lat, a.lon);
+              return d.toFixed(1) + ' km';
+            }
+            return '<span style="color:#4b5563">—</span>';
+          })()}</td>
+          <td class="${vr !== undefined && vr > 128 ? 'alt-cl' : vr !== undefined && vr < -128 ? 'alt-desc' : ''}">${vr !== undefined ? (vr > 0 ? '+' : '') + vr : '<span style="color:#4b5563">—</span>'}</td>
+          <td>${a.category ? escHtml(a.category) : '<span style="color:#4b5563">—</span>'}</td>
+          <td>${a.rssi !== undefined ? a.rssi.toFixed(1) : '<span style="color:#4b5563">—</span>'}</td>
+          <td class="${seenClass}">${a.seen !== undefined ? a.seen.toFixed(1) : '—'}</td>
+          <td>${a.messages !== undefined ? a.messages.toLocaleString() : '—'}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function updateTableHeaders() {
+      document.getElementById('th-alt').textContent = useMetric ? 'Alt (m)'    : 'Alt (ft)';
+      document.getElementById('th-spd').textContent = useMetric ? 'Spd (km/h)' : 'Spd (kt)';
+      const btn = document.getElementById('unit-toggle');
+      if (btn) btn.textContent = useMetric ? 'm / km/h' : 'ft / kt';
+    }
+
+    function toggleUnits() {
+      useMetric = !useMetric;
+      loadAircraft();
+    }
+
+    function showEmpty() {
+      tableEl.style.display = 'none';
+      emptyEl.style.display = '';
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function formatNow(unixTs) {
+      if (!unixTs) return '—';
+      const d = new Date(unixTs * 1000);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  CONFIG / LOCATION
+    // ══════════════════════════════════════════════════════════════
+    async function loadConfig() {
+      const cfg = await fetchConfig();
+      if (!cfg) {
+        document.getElementById('location-widget').innerHTML =
+          '<div style="color:#4b5563;font-size:11px;">Config not available</div>';
+        return;
+      }
+
+      const lat = cfg.location_latitude  ?? cfg.latitude  ?? null;
+      const lon = cfg.location_longitude ?? cfg.longitude ?? null;
+      const alt = cfg.location_altitude  ?? cfg.altitude  ?? null;
+
+      if (typeof lat === 'number' && isFinite(lat) &&
+          typeof lon === 'number' && isFinite(lon)) {
+        locationLat = lat;
+        locationLon = lon;
+      }
+
+      // Compass mask params
+      imageMaskRadius = (cfg.image_mask_radius != null) ? parseFloat(cfg.image_mask_radius) : null;
+      imageZenithX    = (cfg.image_zenith_x    != null) ? parseFloat(cfg.image_zenith_x)    : null;
+      imageZenithY    = (cfg.image_zenith_y    != null) ? parseFloat(cfg.image_zenith_y)    : null;
+      imageNorthAngle = (cfg.image_north_angle != null) ? parseFloat(cfg.image_north_angle) : 0;
+      if (isNaN(imageMaskRadius)) imageMaskRadius = null;
+      if (isNaN(imageZenithX))    imageZenithX    = null;
+      if (isNaN(imageZenithY))    imageZenithY    = null;
+      if (isNaN(imageNorthAngle)) imageNorthAngle = 0;
+      drawCompass();
+
+      const latStr = (locationLat !== null) ? locationLat.toFixed(4) : 'N/A';
+      const lonStr = (locationLon !== null) ? locationLon.toFixed(4) : 'N/A';
+      const altStr = (alt !== null && alt !== undefined) ? alt + ' m' : 'N/A';
+      const mapsUrl = (locationLat !== null)
+        ? `https://maps.google.com/?q=${locationLat},${locationLon}`
+        : '#';
+
+      document.getElementById('location-widget').innerHTML = `
+        <div class="metadata-section">
+          <h2>Location</h2>
+          <div>Longitude <span>${lonStr}</span></div>
+          <div>Latitude  <span>${latStr}</span></div>
+          <div>Altitude  <span>${altStr}</span></div>
+          <div style="border:none; margin-top:6px;">
+            <a href="${mapsUrl}" target="_blank">→ Google Maps</a>
+          </div>
+        </div>`;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  COMPASS ROSE
+    // ══════════════════════════════════════════════════════════════
+    function drawCompass() {
+      const canvas = document.getElementById('compass-canvas');
+      if (!canvas) return;
+
+      const conW = wrap.clientWidth;
+      const conH = wrap.clientHeight;
+      canvas.width  = conW;
+      canvas.height = conH;
+
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, conW, conH);
+
+      if (!imageMaskRadius || imageZenithX === null || imageZenithY === null) return;
+      const natW = imageEl.naturalWidth;
+      const natH = imageEl.naturalHeight;
+      if (!natW || !natH) return;
+
+      // Object-fit: contain — compute rendered image bounds
+      const scale = Math.min(conW / natW, conH / natH);
+      const offX  = (conW - natW * scale) / 2;
+      const offY  = (conH - natH * scale) / 2;
+
+      // Map image-pixel coords → canvas coords (including current zoom/pan)
+      // CSS transform: translate(panX,panY) scale(zoomFactor) around container center
+      const ccx = conW / 2, ccy = conH / 2;
+      function img2c(px, py) {
+        const bx = offX + px * scale;
+        const by = offY + py * scale;
+        return {
+          x: (bx - ccx) * zoomFactor + ccx + panX,
+          y: (by - ccy) * zoomFactor + ccy + panY
+        };
+      }
+
+      const c = img2c(imageZenithX, imageZenithY);
+      const r = imageMaskRadius * scale * zoomFactor;
+
+      if (r < 20) return; // too small to draw
+
+      // Adaptive font size
+      const fontSize = Math.max(9, Math.min(13, r / 28));
+
+      ctx.save();
+
+      // ── Ring at mask edge ──────────────────────────────────────
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(210,50,50,0.35)';
+      ctx.lineWidth   = 1;
+      ctx.stroke();
+
+      // ── Ticks + labels every 10° ───────────────────────────────
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+
+      const CARDINALS      = { 0:'N', 90:'E', 180:'S', 270:'W' };
+      const INTERCARDINALS = { 45:'NE', 135:'SE', 225:'SW', 315:'NW' };
+
+      for (let az = 0; az < 360; az += 10) {
+        const isCard  = (az % 90  === 0);
+        const isInter = (az % 45  === 0 && !isCard);
+        const is30    = (az % 30  === 0 && !isCard && !isInter);
+        // remaining multiples of 10 that aren't any of the above
+        const is10    = !isCard && !isInter && !is30;
+
+        // Tick lengths
+        const tickLen = isCard ? 14 : isInter ? 10 : is30 ? 8 : 5;
+
+        // Screen direction: North = "up" (−y), clockwise
+        const screenRad = (imageNorthAngle + az) * Math.PI / 180;
+        const sx =  Math.sin(screenRad);
+        const sy = -Math.cos(screenRad);
+
+        // Outer → inner tick
+        const ox = c.x + sx * r;
+        const oy = c.y + sy * r;
+        const ix = c.x + sx * (r - tickLen);
+        const iy = c.y + sy * (r - tickLen);
+
+        ctx.beginPath();
+        ctx.moveTo(ox, oy);
+        ctx.lineTo(ix, iy);
+        ctx.lineWidth   = isCard ? 2.5 : isInter ? 1.5 : 1;
+        ctx.strokeStyle = isCard
+          ? (az === 0 ? 'rgba(255,70,70,0.95)' : 'rgba(220,60,60,0.90)')
+          : isInter ? 'rgba(200,55,55,0.80)'
+          : is30    ? 'rgba(185,50,50,0.65)'
+          :           'rgba(165,45,45,0.45)';
+        ctx.stroke();
+
+        // Label text and size
+        let label    = null;
+        let lblSize  = fontSize;
+        let lblColor = 'rgba(220,70,70,0.90)';
+
+        if (isCard) {
+          label    = CARDINALS[az];
+          lblSize  = fontSize;
+          lblColor = az === 0 ? 'rgba(255,80,80,1)' : 'rgba(220,70,70,0.95)';
+        } else if (isInter) {
+          label    = INTERCARDINALS[az];
+          lblSize  = fontSize * 0.90;
+          lblColor = 'rgba(210,65,65,0.88)';
+        } else if (is30) {
+          label    = String(az);
+          lblSize  = fontSize * 0.85;
+          lblColor = 'rgba(200,60,60,0.82)';
+        } else {
+          // every unlabeled 10° mark gets a small numeric label
+          label    = String(az);
+          lblSize  = fontSize * 0.72;
+          lblColor = 'rgba(185,52,52,0.65)';
+        }
+
+        if (label) {
+          const gap = isCard ? fontSize * 1.5 + 3
+                    : isInter ? fontSize * 1.3 + 2
+                    : is30    ? fontSize * 1.2 + 2
+                    :           fontSize * 1.0 + 1;
+          const lx = c.x + sx * (r + gap);
+          const ly = c.y + sy * (r + gap);
+          ctx.font      = `bold ${lblSize}px sans-serif`;
+          ctx.fillStyle = lblColor;
+          ctx.fillText(label, lx, ly);
+        }
+      }
+
+      // ── North pointer (filled triangle inside ring) ────────────
+      {
+        const northRad = imageNorthAngle * Math.PI / 180;
+        const nx =  Math.sin(northRad);
+        const ny = -Math.cos(northRad);
+        const tipX  = c.x + nx * (r - 18);
+        const tipY  = c.y + ny * (r - 18);
+        const perpX = -ny, perpY = nx;
+        const base  = 4;
+        ctx.beginPath();
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(tipX - nx * 10 + perpX * base, tipY - ny * 10 + perpY * base);
+        ctx.lineTo(tipX - nx * 10 - perpX * base, tipY - ny * 10 - perpY * base);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255,65,65,0.90)';
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    // Redraw on image load and window resize
+    imageEl.addEventListener('load', drawCompass);
+    window.addEventListener('resize', drawCompass);
+
+    // ══════════════════════════════════════════════════════════════
+    //  DISTANCE (Haversine)
+    // ══════════════════════════════════════════════════════════════
+    function haversineKm(lat1, lon1, lat2, lon2) {
+      const R    = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a    = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                   Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  POLL AIRCRAFT DATA (every 5 s)
+    // ══════════════════════════════════════════════════════════════
+    function startAircraftPolling() {
+      loadAircraft();
+      setInterval(loadAircraft, 5000);
+    }
+
+    // Poll process status every 30 s
+    function startProcessPolling() {
+      checkProcessStatus();
+      setInterval(checkProcessStatus, 30000);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  INIT
+    // ══════════════════════════════════════════════════════════════
+    loadConfig();
+    loadLatestImage();
+    startAircraftPolling();
+    startProcessPolling();
+  </script>
+</body>
+
+</html>

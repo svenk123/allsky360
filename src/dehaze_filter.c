@@ -57,24 +57,24 @@ static void laplacian_filter(const float *src, float *dst, int width,
 }
 
 static float compute_global_haze_level(const float *rgba_image, const float *luma,
-                                int pixel_count, float haze_percent) {
-  int max_valid = pixel_count;
+                                size_t pixel_count, float haze_percent) {
+  size_t max_valid = pixel_count;
   float *valid_luma = allsky_safe_malloc(max_valid * sizeof(float));
   if (!valid_luma)
     return 0.0f; // fallback
 
-  int count = 0;
+  size_t count = 0;
 
 /* Build valid Luma array (ignore fully black RGB pixels) */
-#pragma omp parallel for reduction(+ : count)
-  for (int i = 0; i < pixel_count; ++i) {
-    int idx = i * 4;
+#pragma omp parallel for
+  for (size_t i = 0; i < pixel_count; ++i) {
+    size_t idx = i * 4;
     float r = rgba_image[idx + 0];
     float g = rgba_image[idx + 1];
     float b = rgba_image[idx + 2];
 
     if (!(r == 0.0f && g == 0.0f && b == 0.0f)) {
-      int local_idx;
+      size_t local_idx;
 #pragma omp atomic capture
       local_idx = count++;
       valid_luma[local_idx] = luma[i];
@@ -112,7 +112,7 @@ int perceptual_dehaze_rgbf1_multiscale_full(float *rgba_image, int width,
 
   printf("Perceptual Dehaze: amount=%f, haze_percent=%f\n", amount, haze_percent);
 
-  int pixel_count = width * height;
+  size_t pixel_count = (size_t)width * height;
   float *luma = allsky_safe_malloc(pixel_count * sizeof(float));
   float *lap = allsky_safe_malloc(pixel_count * sizeof(float));
   if (!luma || !lap) {
@@ -123,8 +123,8 @@ int perceptual_dehaze_rgbf1_multiscale_full(float *rgba_image, int width,
 
 /* Step 1: Compute Luminance */
 #pragma omp parallel for
-  for (int i = 0; i < pixel_count; ++i) {
-    int idx = i * 4;
+  for (size_t i = 0; i < pixel_count; ++i) {
+    size_t idx = i * 4;
     float r = rgba_image[idx + 0];
     float g = rgba_image[idx + 1];
     float b = rgba_image[idx + 2];
@@ -140,8 +140,8 @@ int perceptual_dehaze_rgbf1_multiscale_full(float *rgba_image, int width,
 
 /* Step 4: Apply both global haze removal + local contrast boost */
 #pragma omp parallel for
-  for (int i = 0; i < pixel_count; ++i) {
-    int idx = i * 4;
+  for (size_t i = 0; i < pixel_count; ++i) {
+    size_t idx = i * 4;
     float delta = lap[i];
     float grad = fabsf(delta);
     const float epsilon = 5000.0f; // typical value → can be tuned

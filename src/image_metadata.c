@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "atomic_file.h"
 #include "image_metadata.h"
 
 static double round_to_precision(double value, int precision) {
@@ -81,16 +82,15 @@ int save_image_metadata_json(const char *image_filename, const image_metadata_t 
         strcat(json_filename, ".json");
     }
 
-    // Save json file
-    FILE *file = fopen(json_filename, "w");
-    if (!file) {
-        fprintf(stderr, "ERROR: Can not write image %s!\n", json_filename);
+    /* Published atomically: the API and the postprocessing hook read this file
+     * while it is being written (review.md, REL-05). */
+    if (write_text_file_atomic(
+            json_filename,
+            json_object_to_json_string_ext(root, JSON_C_TO_STRING_PRETTY)) != 0) {
+        fprintf(stderr, "ERROR: Can not write image metadata %s!\n", json_filename);
         json_object_put(root);
         return 1;
     }
-
-    fprintf(file, "%s\n", json_object_to_json_string_ext(root, JSON_C_TO_STRING_PRETTY));
-    fclose(file);
 
     printf("JSON meta data file saved: %s\n", json_filename);
     json_object_put(root);

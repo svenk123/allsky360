@@ -95,9 +95,9 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
     const struct HdrFrames frames[MAX_IMAGES], int use_max_images, int width, int height,
     float clipping_threshold, float Y_max_expected,
     float *output_hdr, const char *dump_images_dir, int dump_weight_maps, int dump_weight_stats,
-    int chroma_mode, float contrast_weight_strength, int pyramid_levels_override,
-    float weight_sigma, float weight_clip_factor,
-    float channel_scale_r, float channel_scale_g, float channel_scale_b);
+    float contrast_weight_strength, float noise_fusion_strength,
+    int pyramid_levels_override,
+    float weight_sigma, float weight_clip_factor);
 
 /**
  * Normalizes the HDR RGBF1 image to a target output range.

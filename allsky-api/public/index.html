@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Allsky360 – Live</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Allsky360">
+  <meta name="theme-color" content="#0d1117" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <script src="js/allsky-common.js"></script>
+
+  <link rel="stylesheet" href="allsky.css">
+  <style>
+    /* ── RESPONSIVE BODY (allow scrolling) ──────────────────────── */
+    body {
+      height: auto;
+      min-height: 100vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    /* ── CONTENT WRAPPER ─────────────────────────────────────────── */
+    #content {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* ── TWO-COLUMN LAYOUT ───────────────────────────────────────── */
+    #live-layout {
+      display: grid;
+      grid-template-columns: 1fr 310px;
+      gap: 12px;
+      align-items: start;
+    }
+
+    /* ── ALLSKY IMAGE ────────────────────────────────────────────── */
+    #allsky-wrap {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: #000;
+      aspect-ratio: 1 / 1;
+    }
+    #allsky-img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+    }
+    #img-timestamp {
+      position: absolute;
+      top: 10px; left: 12px;
+      font-size: 11px; font-weight: 600;
+      color: rgba(255,255,255,0.75);
+      text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+      pointer-events: none;
+      letter-spacing: 0.02em;
+    }
+    #img-badges {
+      position: absolute;
+      bottom: 14px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; gap: 6px;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .sky-badge {
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 10px; padding: 3px 9px;
+      font-size: 11px; font-weight: 600; color: #fff;
+      white-space: nowrap;
+    }
+
+    /* ── DATA SIDEBAR ────────────────────────────────────────────── */
+    #data-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* ── RESPONSIVE BREAKPOINTS ──────────────────────────────────── */
+
+    /* Tablet landscape */
+    @media (max-width: 1024px) {
+      #live-layout {
+        grid-template-columns: 1fr 280px;
+      }
+    }
+
+    /* Tablet portrait / large phone landscape → stack vertically */
+    @media (max-width: 720px) {
+      #live-layout {
+        grid-template-columns: 1fr;
+      }
+      #data-sidebar {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    /* Small phone → single column everywhere */
+    @media (max-width: 480px) {
+      #data-sidebar {
+        grid-template-columns: 1fr;
+      }
+      #content {
+        padding: 8px;
+        gap: 8px;
+      }
+      #app-header {
+        padding: 0 10px;
+        gap: 8px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- allsky-common.js registers a click handler that reads these IDs -->
+  <div id="nav-menu"           style="display:none;"></div>
+  <div id="hamburger-menu-btn" style="display:none;"></div>
+
+  <!-- ═══════════════════ HEADER ════════════════════════════════════ -->
+  <header id="app-header">
+    <a class="hdr-brand" href="index.html">
+      <img src="allsky360_256x256.png" alt="Allsky360" width="30" height="30" />
+      <div class="hdr-brand-text">
+        <div class="hdr-title">Allsky360</div>
+        <div class="hdr-crumb">Live</div>
+      </div>
+    </a>
+
+    <div class="hdr-badges">
+      <span class="badge badge-green">
+        <span class="badge-dot live-pulse"></span>LIVE
+      </span>
+      <span class="badge badge-blue"   id="hdr-timer">-- s</span>
+      <span class="badge badge-orange" id="hdr-mode">--</span>
+      <a href="dashboard.html" class="badge badge-gray">Dashboard →</a>
+    </div>
+  </header>
+
+  <!-- ═══════════════════ MAIN CONTENT ══════════════════════════════ -->
+  <div id="content">
+    <div id="live-layout">
+
+      <!-- ── ALLSKY IMAGE ──────────────────────────────────────────── -->
+      <div id="allsky-wrap">
+        <div id="img-timestamp"></div>
+        <img id="allsky-img" src="" alt="Live allsky image" />
+        <div id="img-badges">
+          <span class="sky-badge" id="sky-mode">--</span>
+          <span class="sky-badge" id="sky-stars" style="display:none">-- ★</span>
+          <span class="sky-badge" id="sky-sqm"   style="display:none">SQM --</span>
+        </div>
+      </div>
+
+      <!-- ── DATA SIDEBAR ──────────────────────────────────────────── -->
+      <div id="data-sidebar">
+
+        <div class="card" id="card-camera">
+          <div style="color:#6b7280;font-size:12px;">Loading…</div>
+        </div>
+
+        <div class="card" id="card-sky">
+          <div style="color:#6b7280;font-size:12px;">Loading…</div>
+        </div>
+
+        <div class="card" id="card-weather" style="display:none;"></div>
+
+        <div class="card" id="card-aurora"  style="display:none;"></div>
+
+      </div><!-- #data-sidebar -->
+
+    </div><!-- #live-layout -->
+  </div><!-- #content -->
+
+  <script>
+    // ════════════════════════════════════════════════════════════════
+    //  STATE
+    // ════════════════════════════════════════════════════════════════
+    let loading          = false;
+    let refreshInterval  = 30;
+    let countdown        = refreshInterval;
+    let timerHandle      = null;
+    let lastLoadTime     = 0;
+    let latitude         = 0.0;
+    let longitude        = 0.0;
+    let altitude         = 0;
+    let timezoneOffset   = 0;
+
+    // DOM refs
+    const imgEl          = document.getElementById('allsky-img');
+    const imgTimestamp   = document.getElementById('img-timestamp');
+    const imgBadges      = document.getElementById('img-badges');
+    const hdrTimer       = document.getElementById('hdr-timer');
+    const hdrMode        = document.getElementById('hdr-mode');
+    const skyMode        = document.getElementById('sky-mode');
+    const skyStars       = document.getElementById('sky-stars');
+    const skySqm         = document.getElementById('sky-sqm');
+    const cardCamera     = document.getElementById('card-camera');
+    const cardSky        = document.getElementById('card-sky');
+    const cardWeather    = document.getElementById('card-weather');
+    const cardAurora     = document.getElementById('card-aurora');
+
+    // ════════════════════════════════════════════════════════════════
+    //  COUNTDOWN TIMER
+    // ════════════════════════════════════════════════════════════════
+    function startTimer() {
+      clearInterval(timerHandle);
+      countdown = refreshInterval;
+      hdrTimer.textContent = countdown + ' s';
+      timerHandle = setInterval(() => {
+        countdown--;
+        hdrTimer.textContent = countdown + ' s';
+        if (countdown <= 0) {
+          clearInterval(timerHandle);
+          loadData();
+        }
+      }, 1000);
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  LOAD CONFIG (lat/lon for location card)
+    // ════════════════════════════════════════════════════════════════
+    async function loadConfig() {
+      try {
+        const cfg = await fetchConfig();
+        latitude  = cfg.location_latitude  ?? cfg.latitude  ?? 0.0;
+        longitude = cfg.location_longitude ?? cfg.longitude ?? 0.0;
+        altitude  = cfg.location_altitude  ?? cfg.altitude  ?? 0;
+      } catch { /* ignore */ }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  HELPERS
+    // ════════════════════════════════════════════════════════════════
+    function windDirLabel(deg) {
+      const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+      return dirs[Math.round(deg / 45) % 8];
+    }
+
+    function row(label, value) {
+      return `<div>${label}<span>${value}</span></div>`;
+    }
+
+    function section(title, rows) {
+      return `<div class="metadata-section"><h2>${title}</h2>${rows}</div>`;
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  LOAD DATA
+    // ════════════════════════════════════════════════════════════════
+    async function loadData() {
+      if (loading) return;
+      loading = true;
+
+      try {
+        // ── 1. Latest image pointer ────────────────────────────────
+        const latestRes  = await fetch('api/latest_image', { cache: 'no-cache' });
+        const latestData = await latestRes.json();
+        const todayStr   = latestData.date;
+        const imageTime  = latestData.image;
+        const filetype   = latestData.filetype;
+        const dateTime   = `${todayStr}${imageTime}`;
+
+        const imgSrc = `images/${todayStr}/image-${dateTime}.${filetype}`;
+        if (!imgEl.src.endsWith(imgSrc)) imgEl.src = imgSrc;
+
+        // ── 2. Image metadata JSON ─────────────────────────────────
+        let meta = null;
+        try {
+          const r = await fetch(`images/${todayStr}/image-${dateTime}.json`, { cache: 'no-cache' });
+          meta = await r.json();
+        } catch { /* optional */ }
+
+        // ── 3. Weather ─────────────────────────────────────────────
+        let weather = null;
+        try {
+          const r = await fetch('latest_meteo_data.json', { cache: 'no-cache' });
+          weather = await r.json();
+        } catch { /* optional */ }
+
+        // ── 4. Aurora ──────────────────────────────────────────────
+        let aurora = null;
+        try {
+          const r = await fetch('latest_aurora_data.json', { cache: 'no-cache' });
+          aurora = await r.json();
+        } catch { /* optional */ }
+
+        // ── Update refresh timer ───────────────────────────────────
+        if (meta) {
+          timezoneOffset = meta.timezone_offset ?? 0;
+          refreshInterval = (typeof meta.capture_interval === 'number' && meta.capture_interval > 0)
+            ? Math.round(meta.capture_interval) : 30;
+        }
+        loading = false;
+        lastLoadTime = Date.now();
+        startTimer();
+
+        // ── Update UI ──────────────────────────────────────────────
+        updateUI(meta, weather, aurora);
+
+      } catch (err) {
+        console.error('Load error:', err);
+        loading = false;
+        lastLoadTime = Date.now();
+        startTimer();
+      }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  UPDATE UI
+    // ════════════════════════════════════════════════════════════════
+    function updateUI(meta, weather, aurora) {
+      const isNight = meta?.night_mode ?? false;
+
+      // ── Header badges ──────────────────────────────────────────
+      hdrMode.textContent = isNight ? '🌙 Night' : '☀️ Day';
+
+      // ── Image overlay badges ───────────────────────────────────
+      skyMode.textContent = isNight ? '🌙 Night' : '☀️ Day';
+      if (isNight && meta?.stars != null) {
+        skyStars.textContent = `${meta.stars} ★`;
+        skyStars.style.display = '';
+      } else {
+        skyStars.style.display = 'none';
+      }
+      if (isNight && meta?.sqm != null) {
+        skySqm.textContent = `SQM ${meta.sqm.toFixed(1)}`;
+        skySqm.style.display = '';
+      } else {
+        skySqm.style.display = 'none';
+      }
+
+      // ── Timestamp overlay ──────────────────────────────────────
+      if (meta?.timestamp) {
+        imgTimestamp.textContent = formatTimestamp(meta.timestamp, meta.timezone_offset);
+      }
+
+      // ── Camera card ────────────────────────────────────────────
+      if (meta) {
+        let exposureRows = row('Exposure (s)', meta.exposure_t0.toFixed(5));
+        if (meta.hdr > 1) exposureRows += row('HDR frames', meta.hdr);
+        let cameraRows = exposureRows
+          + row('Gain', meta.gain.toFixed(1));
+        if (meta.focus)              cameraRows += row('Focus', meta.focus.toFixed(2));
+        if (meta.sensor_temperature != null)
+          cameraRows += row('Sensor temp', meta.sensor_temperature.toFixed(1) + ' °C');
+        cameraRows += row('Brightness', meta.mean_brightness.toFixed(2) + ' → ' + meta.target_brightness.toFixed(2));
+        if (meta.capture_interval)
+          cameraRows += row('Interval (s)', meta.capture_interval);
+        cardCamera.innerHTML = section('Camera', cameraRows);
+      } else {
+        cardCamera.innerHTML = '<div style="color:#6b7280;font-size:12px;">No camera data</div>';
+      }
+
+      // ── Sky card ───────────────────────────────────────────────
+      {
+        let skyRows = '';
+        if (meta) {
+          if (isNight && meta.stars != null)
+            skyRows += row('Stars detected', meta.stars);
+          if (isNight && meta.sqm != null)
+            skyRows += row('SQM (mag/arcs²)', meta.sqm.toFixed(1));
+          if (meta.sun_altitude != null)
+            skyRows += row('Sun altitude (°)', meta.sun_altitude.toFixed(1));
+          if (meta.moon_altitude != null)
+            skyRows += row('Moon altitude (°)', meta.moon_altitude.toFixed(1));
+          if (meta.moon_phase_percentage != null)
+            skyRows += row('Moon phase (%)', meta.moon_phase_percentage.toFixed(1));
+        }
+        if (latitude !== 0 || longitude !== 0) {
+          skyRows += `<div style="border:none; margin-top:6px;">
+            <a href="https://maps.google.com/?q=${latitude},${longitude}" target="_blank">
+              📍 ${latitude.toFixed(4)}, ${longitude.toFixed(4)}
+            </a>
+          </div>`;
+        }
+        cardSky.innerHTML = skyRows
+          ? section('Sky & Location', skyRows)
+          : '<div style="color:#6b7280;font-size:12px;">No sky data</div>';
+      }
+
+      // ── Weather card ───────────────────────────────────────────
+      if (weather) {
+        const cloudColor = (pct) =>
+          `<span style="display:inline-block;width:1.2em;height:0.8em;background:${cloudCoverToRGB(pct)};border-radius:2px;vertical-align:middle;margin-left:4px;"></span>`;
+        const weatherRows =
+            row('Temperature',    weather.temperature.toFixed(1) + ' °C')
+          + row('Humidity',        weather.humidity.toFixed(0) + ' %')
+          + row('Dew point',       weather.dew_point.toFixed(1) + ' °C')
+          + row('Pressure',        weather.pressure_msl.toFixed(0) + ' hPa')
+          + row('Cloud low (%)',   weather.cloud_low.toFixed(0) + cloudColor(weather.cloud_low))
+          + row('Cloud mid (%)',   weather.cloud_mid.toFixed(0) + cloudColor(weather.cloud_mid))
+          + row('Cloud high (%)',  weather.cloud_high.toFixed(0) + cloudColor(weather.cloud_high))
+          + row('Visibility',      (weather.visibility * 0.001).toFixed(0) + ' km')
+          + row('Wind 10 m',       weather.wind_speed_10m.toFixed(1) + ' km/h ' + windDirLabel(weather.wind_dir_10m))
+          + row('Jetstream',       weather.wind_speed_300hPa.toFixed(0) + ' km/h · ' + getSeeingLabel(weather.wind_speed_300hPa));
+        cardWeather.innerHTML = section('Weather', weatherRows);
+        cardWeather.style.display = '';
+      } else {
+        cardWeather.style.display = 'none';
+      }
+
+      // ── Aurora card ────────────────────────────────────────────
+      if (aurora) {
+        const bzColor = aurora.bz < 0 ? '#22c55e' : '#9ca3af';
+        const auroraRows =
+            row('Kp Index',          aurora.kp_index.toFixed(1))
+          + row('Probability (%)',   aurora.probability_percent.toFixed(1))
+          + row('Max prob. (%)',     aurora.probability_max.toFixed(1))
+          + row('Bt (nT)',           aurora.bt.toFixed(1))
+          + `<div>Bz (nT)<span style="color:${bzColor}">${aurora.bz.toFixed(1)}</span></div>`
+          + row('SW Speed (km/s)',   aurora.speed)
+          + row('SW Density',        aurora.density)
+          + row('SW Temp (K)',        aurora.temperature);
+        cardAurora.innerHTML = section('Aurora & Space Weather', auroraRows);
+        cardAurora.style.display = '';
+      } else {
+        cardAurora.style.display = 'none';
+      }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  INIT
+    // ════════════════════════════════════════════════════════════════
+    loadConfig();
+    loadData();
+  </script>
+
+</body>
+</html>
