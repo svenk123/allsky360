@@ -78,8 +78,13 @@ int init_encoder_nvenc(const char *filename, int w, int h, int fps) {
   height = h;
   codec_ctx->width = width;
   codec_ctx->height = height;
+  /* yuv420p + H.264 High profile: plays in every browser incl. Safari/iOS */
   codec_ctx->pix_fmt = AV_PIX_FMT_YUV420P;
-  codec_ctx->bit_rate = 4000000;
+  /* Quality-based rate control (CRF, set below) with a peak cap, so the file
+   * stays streamable over slow links; no fixed average bitrate. */
+  codec_ctx->bit_rate = 0;
+  codec_ctx->rc_max_rate = 4000000;
+  codec_ctx->rc_buffer_size = 8000000;
 
   // Set framerate and timebase
   AVRational fps1 = {fps, 1};
@@ -88,10 +93,10 @@ int init_encoder_nvenc(const char *filename, int w, int h, int fps) {
   codec_ctx->framerate = fps1;
   codec_ctx->time_base = time_base;
 
-  // Encoder tuning
-  codec_ctx->gop_size = 10;
-  codec_ctx->max_b_frames = 1;
-  codec_ctx->flags |= AV_CODEC_FLAG_LOW_DELAY;
+  // Encoder tuning for files (VOD), not live streaming: a keyframe every
+  // 2 seconds keeps seeking fast, B-frames and lookahead stay enabled.
+  codec_ctx->gop_size = fps * 2 > 0 ? fps * 2 : 10;
+  codec_ctx->max_b_frames = 2;
 
   if (fmt_ctx->oformat->flags & AVFMT_GLOBALHEADER)
     codec_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
@@ -102,7 +107,8 @@ int init_encoder_nvenc(const char *filename, int w, int h, int fps) {
   // Libx264 options
   AVDictionary *opts = NULL;
   av_dict_set(&opts, "preset", "slow", 0);
-  av_dict_set(&opts, "tune", "zerolatency", 0);
+  av_dict_set(&opts, "crf", "23", 0);
+  av_dict_set(&opts, "profile", "high", 0);
 
   if (avcodec_open2(codec_ctx, codec, &opts) < 0) {
     fprintf(stderr, "[ERROR] Failed to open encoder.\n");
@@ -126,10 +132,19 @@ int init_encoder_nvenc(const char *filename, int w, int h, int fps) {
     }
   }
 
-  if (avformat_write_header(fmt_ctx, NULL) < 0) {
+  /* MP4/MOV: move the index (moov atom) to the start of the file when it is
+   * finalised ("faststart"), so browsers can start playing and seeking
+   * before the whole file is downloaded. */
+  AVDictionary *mux_opts = NULL;
+  if (format && (strcmp(format, "mp4") == 0 || strcmp(format, "mov") == 0))
+    av_dict_set(&mux_opts, "movflags", "+faststart", 0);
+
+  if (avformat_write_header(fmt_ctx, &mux_opts) < 0) {
     fprintf(stderr, "[ERROR] Failed to write stream header.\n");
+    av_dict_free(&mux_opts);
     return -1;
   }
+  av_dict_free(&mux_opts);
 
   av_dump_format(fmt_ctx, 0, filename, 1);
 
