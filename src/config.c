@@ -16,21 +16,73 @@
  *
  *****************************************************************************/
 #include <limits.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <json-c/json.h>
 
+#include "atomic_file.h"
 #include "config.h"
+#include "coordinates.h"
+
+/* Unknown keys are reported only on the first load (see load_config()). */
+static int warn_unknown_keys = 1;
+
+/* Maximum length of one line and of one value in config.ini */
+#define CONFIG_LINE_MAX 1024
+#define CONFIG_VALUE_MAX 512
+
+/**
+ * Copy a string value into a fixed-size config field.
+ * Reports values that do not fit instead of silently truncating them
+ * (a cut-off directory path otherwise only shows up as a confusing
+ * "directory does not exist" error later on).
+ */
+static void config_copy_string(char *dst, size_t dst_size, const char *key,
+                               const char *value) {
+  size_t len = strlen(value);
+
+  if (len >= dst_size && warn_unknown_keys)
+    fprintf(stderr,
+            "WARNING: config.ini: value of '%s' is %zu characters long, "
+            "only %zu are supported - it is truncated\n",
+            key, len, dst_size - 1);
+
+  snprintf(dst, dst_size, "%.*s", (int)dst_size - 1, value);
+}
 
 int load_config(const char *filename, config_t *config) {
+  if (!filename || !config)
+    return 1;
+
+  /* config_t is an uninitialised local in the caller. Zero it first so that a
+   * field whose key is missing from config.ini can never hold stack garbage,
+   * even if someone adds a struct member without a default below. */
+  memset(config, 0, sizeof(*config));
+
   FILE *file = fopen(filename, "r");
   if (!file) {
     return 1;
   }
 
   // Set default values
+  config->daytime_capture = 1;
+  config->daytime_meanbrightness = 0.20;
+  config->nighttime_meanbrightness = 0.15;
+  config->nighttime_fullmoongain = 0;
+  /* Radius of the auto-exposure brightness measurement, as a fraction
+   * (0.0 - 1.0) of image_horizon_radius. */
+  config->measure_brightness_area = 0.55;
+  config->crop_image = 0;
+  config->crop_width = 0;
+  config->crop_height = 0;
+  config->crop_x_offset = 0;
+  config->crop_y_offset = 0;
+  config->rotate_image = 0;
+  snprintf(config->indigoservername, sizeof(config->indigoservername),
+           "indigo_server");
   config->daytime_startexposure = 0.05;
   config->daytime_startgain = 0.0;
   config->daytime_move_blackpoint = 0.05;
@@ -68,13 +120,21 @@ int load_config(const char *filename, config_t *config) {
   config->hdr_y_max_expected = 1.0;
   config->hdr_weight_sigma = 0.25;
   config->hdr_weight_clip_factor = 0.90;
-  config->hdr_chroma_mode = 2;
   config->hdr_contrast_weight_strength = 0.5;
+  config->hdr_noise_fusion_strength = 1.0;
   config->hdr_pyramid_levels_override = 6;
   config->hdr_weight_maps = 0;
   config->hdr_weight_stats = 0;
   config->hdr_save_exposures = 1;
   config->hdrmt = 0;
+
+  config->spektrum_enabled = 0;
+  config->spektrum_cx = -1;
+  config->spektrum_cy = -1;
+  config->spektrum_radius = 50;
+  config->spektrum_regularization = 0.01;
+  snprintf(config->spektrum_output_path, sizeof(config->spektrum_output_path),
+           "images/spektrum.json");
 
   config->autostretch = 1;
   config->autostretch_min_val = 0.01;
@@ -91,6 +151,17 @@ int load_config(const char *filename, config_t *config) {
   config->acdnr_filter_chrom_kernel_size = 5;
 
   config->gamma = 0.8;
+  config->auto_gamma = 0;
+  config->auto_gamma_target = 0.18;
+  config->auto_gamma_min = 0.15;
+  config->auto_gamma_max = 1.2;
+  config->reinhard_tonemap = 0;
+  config->reinhard_white_point = 0.0;
+
+  config->tone_curve = 0;
+  config->tone_curve_shadow_lift = 0.2;
+  config->tone_curve_midtone_contrast = 0.3;
+
   config->saturation = 2.8;
 
   config->dehaze_amount = 0.8;
@@ -124,11 +195,14 @@ int load_config(const char *filename, config_t *config) {
   config->sqm = 0;
   config->sqm_max_stars = 1000;
   config->sqm_threshold = 0.7f;
+  config->sqm_min_brightness = 0.05f;
   config->sqm_radius = 0;
+  config->sqm_center_x = 0;
+  config->sqm_center_y = 0;
   config->sqm_template[0] = '\0';
   config->sqm_star_size = 7;
-  config->sqm_star_sigma = 2.5f;
-  config->sqm_intercept = 23.0f;
+  config->sqm_star_sigma = 2.0f;
+  config->sqm_intercept = 18.0f;
   config->sqm_slope = 1.5f;
 
   config->debug_raw_exposures = 0;
@@ -177,8 +251,22 @@ int load_config(const char *filename, config_t *config) {
   snprintf(config->location_owner, sizeof(config->location_owner), "Max Mustermann");
 
   config->capture_interval = 120;
+
+  config->publish_exact_location = 1;
+
+  snprintf(config->postprocessing_script, sizeof(config->postprocessing_script),
+           "/opt/allsky360/scripts/postprocessing.sh");
+  snprintf(config->endofnight_script, sizeof(config->endofnight_script),
+           "/opt/allsky360/scripts/endofnight.sh");
+
+  config->retention = 1;
+  config->retention_max_days = 365;
+  config->retention_max_size_gb = 500.0;
+  config->retention_keep_days = 2;
+  config->retention_dry_run = 0;
   snprintf(config->working_directory, sizeof(config->working_directory), "/opt/allsky360");
   snprintf(config->image_directory, sizeof(config->image_directory), "/home/allskyuser/images");
+  snprintf(config->raw_dump_directory, sizeof(config->raw_dump_directory), "/home/allskyuser/raw");
   snprintf(config->video_directory, sizeof(config->video_directory), "/home/allskyuser/videos");
   snprintf(config->database_directory, sizeof(config->database_directory), "/home/allskyuser/database");
 
@@ -187,23 +275,67 @@ int load_config(const char *filename, config_t *config) {
   config->lens_focallength = 2.1;
   config->lens_focalratio = 1.6;
 
-  snprintf(config->indigoserver, sizeof(config->indigoservername), "remote");
   snprintf(config->indigoserver, sizeof(config->indigoserver), "127.0.0.1");
   config->indigoport = 7624;
   snprintf(config->indigocamera, sizeof(config->indigocamera),
            "Uranus-C @ localhost");
+  config->indigomount[0] = '\0';
   config->indigo_capture_timeout = 20;
 
-  char line[256], key[50], value[100];
+  char line[CONFIG_LINE_MAX], key[64], value[CONFIG_VALUE_MAX];
   while (fgets(line, sizeof(line), file)) {
-    if (line[0] == '#' || strlen(line) < 3)
+    /* A line without '\n' that is not the last one did not fit into the
+     * buffer. Skip the rest of it instead of parsing the remainder as a new
+     * line, and do not use the truncated part either. */
+    if (!strchr(line, '\n') && !feof(file)) {
+      int c;
+      while ((c = fgetc(file)) != EOF && c != '\n')
+        ;
+      if (warn_unknown_keys)
+        fprintf(stderr,
+                "WARNING: config.ini: line longer than %d characters "
+                "ignored: %.40s...\n",
+                CONFIG_LINE_MAX - 1, line);
+      continue;
+    }
+
+    char *trim_line = strtok(line, "\n");
+    if (!trim_line)
       continue;
 
-    // Remove spaces
-    char *trim_line = strtok(line, "\n");
+    /* Skip leading blanks so that indented keys and comments behave the same
+     * as unindented ones. */
+    while (*trim_line == ' ' || *trim_line == '\t' || *trim_line == '\r')
+      trim_line++;
 
-    if (sscanf(trim_line, "%49[^=] = \"%99[^\"]\"", key, value) == 2 ||
-        sscanf(trim_line, "%49[^=] = %99s", key, value) == 2) {
+    if (*trim_line == '\0' || *trim_line == '#')
+      continue;
+
+    /* The widths must match key[64] and value[CONFIG_VALUE_MAX] above */
+    if (sscanf(trim_line, "%63[^=] = \"%511[^\"]\"", key, value) == 2 ||
+        sscanf(trim_line, "%63[^=] = %511[^\n]", key, value) == 2) {
+      /* Unquoted values run to the end of the line. "%s" used to stop at
+       * the first blank and silently drop the rest, e.g. the 'S' of
+       * "33.9249 S" or everything after "Uranus-C" in a camera name.
+       * Only trailing blanks are removed. */
+      size_t value_len = strlen(value);
+      while (value_len > 0 && (value[value_len - 1] == ' ' ||
+                               value[value_len - 1] == '\t' ||
+                               value[value_len - 1] == '\r'))
+        value[--value_len] = '\0';
+
+      /* "%49[^=]" matches everything up to '=', including the blanks in
+       * "key = value". Strip them, otherwise every strcmp() below fails and
+       * the setting is silently ignored. */
+      size_t key_len = strlen(key);
+      while (key_len > 0 && (key[key_len - 1] == ' ' ||
+                             key[key_len - 1] == '\t' ||
+                             key[key_len - 1] == '\r'))
+        key[--key_len] = '\0';
+
+      if (key_len == 0)
+        continue;
+
       if (strcmp(key, "daytime_capture") == 0)
         config->daytime_capture = atoi(value);
       else if (strcmp(key, "daytime_startexposure") == 0)
@@ -288,10 +420,10 @@ int load_config(const char *filename, config_t *config) {
         config->hdr_weight_sigma = atof(value);
       else if (strcmp(key, "hdr_weight_clip_factor") == 0)
         config->hdr_weight_clip_factor = atof(value);
-      else if (strcmp(key, "hdr_chroma_mode") == 0)
-        config->hdr_chroma_mode = atoi(value);
       else if (strcmp(key, "hdr_contrast_weight_strength") == 0)
         config->hdr_contrast_weight_strength = atof(value);
+      else if (strcmp(key, "hdr_noise_fusion_strength") == 0)
+        config->hdr_noise_fusion_strength = atof(value);
       else if (strcmp(key, "hdr_pyramid_levels_override") == 0)
         config->hdr_pyramid_levels_override = atoi(value);
       else if (strcmp(key, "hdr_weight_maps") == 0)
@@ -302,6 +434,20 @@ int load_config(const char *filename, config_t *config) {
         config->hdr_save_exposures = atoi(value);
       else if (strcmp(key, "hdrmt") == 0)
         config->hdrmt = atoi(value);
+
+      else if (strcmp(key, "spektrum_enabled") == 0)
+        config->spektrum_enabled = atoi(value);
+      else if (strcmp(key, "spektrum_cx") == 0)
+        config->spektrum_cx = atoi(value);
+      else if (strcmp(key, "spektrum_cy") == 0)
+        config->spektrum_cy = atoi(value);
+      else if (strcmp(key, "spektrum_radius") == 0)
+        config->spektrum_radius = atoi(value);
+      else if (strcmp(key, "spektrum_regularization") == 0)
+        config->spektrum_regularization = atof(value);
+      else if (strcmp(key, "spektrum_output_path") == 0)
+        config_copy_string(config->spektrum_output_path, sizeof(config->spektrum_output_path), key,
+                           value);
 
       else if (strcmp(key, "autostretch") == 0)
         config->autostretch = atoi(value);
@@ -332,6 +478,25 @@ int load_config(const char *filename, config_t *config) {
 
       else if (strcmp(key, "gamma") == 0)
         config->gamma = atof(value);
+      else if (strcmp(key, "auto_gamma") == 0)
+        config->auto_gamma = atoi(value);
+      else if (strcmp(key, "auto_gamma_target") == 0)
+        config->auto_gamma_target = atof(value);
+      else if (strcmp(key, "auto_gamma_min") == 0)
+        config->auto_gamma_min = atof(value);
+      else if (strcmp(key, "auto_gamma_max") == 0)
+        config->auto_gamma_max = atof(value);
+      else if (strcmp(key, "reinhard_tonemap") == 0)
+        config->reinhard_tonemap = atoi(value);
+      else if (strcmp(key, "reinhard_white_point") == 0)
+        config->reinhard_white_point = atof(value);
+      else if (strcmp(key, "tone_curve") == 0)
+        config->tone_curve = atoi(value);
+      else if (strcmp(key, "tone_curve_shadow_lift") == 0)
+        config->tone_curve_shadow_lift = atof(value);
+      else if (strcmp(key, "tone_curve_midtone_contrast") == 0)
+        config->tone_curve_midtone_contrast = atof(value);
+
       else if (strcmp(key, "saturation") == 0)
         config->saturation = atof(value);
 
@@ -372,9 +537,8 @@ int load_config(const char *filename, config_t *config) {
       else if (strcmp(key, "scnr_filter_amount") == 0)
         config->scnr_filter_amount = atof(value);
       else if (strcmp(key, "scnr_filter_protection") == 0)
-        snprintf(config->scnr_filter_protection,
-                 sizeof(config->scnr_filter_protection), "%.*s",
-                 (int)sizeof(config->scnr_filter_protection) - 1, value);
+        config_copy_string(config->scnr_filter_protection, sizeof(config->scnr_filter_protection), key,
+                           value);
 
       else if (strcmp(key, "wavelet_sharpen") == 0)
         config->wavelet_sharpen = atoi(value);
@@ -391,11 +555,17 @@ int load_config(const char *filename, config_t *config) {
         config->sqm_max_stars = atoi(value);
       else if (strcmp(key, "sqm_threshold") == 0)
         config->sqm_threshold = atof(value);
+      else if (strcmp(key, "sqm_min_brightness") == 0)
+        config->sqm_min_brightness = atof(value);
       else if (strcmp(key, "sqm_radius") == 0)
         config->sqm_radius = atoi(value);
+      else if (strcmp(key, "sqm_center_x") == 0)
+        config->sqm_center_x = atoi(value);
+      else if (strcmp(key, "sqm_center_y") == 0)
+        config->sqm_center_y = atoi(value);
       else if (strcmp(key, "sqm_template") == 0)
-        snprintf(config->sqm_template, sizeof(config->sqm_template), "%.*s",
-                 (int)sizeof(config->sqm_template) - 1, value);
+        config_copy_string(config->sqm_template, sizeof(config->sqm_template), key,
+                           value);
       else if (strcmp(key, "sqm_star_size") == 0)
         config->sqm_star_size = atoi(value);
       else if (strcmp(key, "sqm_star_sigma") == 0)
@@ -431,14 +601,14 @@ int load_config(const char *filename, config_t *config) {
       else if (strcmp(key, "camera_b_factor") == 0)
         config->camera_b_factor = atof(value);
       else if (strcmp(key, "camera_debayer") == 0)
-        snprintf(config->camera_debayer, sizeof(config->camera_debayer), "%.*s",
-                 (int)sizeof(config->camera_debayer) - 1, value);
+        config_copy_string(config->camera_debayer, sizeof(config->camera_debayer), key,
+                           value);
 
       else if (strcmp(key, "jpeg_quality") == 0)
         config->jpeg_quality = atoi(value);
       else if (strcmp(key, "lens_name") == 0)
-        snprintf(config->lens_name, sizeof(config->lens_name), "%.*s",
-                 (int)sizeof(config->lens_name) - 1, value);
+        config_copy_string(config->lens_name, sizeof(config->lens_name), key,
+                           value);
       else if (strcmp(key, "lens_focallength") == 0)
         config->lens_focallength = atof(value);
       else if (strcmp(key, "lens_focalratio") == 0)
@@ -463,8 +633,8 @@ int load_config(const char *filename, config_t *config) {
         config->focus_radius = atoi(value);
 
       else if (strcmp(key, "font_path") == 0)
-        snprintf(config->font_path, sizeof(config->font_path), "%.*s",
-                 (int)sizeof(config->font_path) - 1, value);
+        config_copy_string(config->font_path, sizeof(config->font_path), key,
+                           value);
       else if (strcmp(key, "font_size") == 0)
         config->font_size = atoi(value);
 
@@ -499,50 +669,139 @@ int load_config(const char *filename, config_t *config) {
       else if (strcmp(key, "panorama_horizontal_start") == 0)
         config->panorama_horizontal_start = atoi(value);
 
-      else if (strcmp(key, "location_latitude") == 0)
-        config->location_latitude = atof(value);
-      else if (strcmp(key, "location_longitude") == 0)
-        config->location_longitude = atof(value);
+      else if (strcmp(key, "location_latitude") == 0 ||
+               strcmp(key, "location_longitude") == 0) {
+        int is_latitude = (strcmp(key, "location_latitude") == 0);
+        double *target = is_latitude ? &config->location_latitude
+                                     : &config->location_longitude;
+        /* Not atof(): it drops the S/W suffix and mirrors the location
+         * (review.md, BUG-10). On error the default is kept. */
+        if (parse_lat_lon(value, is_latitude, target) != 0)
+          fprintf(stderr,
+                  "WARNING: config.ini: invalid %s '%s' (expected e.g. %s), "
+                  "using %.4f\n",
+                  key, value, is_latitude ? "51.2349N, 33.9249S or -33.9249"
+                                          : "7.4479E, 74.0060W or -74.0060",
+                  *target);
+      }
       else if (strcmp(key, "location_altitude") == 0)
         config->location_altitude = atoi(value);
       else if (strcmp(key, "location_city") == 0)
-        snprintf(config->location_city, sizeof(config->location_city), "%.*s",
-                 (int)sizeof(config->location_city) - 1, value);
+        config_copy_string(config->location_city, sizeof(config->location_city), key,
+                           value);
       else if (strcmp(key, "location_owner") == 0)
-        snprintf(config->location_owner, sizeof(config->location_owner), "%.*s",
-                 (int)sizeof(config->location_owner) - 1, value);
+        config_copy_string(config->location_owner, sizeof(config->location_owner), key,
+                           value);
       else if (strcmp(key, "working_directory") == 0)
-        snprintf(config->working_directory, sizeof(config->working_directory),
-                 "%.*s", (int)sizeof(config->working_directory) - 1, value);
+        config_copy_string(config->working_directory, sizeof(config->working_directory), key,
+                           value);
       else if (strcmp(key, "image_directory") == 0)
-        snprintf(config->image_directory, sizeof(config->image_directory),
-                 "%.*s", (int)sizeof(config->image_directory) - 1, value);
+        config_copy_string(config->image_directory, sizeof(config->image_directory), key,
+                           value);
+      else if (strcmp(key, "raw_dump_directory") == 0)
+        config_copy_string(config->raw_dump_directory, sizeof(config->raw_dump_directory), key,
+                           value);
       else if (strcmp(key, "video_directory") == 0)
-        snprintf(config->video_directory, sizeof(config->video_directory),
-                 "%.*s", (int)sizeof(config->video_directory) - 1, value);
+        config_copy_string(config->video_directory, sizeof(config->video_directory), key,
+                           value);
       else if (strcmp(key, "database_directory") == 0)
-        snprintf(config->database_directory, sizeof(config->database_directory),
-                 "%.*s", (int)sizeof(config->database_directory) - 1, value);
+        config_copy_string(config->database_directory, sizeof(config->database_directory), key,
+                           value);
 
       else if (strcmp(key, "capture_interval") == 0)
         config->capture_interval = atoi(value);
       else if (strcmp(key, "indigo_servername") == 0)
-        snprintf(config->indigoservername, sizeof(config->indigoservername),
-                 "%.*s", (int)sizeof(config->indigoservername) - 1, value);
+        config_copy_string(config->indigoservername, sizeof(config->indigoservername), key,
+                           value);
       else if (strcmp(key, "indigo_server") == 0)
-        snprintf(config->indigoserver, sizeof(config->indigoserver), "%.*s",
-                 (int)sizeof(config->indigoserver) - 1, value);
+        config_copy_string(config->indigoserver, sizeof(config->indigoserver), key,
+                           value);
       else if (strcmp(key, "indigo_port") == 0)
         config->indigoport = atoi(value);
       else if (strcmp(key, "indigo_camera") == 0)
-        snprintf(config->indigocamera, sizeof(config->indigocamera), "%.*s",
-                 (int)sizeof(config->indigocamera) - 1, value);
+        config_copy_string(config->indigocamera, sizeof(config->indigocamera), key,
+                           value);
+      else if (strcmp(key, "indigo_mount") == 0)
+        config_copy_string(config->indigomount, sizeof(config->indigomount), key,
+                           value);
       else if (strcmp(key, "indigo_capture_timeout") == 0)
         config->indigo_capture_timeout = atoi(value);
+
+      else if (strcmp(key, "publish_exact_location") == 0)
+        config->publish_exact_location = atoi(value);
+
+      else if (strcmp(key, "postprocessing_script") == 0)
+        config_copy_string(config->postprocessing_script, sizeof(config->postprocessing_script), key,
+                           value);
+      else if (strcmp(key, "endofnight_script") == 0)
+        config_copy_string(config->endofnight_script, sizeof(config->endofnight_script), key,
+                           value);
+
+      else if (strcmp(key, "retention") == 0)
+        config->retention = atoi(value);
+      else if (strcmp(key, "retention_max_days") == 0)
+        config->retention_max_days = atoi(value);
+      else if (strcmp(key, "retention_max_size_gb") == 0)
+        config->retention_max_size_gb = atof(value);
+      else if (strcmp(key, "retention_keep_days") == 0)
+        config->retention_keep_days = atoi(value);
+      else if (strcmp(key, "retention_dry_run") == 0)
+        config->retention_dry_run = atoi(value);
+
+      /* Consumed by the Node.js API (allsky-api/index.js), not by this daemon. */
+      else if (strncmp(key, "api-", 4) == 0) {
+        /* intentionally ignored */
+      }
+
+      /* Anything else is a typo or a stale setting. Report it once per process:
+       * load_config() runs on every capture cycle, so warning every time would
+       * flood the log. */
+      else if (warn_unknown_keys)
+        fprintf(stderr,
+                "WARNING: %s: unknown configuration key '%s' (ignored)\n",
+                filename, key);
     }
   }
 
   fclose(file);
+
+  /* Range checks for values that would otherwise misbehave silently. */
+  if (config->retention_max_days < 1) {
+    if (warn_unknown_keys)
+      fprintf(stderr,
+              "WARNING: %s: retention_max_days %d is below 1, retention "
+              "disabled\n",
+              filename, config->retention_max_days);
+    config->retention = 0;
+  }
+  if (config->retention_max_size_gb <= 0.0) {
+    if (warn_unknown_keys)
+      fprintf(stderr,
+              "WARNING: %s: retention_max_size_gb %.2f is not positive, "
+              "retention disabled\n",
+              filename, config->retention_max_size_gb);
+    config->retention = 0;
+  }
+  if (config->retention_keep_days < 2) {
+    if (warn_unknown_keys && config->retention_keep_days != 0)
+      fprintf(stderr,
+              "WARNING: %s: retention_keep_days %d is below the minimum of 2, "
+              "using 2\n",
+              filename, config->retention_keep_days);
+    config->retention_keep_days = 2;
+  }
+
+  if (config->nighttime_sunangle > 0.0 || config->nighttime_sunangle < -18.0) {
+    double clamped = config->nighttime_sunangle > 0.0 ? 0.0 : -18.0;
+    if (warn_unknown_keys)
+      fprintf(stderr,
+              "WARNING: %s: nighttime_sunangle %.2f is outside -18.0..0.0, "
+              "clamped to %.2f\n",
+              filename, config->nighttime_sunangle, clamped);
+    config->nighttime_sunangle = clamped;
+  }
+
+  warn_unknown_keys = 0;
 
   return 0;
 }
@@ -570,6 +829,18 @@ int show_config(config_t *config) {
   printf("daytime_white_balance_light_protect: %.1f\n",
          config->daytime_white_balance_light_protect);
 
+  printf("postprocessing_script: %s\n",
+         config->postprocessing_script[0] ? config->postprocessing_script
+                                          : "(disabled)");
+  printf("endofnight_script: %s\n",
+         config->endofnight_script[0] ? config->endofnight_script
+                                      : "(disabled)");
+  printf("retention: %d (%s)\n", config->retention,
+         config->retention == 1 ? "on" : "off");
+  printf("retention_max_days: %d\n", config->retention_max_days);
+  printf("retention_max_size_gb: %.2f\n", config->retention_max_size_gb);
+  printf("retention_keep_days: %d\n", config->retention_keep_days);
+  printf("retention_dry_run: %d\n", config->retention_dry_run);
   printf("nighttime_sunangle: %.2f\n", config->nighttime_sunangle);
   printf("nighttime_startexposure: %.6f\n", config->nighttime_startexposure);
   printf("nighttime_startgain: %d\n", config->nighttime_startgain);
@@ -604,7 +875,7 @@ int show_config(config_t *config) {
          config->nighttime_multiscale_median_filter_amount);
 
   printf("measure_brightness_area: %.1f\n", config->measure_brightness_area);
-  +printf("target_mean: %.2f\n", config->target_mean);
+  printf("target_mean: %.2f\n", config->target_mean);
   printf("black_clipping_point: %.2f\n", config->black_clipping_point);
   printf("white_clipping_point: %.2f\n", config->white_clipping_point);
 
@@ -614,9 +885,10 @@ int show_config(config_t *config) {
   printf("hdr_y_max_expected: %.1f\n", config->hdr_y_max_expected);
   printf("hdr_weight_sigma: %.2f\n", config->hdr_weight_sigma);
   printf("hdr_weight_clip_factor: %.2f\n", config->hdr_weight_clip_factor);
-  printf("hdr_chroma_mode: %d\n", config->hdr_chroma_mode);
   printf("hdr_contrast_weight_strength: %.1f\n",
          config->hdr_contrast_weight_strength);
+  printf("hdr_noise_fusion_strength: %.2f\n",
+         config->hdr_noise_fusion_strength);
   printf("hdr_pyramid_levels_override: %d\n",
          config->hdr_pyramid_levels_override);
   printf("hdr_weight_maps: %d (%s)\n", config->hdr_weight_maps,
@@ -626,6 +898,14 @@ int show_config(config_t *config) {
   printf("hdr_save_exposures: %d (%s)\n", config->hdr_save_exposures,
          config->hdr_save_exposures == 1 ? "yes" : "no");
   printf("hdrmt: %d (%s)\n", config->hdrmt, config->hdrmt == 1 ? "yes" : "no");
+
+  printf("spektrum_enabled: %d (%s)\n", config->spektrum_enabled,
+         config->spektrum_enabled == 1 ? "yes" : "no");
+  printf("spektrum_cx: %d\n", config->spektrum_cx);
+  printf("spektrum_cy: %d\n", config->spektrum_cy);
+  printf("spektrum_radius: %d px\n", config->spektrum_radius);
+  printf("spektrum_regularization: %.4f\n", config->spektrum_regularization);
+  printf("spektrum_output_path: %s\n", config->spektrum_output_path);
 
   printf("autostretch: %d (%s)\n", config->autostretch,
          config->autostretch == 1 ? "yes" : "no");
@@ -653,6 +933,20 @@ int show_config(config_t *config) {
          config->acdnr_filter_chrom_kernel_size);
 
   printf("gamma: %.1f\n", config->gamma);
+  printf("auto_gamma: %d (%s)\n", config->auto_gamma,
+         config->auto_gamma == 1 ? "yes" : "no");
+  printf("auto_gamma_target: %.3f\n", config->auto_gamma_target);
+  printf("auto_gamma_min: %.2f\n", config->auto_gamma_min);
+  printf("auto_gamma_max: %.2f\n", config->auto_gamma_max);
+  printf("reinhard_tonemap: %d (%s)\n", config->reinhard_tonemap,
+         config->reinhard_tonemap == 1 ? "yes" : "no");
+  printf("reinhard_white_point: %.3f%s\n", config->reinhard_white_point,
+         config->reinhard_white_point == 0.0 ? " (simple)" : " (extended)");
+  printf("tone_curve: %d (%s)\n", config->tone_curve,
+         config->tone_curve == 1 ? "yes" : "no");
+  printf("tone_curve_shadow_lift: %.3f\n", config->tone_curve_shadow_lift);
+  printf("tone_curve_midtone_contrast: %.3f\n",
+         config->tone_curve_midtone_contrast);
   printf("saturation: %.1f\n", config->saturation);
 
   printf("dehaze_amount: %.1f\n", config->dehaze_amount);
@@ -698,9 +992,12 @@ int show_config(config_t *config) {
          config->wavelet_sharpen_gain_large);
 
   printf("sqm: %d (%s)\n", config->sqm, config->sqm == 1 ? "yes" : "no");
-  printf("sqm_threshold: %.1f\n", config->sqm_threshold);
+  printf("sqm_threshold: %.2f\n", config->sqm_threshold);
+  printf("sqm_min_brightness: %.2f\n", config->sqm_min_brightness);
   printf("sqm_max_stars: %d\n", config->sqm_max_stars);
   printf("sqm_radius: %dpx\n", config->sqm_radius);
+  printf("sqm_center_x: %d\n", config->sqm_center_x);
+  printf("sqm_center_y: %d\n", config->sqm_center_y);
   printf("sqm_template: %s\n", config->sqm_template);
   printf("sqm_star_size: %d px\n", config->sqm_star_size);
   printf("sqm_star_sigma: %.1f\n", config->sqm_star_sigma);
@@ -771,6 +1068,7 @@ int show_config(config_t *config) {
   printf("location_owner: %s\n", config->location_owner);
   printf("working_directory: %s\n", config->working_directory);
   printf("image_directory: %s\n", config->image_directory);
+  printf("raw_dump_directory: %s\n", config->raw_dump_directory);
   printf("video_directory: %s\n", config->video_directory);
   printf("database_directory: %s\n", config->database_directory);
 
@@ -779,6 +1077,7 @@ int show_config(config_t *config) {
   printf("indigo_server: %s\n", config->indigoserver);
   printf("indigo_port: %d\n", config->indigoport);
   printf("indigo_camera: %s\n", config->indigocamera);
+  printf("indigo_mount: %s\n", config->indigomount);
   printf("indigo_capture_timeout: %ds\n", config->indigo_capture_timeout);
 
   return 0;
@@ -787,10 +1086,6 @@ int show_config(config_t *config) {
 int config_to_json(const char *filename, const config_t *config) {
   if (!filename || !config)
     return 1;
-
-  FILE *file = fopen(filename, "w");
-  if (!file)
-    return 2;
 
   struct json_object *jroot = json_object_new_object();
 
@@ -829,6 +1124,12 @@ int config_to_json(const char *filename, const config_t *config) {
       jroot, "daytime_white_balance_light_protect",
       json_object_new_double(config->daytime_white_balance_light_protect));
 
+  json_object_object_add(jroot, "retention",
+                         json_object_new_int(config->retention));
+  json_object_object_add(jroot, "retention_max_days",
+                         json_object_new_int(config->retention_max_days));
+  json_object_object_add(jroot, "retention_max_size_gb",
+                         json_object_new_double(config->retention_max_size_gb));
   json_object_object_add(jroot, "nighttime_sunangle",
                          json_object_new_double(config->nighttime_sunangle));
   json_object_object_add(
@@ -904,11 +1205,12 @@ int config_to_json(const char *filename, const config_t *config) {
   json_object_object_add(
       jroot, "hdr_weight_clip_factor",
       json_object_new_double(config->hdr_weight_clip_factor));
-  json_object_object_add(jroot, "hdr_chroma_mode",
-                         json_object_new_int(config->hdr_chroma_mode));
   json_object_object_add(
       jroot, "hdr_contrast_weight_strength",
       json_object_new_double(config->hdr_contrast_weight_strength));
+  json_object_object_add(
+      jroot, "hdr_noise_fusion_strength",
+      json_object_new_double(config->hdr_noise_fusion_strength));
   json_object_object_add(
       jroot, "hdr_pyramid_levels_override",
       json_object_new_int(config->hdr_pyramid_levels_override));
@@ -919,6 +1221,19 @@ int config_to_json(const char *filename, const config_t *config) {
   json_object_object_add(jroot, "hdr_save_exposures",
                          json_object_new_int(config->hdr_save_exposures));
   json_object_object_add(jroot, "hdrmt", json_object_new_int(config->hdrmt));
+  json_object_object_add(jroot, "spektrum_enabled",
+                         json_object_new_int(config->spektrum_enabled));
+  json_object_object_add(jroot, "spektrum_cx",
+                         json_object_new_int(config->spektrum_cx));
+  json_object_object_add(jroot, "spektrum_cy",
+                         json_object_new_int(config->spektrum_cy));
+  json_object_object_add(jroot, "spektrum_radius",
+                         json_object_new_int(config->spektrum_radius));
+  json_object_object_add(
+      jroot, "spektrum_regularization",
+      json_object_new_double(config->spektrum_regularization));
+  json_object_object_add(jroot, "spektrum_output_path",
+                         json_object_new_string(config->spektrum_output_path));
   json_object_object_add(jroot, "autostretch",
                          json_object_new_int(config->autostretch));
   json_object_object_add(jroot, "autostretch_min_val",
@@ -952,6 +1267,24 @@ int config_to_json(const char *filename, const config_t *config) {
       jroot, "acdnr_filter_chrom_kernel_size",
       json_object_new_int(config->acdnr_filter_chrom_kernel_size));
   json_object_object_add(jroot, "gamma", json_object_new_double(config->gamma));
+  json_object_object_add(jroot, "auto_gamma",
+                         json_object_new_int(config->auto_gamma));
+  json_object_object_add(jroot, "auto_gamma_target",
+                         json_object_new_double(config->auto_gamma_target));
+  json_object_object_add(jroot, "auto_gamma_min",
+                         json_object_new_double(config->auto_gamma_min));
+  json_object_object_add(jroot, "auto_gamma_max",
+                         json_object_new_double(config->auto_gamma_max));
+  json_object_object_add(jroot, "reinhard_tonemap",
+                         json_object_new_int(config->reinhard_tonemap));
+  json_object_object_add(jroot, "reinhard_white_point",
+                         json_object_new_double(config->reinhard_white_point));
+  json_object_object_add(jroot, "tone_curve",
+                         json_object_new_int(config->tone_curve));
+  json_object_object_add(jroot, "tone_curve_shadow_lift",
+                         json_object_new_double(config->tone_curve_shadow_lift));
+  json_object_object_add(jroot, "tone_curve_midtone_contrast",
+                         json_object_new_double(config->tone_curve_midtone_contrast));
   json_object_object_add(jroot, "saturation",
                          json_object_new_double(config->saturation));
   json_object_object_add(jroot, "dehaze_amount",
@@ -1012,10 +1345,16 @@ int config_to_json(const char *filename, const config_t *config) {
   json_object_object_add(jroot, "sqm", json_object_new_int(config->sqm));
   json_object_object_add(jroot, "sqm_threshold",
                          json_object_new_double(config->sqm_threshold));
+  json_object_object_add(jroot, "sqm_min_brightness",
+                         json_object_new_double(config->sqm_min_brightness));
   json_object_object_add(jroot, "sqm_max_stars",
                          json_object_new_int(config->sqm_max_stars));
   json_object_object_add(jroot, "sqm_radius",
                          json_object_new_int(config->sqm_radius));
+  json_object_object_add(jroot, "sqm_center_x",
+                         json_object_new_int(config->sqm_center_x));
+  json_object_object_add(jroot, "sqm_center_y",
+                         json_object_new_int(config->sqm_center_y));
   json_object_object_add(jroot, "sqm_template",
                          json_object_new_string(config->sqm_template));
   json_object_object_add(jroot, "sqm_star_size",
@@ -1110,32 +1449,41 @@ int config_to_json(const char *filename, const config_t *config) {
   json_object_object_add(
       jroot, "panorama_horizontal_start",
       json_object_new_int(config->panorama_horizontal_start));
+  /* config.json is served unauthenticated through /api/config. The dashboard
+   * needs the coordinates (sun/moon altitude, aircraft distances), so they stay
+   * - but publish_exact_location=0 rounds them to about 1 km, which is plenty
+   * for those calculations and drops house-level precision (review.md, SEC-04). */
+  double published_latitude = config->location_latitude;
+  double published_longitude = config->location_longitude;
+  if (!config->publish_exact_location) {
+    published_latitude = round(published_latitude * 100.0) / 100.0;
+    published_longitude = round(published_longitude * 100.0) / 100.0;
+  }
+
   json_object_object_add(jroot, "location_latitude",
-                         json_object_new_double(config->location_latitude));
+                         json_object_new_double(published_latitude));
   json_object_object_add(jroot, "location_longitude",
-                         json_object_new_double(config->location_longitude));
+                         json_object_new_double(published_longitude));
   json_object_object_add(jroot, "location_altitude",
                          json_object_new_int(config->location_altitude));
   json_object_object_add(jroot, "location_city",
                          json_object_new_string(config->location_city));
-  json_object_object_add(jroot, "location_owner",
-                         json_object_new_string(config->location_owner));
+  /* location_owner is a person's name - deliberately not published (SEC-04) */
   json_object_object_add(jroot, "working_directory",
                          json_object_new_string(config->working_directory));
   json_object_object_add(jroot, "image_directory",
                          json_object_new_string(config->image_directory));
+  json_object_object_add(jroot, "raw_dump_directory",
+                         json_object_new_string(config->raw_dump_directory));
   json_object_object_add(jroot, "video_directory",
                          json_object_new_string(config->video_directory));
   json_object_object_add(jroot, "database_directory",
                          json_object_new_string(config->database_directory));
   json_object_object_add(jroot, "capture_interval",
                          json_object_new_int(config->capture_interval));
-  json_object_object_add(jroot, "indigoservername",
-                         json_object_new_string(config->indigoservername));
-  json_object_object_add(jroot, "indigoserver",
-                         json_object_new_string(config->indigoserver));
-  json_object_object_add(jroot, "indigoport",
-                         json_object_new_int(config->indigoport));
+  /* Host, port and mount of the INDIGO server describe the internal network
+   * and are deliberately not published (SEC-04). The camera name stays: it is
+   * hardware information the dashboard shows. */
   json_object_object_add(jroot, "indigocamera",
                          json_object_new_string(config->indigocamera));
   json_object_object_add(jroot, "indigo_capture_timeout",
@@ -1143,15 +1491,14 @@ int config_to_json(const char *filename, const config_t *config) {
 
   const char *json_str =
       json_object_to_json_string_ext(jroot, JSON_C_TO_STRING_SPACED);
-  // const char *json_str = json_object_to_json_string_ext(jroot,
-  // JSON_C_TO_STRING_PRETTY);
-  if (fprintf(file, "%s\n", json_str) < 0) {
-    fclose(file);
+
+  /* config.json sits in the web docroot and is polled by the dashboard -
+   * publish it atomically (review.md, REL-05). */
+  if (write_text_file_atomic(filename, json_str) != 0) {
     json_object_put(jroot);
     return 3;
   }
 
-  fclose(file);
   json_object_put(jroot);
   return 0;
 }

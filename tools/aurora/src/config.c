@@ -22,6 +22,7 @@
 
 #include <json-c/json.h>
 
+#include "coordinates.h"
 #include "config.h"
 
 int load_config(const char *filename, config_t *config) {
@@ -36,25 +37,55 @@ int load_config(const char *filename, config_t *config) {
     config->location_altitude=100;
     snprintf(config->database_directory, sizeof(config->database_directory), "/opt/allsky360/database");
 
-    char line[256], key[50], value[100];
+    char line[1024], key[64], value[512];
     while (fgets(line, sizeof(line), file)) {
+        // Skip the rest of lines that do not fit into the buffer
+        if (!strchr(line, '\n') && !feof(file)) {
+            int c;
+            while ((c = fgetc(file)) != EOF && c != '\n')
+                ;
+            fprintf(stderr, "WARNING: config.ini: line longer than %zu characters ignored\n", sizeof(line) - 1);
+            continue;
+        }
+
         if (line[0] == '#' || strlen(line) < 3) 
 	    continue;
         
         // Remove spaces
         char *trim_line = strtok(line, "\n");
+        if (!trim_line)
+            continue;
         
-        if (sscanf(trim_line, "%49[^=] = \"%99[^\"]\"", key, value) == 2 ||
-            sscanf(trim_line, "%49[^=] = %99s", key, value) == 2) {
+        if (sscanf(trim_line, "%63[^=] = \"%511[^\"]\"", key, value) == 2 ||
+            sscanf(trim_line, "%63[^=] = %511[^\n]", key, value) == 2) {
 
-            if (strcmp(key, "location_latitude") == 0)
-                config->location_latitude = atof(value);
-            else if (strcmp(key, "location_longitude") == 0)
-                config->location_longitude = atof(value);
+            // Unquoted values run to the end of the line, drop trailing blanks
+            size_t value_len = strlen(value);
+            while (value_len > 0 && (value[value_len - 1] == ' ' || value[value_len - 1] == '\t' || value[value_len - 1] == '\r'))
+                value[--value_len] = '\0';
+
+            // "%63[^=]" includes blanks before '=' - strip them
+            size_t key_len = strlen(key);
+            while (key_len > 0 && (key[key_len - 1] == ' ' || key[key_len - 1] == '\t' || key[key_len - 1] == '\r'))
+                key[--key_len] = '\0';
+
+            if (strcmp(key, "location_latitude") == 0) {
+                // Handles N/S suffixes, atof() would ignore 'S' (review.md, BUG-10)
+                if (parse_lat_lon(value, 1, &config->location_latitude) != 0)
+                    fprintf(stderr, "WARNING: config.ini: invalid location_latitude '%s', using %.4f\n", value, config->location_latitude);
+            }
+            else if (strcmp(key, "location_longitude") == 0) {
+                // Handles E/W suffixes, atof() would ignore 'W' (review.md, BUG-10)
+                if (parse_lat_lon(value, 0, &config->location_longitude) != 0)
+                    fprintf(stderr, "WARNING: config.ini: invalid location_longitude '%s', using %.4f\n", value, config->location_longitude);
+            }
             else if (strcmp(key, "location_altitude") == 0)
                 config->location_altitude = atoi(value);
-            else if (strcmp(key, "database_directory") == 0)
+            else if (strcmp(key, "database_directory") == 0) {
+                if (strlen(value) >= sizeof(config->database_directory))
+                    fprintf(stderr, "WARNING: config.ini: database_directory longer than %zu characters - truncated\n", sizeof(config->database_directory) - 1);
                 snprintf(config->database_directory, sizeof(config->database_directory), "%.*s", (int)sizeof(config->database_directory)-1, value);
+            }
 
         }
     }

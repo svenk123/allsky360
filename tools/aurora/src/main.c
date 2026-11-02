@@ -18,7 +18,7 @@
 #include "aurora_database.h"
 #include "aurora_fetch.h"
 #include "config.h"
-#include "coordinate_parser.h"
+#include "coordinates.h"
 #include <getopt.h>
 #include <json-c/json.h>
 #include <stdio.h>
@@ -122,14 +122,14 @@ int main(int argc, char *argv[]) {
       config_path = optarg;
       break;
     case 'l':
-      if (parse_coordinate(optarg, &longitude) != 0) {
+      if (parse_lat_lon(optarg, 0, &longitude) != 0) {
         fprintf(stderr, "Invalid longitude format: %s\n", optarg);
         return 1;
       }
       lon_set = 1;
       break;
     case 'b':
-      if (parse_coordinate(optarg, &latitude) != 0) {
+      if (parse_lat_lon(optarg, 1, &latitude) != 0) {
         fprintf(stderr, "Invalid latitude format: %s\n", optarg);
         return 1;
       }
@@ -225,8 +225,8 @@ int main(int argc, char *argv[]) {
     printf("\nResponse:\n%s\n\n", json_raw);
   }
 
-  if (json_raw)
-    free(json_raw);
+  free(json_raw);
+  json_raw = NULL;
 
   if (fetch_kp) {
     if (fetch_aurora_json(url_kp, &json_raw) == 0 &&
@@ -237,8 +237,10 @@ int main(int argc, char *argv[]) {
       printf("\nResponse:\n%s\n\n", json_raw);
     }
 
-    if (json_raw)
-      free(json_raw);
+    free(json_raw);
+    /* Reset: a failed fetch below leaves json_raw untouched, freeing the
+     * stale pointer again was a double free (abort when NOAA lacks data). */
+    json_raw = NULL;
   }
   if (fetch_mag) {
     if (fetch_aurora_json(url_mag, &json_raw) == 0 &&
@@ -249,8 +251,10 @@ int main(int argc, char *argv[]) {
       printf("\nResponse:\n%s\n\n", json_raw);
     }
 
-    if (json_raw)
-      free(json_raw);
+    free(json_raw);
+    /* Reset: a failed fetch below leaves json_raw untouched, freeing the
+     * stale pointer again was a double free (abort when NOAA lacks data). */
+    json_raw = NULL;
   }
   if (fetch_plasma) {
     if (fetch_aurora_json(url_plasma, &json_raw) == 0 &&
@@ -263,8 +267,10 @@ int main(int argc, char *argv[]) {
       printf("\nResponse:\n%s\n\n", json_raw);
     }
 
-    if (json_raw)
-      free(json_raw);
+    free(json_raw);
+    /* Reset: a failed fetch below leaves json_raw untouched, freeing the
+     * stale pointer again was a double free (abort when NOAA lacks data). */
+    json_raw = NULL;
   }
 
   json_object *jout = json_object_new_object();

@@ -16,7 +16,6 @@
  *
  *****************************************************************************/
 #include "config.h"
-#include "coordinate_parser.h"
 #include "meteo_database.h"
 #include "open_meteo_fetch.h"
 #include <getopt.h>

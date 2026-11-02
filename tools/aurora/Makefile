@@ -19,6 +19,8 @@
 
 CC      = gcc
 CFLAGS  = -Wall -Wextra -O2 -DINDIGO_LINUX -std=gnu11 -D_GNU_SOURCE -D_XOPEN_SOURCE=700
+# Shared headers from the main project (coordinates.h)
+CFLAGS += -I../../src
 
 INCLUDE = -I../../include
 
