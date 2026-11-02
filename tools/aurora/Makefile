@@ -41,10 +41,10 @@ INSTALLDIR = /opt/allsky360/bin
 
 all: $(BINDIR)/$(TARGET)
 
-$(BINDIR)/$(TARGET): $(OBJECTS)
+$(BINDIR)/$(TARGET): $(OBJECTS) | $(BINDIR)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.c
+$(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
 	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
 
 $(OBJDIR):
