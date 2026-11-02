@@ -1,7 +1,10 @@
 [Unit]
 Description=Allsky360 Camera Deamon
-After=network.target indigoserver.service
-Wants=network.target
+# The INDIGO unit is named differently depending on how it was installed
+# (indigo-server.service from this repo, indigoserver.service elsewhere).
+# Wants= on a unit that does not exist is ignored, so both can be listed.
+After=network-online.target indigo-server.service indigoserver.service
+Wants=network-online.target indigo-server.service indigoserver.service
 
 [Service]
 # Default values (can be overridden via EnvironmentFile)
@@ -15,16 +18,65 @@ Group=allskygroup
 #EnvironmentFile=-/etc/allsky360/env
 
 WorkingDirectory=/home/allskyuser
+
+# The daemon reports READY=1 after initialisation and pings the systemd
+# watchdog from its main loop and while waiting for exposures. If the pings
+# stop for WatchdogSec (hung INDIGO call, CUDA driver, deadlock), systemd
+# kills the process and Restart=always starts it again.
+# WatchdogSec must be longer than the longest legitimate gap between two
+# pings: processing of one HDR series (no pings inside the pipeline) plus
+# saving and overlays. 10 minutes is conservative; check
+# 'journalctl -u allsky360-camera' for "Watchdog timeout" after changes.
+Type=notify
+NotifyAccess=main
+WatchdogSec=600
 ExecStart=/opt/allsky360/bin/allsky360-camera --config /home/allskyuser/config.ini -v
 ExecReload=/bin/kill -HUP $MAINPID
 ExecStop=/bin/kill -TERM $MAINPID
 
-StandardOutput=append:/var/log/allsky360.log
-StandardError=append:/var/log/allsky360.log
+# /var/log/allsky360/ is what etc/logrotate.d/allsky360 rotates.
+# The previous path /var/log/allsky360.log was not covered by any rule and
+# grew without bound (see review.md, REL-01).
+StandardOutput=append:/var/log/allsky360/camera.log
+StandardError=append:/var/log/allsky360/camera.log
 
 Restart=always
 RestartSec=90
 
+# --- Sandbox (review.md, SEC-09) ------------------------------------------
+# Moderate on purpose: the daemon and the hook scripts it starts
+# (postprocessing.sh with PyTorch/TensorRT, endofnight.sh with the timelapse
+# encoder) use the GPU, and the data directories are configurable.
+#  - No PrivateDevices=/ProtectClock=/DevicePolicy=: they restrict /dev and
+#    would block the NVIDIA GPU devices (CUDA, nvjpeg, TensorRT).
+#  - No MemoryDenyWriteExecute=: CUDA and PyTorch generate code at runtime.
+#  - ProtectSystem=full (not strict): image/video/database directories can be
+#    set anywhere outside /usr, /etc and /boot in config.ini.
+#  - Data in another user's home needs a drop-in, e.g.
+#      systemctl edit allsky360-camera  ->  [Service] BindPaths=/home/<user>/data
+# Check the result with: systemd-analyze security allsky360-camera.service
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=full
+ProtectHome=tmpfs
+BindPaths=/home/allskyuser
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RemoveIPC=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallErrorNumber=EPERM
+UMask=0022
 
 [Install]
 WantedBy=multi-user.target

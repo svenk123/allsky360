@@ -1,0 +1,12 @@
+[Unit]
+Description=Run allsky360-mount-position every 1 minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=30s
+Persistent=true
+Unit=allsky360-mount-position.service
+
+[Install]
+WantedBy=timers.target
