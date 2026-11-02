@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-# YOLOv11 inference script for Allsky360
+# Ultralytics YOLO inference script for Allsky360 (YOLO26, also loads YOLO11 models)
 #
 # This script is designed to be executed via systemd-run.
 #
 # Usage:
-#   yolov11_infer.py --model /path/to/yolov11.pt --source /path/to/image.jpg --save_json /path/to/output.json
+#   yolo_infer.py --model /path/to/weather.pt --source /path/to/image.jpg --save_json /path/to/output.json
 #
 # Copyright (c) 2025 Sven Kreiensen
 #
@@ -33,9 +33,19 @@ model = YOLO(args.model)
 
 res = model.predict(args.source, verbose=False, imgsz=640, device=0)
 
-# YOLOv11 result serialization
+# Result serialization: classification models (task=classify, e.g. the
+# weather model) report probabilities, detection models report boxes.
 objects = []
+classification = None
 for r in res:
+    if r.probs is not None:
+        top1 = int(r.probs.top1)
+        classification = {
+            "cls": top1,
+            "name": model.names[top1],
+            "conf": float(r.probs.top1conf),
+        }
+        continue
     for box in r.boxes:
         objects.append({
             "cls": int(box.cls),
@@ -48,4 +58,5 @@ for r in res:
         })
 
 with open(args.save_json, "w") as f:
-    json.dump({"image": args.source, "objects": objects}, f, indent=2)
+    json.dump({"image": args.source, "classification": classification,
+               "objects": objects}, f, indent=2)
