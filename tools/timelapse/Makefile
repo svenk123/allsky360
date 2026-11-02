@@ -45,7 +45,7 @@ ifeq ($(USE_CUDA),1)
 	USE_NVJPEG = 1
 
 # Intelligent CUDA-path detection
-	CUDA_PATH = $(shell \
+	CUDA_PATH ?= $(shell \
         if command -v nvcc >/dev/null 2>&1; then \
             dirname $$(dirname $$(which nvcc)); \
         elif [ -d "/usr/local/cuda" ]; then \
@@ -64,8 +64,12 @@ ifeq ($(USE_CUDA),1)
 # nvcc mischt unterschiedliche Versionen der Standardbibliothek, was zur Redefinition von std::integral_constant führt.
 # Der Fehler tritt oft bei CUDA 11+ mit neuen GCC-Versionen auf.
 # Lösung:
-    NVCC = nvcc --compiler-bindir=/usr/bin/gcc-11 -I$(CUDA_PATH)/include
-	NVCCFLAGS = -arch=sm_87 -O2 --compiler-options '-fPIC -std=c++17'
+# Host compiler for nvcc: prefer gcc-11 if installed (JetPack 6), otherwise default gcc (JetPack 7: gcc-13)
+    NVCC_HOST_CC ?= $(shell command -v gcc-11 2>/dev/null || command -v gcc)
+    NVCC = $(CUDA_PATH)/bin/nvcc --compiler-bindir=$(NVCC_HOST_CC) -I$(CUDA_PATH)/include
+	# 'native' = GPU of the build machine; override with CUDA_ARCH=sm_87 etc.
+	CUDA_ARCH ?= native
+	NVCCFLAGS = -arch=$(CUDA_ARCH) -O2 --compiler-options '-fPIC -std=c++17'
 # Jetson nano
 #    NVCC = nvcc --compiler-bindir=/usr/bin/gcc-7 -I$(CUDA_PATH)/include
 
@@ -73,16 +77,20 @@ ifeq ($(USE_CUDA),1)
 
 	CFLAGS +=  -I/usr/include/aarch64-linux-gnu -I$(CUDA_PATH)/include
 	LDFLAGS += -L/usr/lib/aarch64-linux-gnu -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib
-	LDFLAGS += -lnppig -lcuda -lcudart -lnvjpeg
+	LDFLAGS += -lnppig -lcuda -lcudart -lnvjpeg -lstdc++
 	CUDA_INCLUDE = -I$(CUDA_PATH)/include -I./src -I../../include
 
-    CU_SRC = $(SRC_DIR)/image_loader_nvjpeg.cu
+    CU_SRC = $(SRC_DIR)/image_loader_nvjpeg.cu $(SRC_DIR)/stacker_cuda.cu
 	CU_OBJS = $(CU_SRC:$(SRC_DIR)/%.cu=$(OBJ_DIR)/%.o)
+	CFLAGS += -DUSE_CUDA
 else
 	C_SRC += $(SRC_DIR)/image_loader_libjpeg.c
     CU_SRCS =
     CU_OBJS =
 endif
+
+# CUDA package version for 'make deps' (JetPack 7.2 = CUDA 13.2, JetPack 6.2 = 12-6)
+CUDA_PKG_VERSION ?= 13-2
 
 all: $(TARGET)
 
@@ -95,7 +103,7 @@ deps:
 	@echo `date +%F\ %R:%S` Installing build dependencies...
 	@apt update
 	@apt -y install libavcodec-dev libavformat-dev libswscale-dev
-	@apt -y install cuda-cudart-dev-12-6 libnvjpeg-dev-12-6 cuda-nvcc-12-6 libnpp-dev-12-6
+	@apt -y install cuda-cudart-dev-$(CUDA_PKG_VERSION) libnvjpeg-dev-$(CUDA_PKG_VERSION) cuda-nvcc-$(CUDA_PKG_VERSION) libnpp-dev-$(CUDA_PKG_VERSION)
 endif
 
 $(TARGET): $(C_OBJS) $(CU_OBJS)

@@ -45,6 +45,7 @@ char host[256];
 int port;
 camera_entry *cams;
 indigo_server_entry *server = NULL;
+static bool server_connection_state = false;
 
 // --- linked list helpers ---
 static camera_entry *find_cam(const char *name) {
@@ -158,11 +159,12 @@ static int is_ccd_info(indigo_property *property) {
 // --- INDIGO client callbacks ---
 static indigo_result client_attach(indigo_client *client) {
   indigo_log("attached to INDIGO bus...");
-  indigo_enumerate_properties(client, NULL);
+  indigo_enumerate_properties(client, &INDIGO_ALL_PROPERTIES);
 
   return INDIGO_OK;
 }
 static indigo_result client_detach(indigo_client *client) {
+  (void)client;
   indigo_log("detached from INDIGO bus...");
 
   return INDIGO_OK;
@@ -306,7 +308,7 @@ int main(int argc, char **argv) {
     return 2;
   }
 
-  indigo_result rc = indigo_connect_server("remote", host, port, NULL);
+  indigo_result rc = indigo_connect_server("indigo_server", /* same name as the camera daemon (indigo_servername) */ host, port, &server, &server_connection_state);
   if (rc != INDIGO_OK) {
     fprintf(stderr, "Failed to connect to %s:%d (rc=%d)\n", host, port, rc);
     indigo_detach_client(&client);
@@ -315,7 +317,7 @@ int main(int argc, char **argv) {
   }
 
   // IMPORTANT: enumerate properties again after successful connect
-  //indigo_enumerate_properties(&client, NULL);
+  //indigo_enumerate_properties(&client, &INDIGO_ALL_PROPERTIES);
   
   // Wait for properties to arrive
   const int step_ms = 50;
@@ -327,7 +329,7 @@ int main(int argc, char **argv) {
 
   print_result(json, timeout_ms, host, port, cams);
 
-//  if (server)
+  if (server)
     indigo_disconnect_server(server);
 
   indigo_detach_client(&client);

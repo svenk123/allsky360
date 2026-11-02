@@ -8,9 +8,13 @@ OBJDIR  = obj
 BINDIR  = bin
 TARGET  = allsky360-location
 
+# Shared sources from the main allsky360 project
+MAIN_SRCDIR = ../../src
+CFLAGS += -I$(MAIN_SRCDIR)
+
 # Sources and objects
 SOURCES = $(wildcard $(SRCDIR)/*.c)
-OBJECTS = $(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(SOURCES))
+OBJECTS = $(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(SOURCES)) $(OBJDIR)/atomic_file.o
 
 # Libraries
 LIBS    = -ljson-c -lm -lc
@@ -26,6 +30,10 @@ $(BINDIR)/$(TARGET): $(OBJECTS) | $(BINDIR)
 
 # Compile each .c to .o
 $(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Compile shared sources from the main project
+$(OBJDIR)/atomic_file.o: $(MAIN_SRCDIR)/atomic_file.c | $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Create obj directory if missing

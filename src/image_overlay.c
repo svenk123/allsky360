@@ -201,7 +201,6 @@ int draw_text_red_freetype_rgbf1(float *rgbf, int width, int height,
       unsigned char *bitmap_base = bm->buffer + (gh - 1) * (-pitch);
 
       for (int y = 0; y < gh; y++) {
-        int src_y = y;
         int dst_y =
             y + (face->glyph->bitmap_top > 0 ? 0 : -face->glyph->bitmap_top);
 

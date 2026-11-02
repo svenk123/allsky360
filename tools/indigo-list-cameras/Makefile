@@ -21,7 +21,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra -O2 -DINDIGO_LINUX -std=gnu11
 
 # indigo server
-INDIGO_ROOT = ../../../indigo
+INDIGO_ROOT ?= ../../../indigo
 INDIGO_CFLAGS = -I$(INDIGO_ROOT)/indigo_libs
 INDIGO_LIBS = -L$(INDIGO_ROOT)/build/lib -lindigo
 
@@ -37,22 +37,19 @@ OBJS = $(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(SRCS))
 TARGET := indigo_list_cameras
 
 CFLAGS  += -I. $(INDIGO_CFLAGS)
-LDFLAGS += -L$(INDIGO_LIBS)
-
-INCLUDE = $(INDIGOI_CFLAGS)
 LDFLAGS += $(INDIGO_LIBS) -lpthread
 
-all: $(TARGET)
+all: $(BINDIR)/$(TARGET)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	@mkdir -p $(OBJDIR)
-	$(CC) $(INCLUDE) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
-$(TARGET): $(OBJS)
+$(BINDIR)/$(TARGET): $(OBJS)
 	@mkdir -p $(BINDIR)
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS)
 
 clean:
-	rm -f $(OBJ) $(TARGET)
+	rm -rf $(OBJDIR) $(BINDIR)
 
 .PHONY: all clean

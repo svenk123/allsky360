@@ -26,6 +26,7 @@
 int save_debug_pipeline_image(const float *image, int width, int height,
                               int pipeline_number, const char *images_dir,
                               int scale_to_16bit) {
+  (void)scale_to_16bit;
   if (!image || !images_dir || pipeline_number < 0) {
     return -1;
   }

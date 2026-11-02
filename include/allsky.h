@@ -18,7 +18,6 @@
 #ifndef ALLSKY_H
 #define ALLSKY_H
 
-#include <assert.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -28,7 +27,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define PROG_VERSION "2.1"
+#define PROG_VERSION "2.2"
 
 #define DEBAYER_ALG_NNI 0
 #define DEBAYER_ALG_BILINEAR 1
@@ -42,9 +41,18 @@
 #define ALLSKY_DEBUG_MEMORY 2
 #define ALLSKY_DEBUG_TIMING 3
 
-/* Macro for timing functions */
+/* Macro for timing functions.
+ *
+ * Uses "if (1) { ... } else ((void)0)" rather than the usual "do { ... }
+ * while (0)": inside a do-while, a 'continue' in the wrapped block would bind
+ * to the macro's own loop and merely fall out of the macro, silently carrying
+ * on with the code that follows instead of skipping the enclosing iteration
+ * (see review.md, BUG-03). With the if/else form, 'continue' and 'break' bind
+ * to the loop at the call site, which is what every caller expects. The
+ * trailing 'else ((void)0)' keeps the macro a single statement and protects
+ * against a dangling else. */
 #define TIMED_BLOCK(func_name, block)                                          \
-  do {                                                                         \
+  if (1) {                                                                     \
     if (allsky_debug >= ALLSKY_DEBUG_TIMING)                                   \
       function_start = clock();                                                \
     block if (allsky_debug >= ALLSKY_DEBUG_TIMING) {                           \
@@ -53,49 +61,57 @@
              func_name,                                                        \
              1000.0 * (function_end - function_start) / CLOCKS_PER_SEC);       \
     }                                                                          \
-  } while (0)
+  } else                                                                       \
+    ((void)0)
 
 /***** Safe memory allocation functions **********/
 
 static inline void *allsky_safe_malloc(size_t size) {
   void *pointer = malloc(size);
-
-  assert(pointer != NULL);
+  if (!pointer) {
+    fprintf(stderr, "allsky_safe_malloc: out of memory (%zu bytes)\n", size);
+    abort();
+  }
   memset(pointer, 0, size);
-
   return pointer;
 }
 
 static inline void *allsky_safe_malloc_copy(size_t size, void *from) {
   void *pointer = malloc(size);
-
-  assert(pointer != NULL);
+  if (!pointer) {
+    fprintf(stderr, "allsky_safe_malloc_copy: out of memory (%zu bytes)\n", size);
+    abort();
+  }
   memcpy(pointer, from, size);
-
   return pointer;
 }
 
 static inline void *allsky_safe_realloc(void *pointer, size_t size) {
   pointer = realloc(pointer, size);
-
-  assert(pointer != NULL);
-
+  if (!pointer) {
+    fprintf(stderr, "allsky_safe_realloc: out of memory (%zu bytes)\n", size);
+    abort();
+  }
   return pointer;
 }
 
 static inline void *allsky_safe_realloc_copy(void *pointer, size_t size,
                                              void *from) {
   pointer = realloc(pointer, size);
-
-  assert(pointer != NULL);
+  if (!pointer) {
+    fprintf(stderr, "allsky_safe_realloc_copy: out of memory (%zu bytes)\n", size);
+    abort();
+  }
   memcpy(pointer, from, size);
-
   return pointer;
 }
 
 static inline void *allsky_safe_calloc(size_t nmemb, size_t size) {
   void *pointer = calloc(nmemb, size);
-  assert(pointer != NULL);
+  if (!pointer) {
+    fprintf(stderr, "allsky_safe_calloc: out of memory (%zu x %zu bytes)\n", nmemb, size);
+    abort();
+  }
   return pointer;
 }
 
@@ -109,24 +125,34 @@ static inline void allsky_safe_free(void *pointer) {
 static inline char *allsky_safe_strncpy(char *dst, const char *src,
                                         size_t size) {
   if (size > 0) {
-    dst[size - 1] = '\0';
-    strncpy(dst, src, size - 1);
+    size_t len = strnlen(src, size - 1);
+    memcpy(dst, src, len);
+    dst[len] = '\0';
   }
 
   return dst;
 }
 
 static inline char *allsky_safe_strdup(const char *s) {
-  assert(s != NULL);
+  if (!s) {
+    fprintf(stderr, "allsky_safe_strdup: NULL argument\n");
+    abort();
+  }
+
   char *copy = strdup(s);
-  assert(copy != NULL);
+  if (!copy) {
+    fprintf(stderr, "allsky_safe_strdup: out of memory (%zu bytes)\n",
+            strlen(s) + 1);
+    abort();
+  }
+
   return copy;
 }
 
 static inline void allsky_safe_strcpy(char *dest, const char *src,
                                       size_t dest_size) {
-  assert(dest != NULL && src != NULL);
-  assert(dest_size > 0);
+  if (!dest || !src || dest_size == 0)
+    return;
 
   strncpy(dest, src, dest_size - 1);
   dest[dest_size - 1] = '\0';
@@ -134,7 +160,9 @@ static inline void allsky_safe_strcpy(char *dest, const char *src,
 
 static inline void allsky_safe_strcat(char *dest, const char *src,
                                       size_t dest_size) {
-  assert(dest != NULL && src != NULL);
+  if (!dest || !src || dest_size == 0)
+    return;
+
   size_t dest_len = strnlen(dest, dest_size);
 
   if (dest_len < dest_size - 1) {
@@ -166,33 +194,62 @@ static inline int allsky_safe_snprintf(char *buf, size_t buf_size,
 
 /****** Safe file operations **************/
 
+/* These report and return instead of asserting. An assert() turns an ordinary
+ * runtime condition - a full filesystem, a read-only directory - into SIGABRT,
+ * and compiling with -DNDEBUG would flip the very same code into ignoring the
+ * error completely (see review.md, REL-04). Callers must check the result.
+ *
+ * For publishing a file where readers must never observe a partial write, use
+ * src/atomic_file.h instead. */
+
 static inline FILE *allsky_safe_fopen(const char *filename, const char *mode) {
-  assert(filename != NULL && mode != NULL);
+  if (!filename || !mode)
+    return NULL;
+
   FILE *file = fopen(filename, mode);
-  assert(file != NULL);
+  if (!file)
+    fprintf(stderr, "allsky_safe_fopen: cannot open %s (mode %s): %s\n",
+            filename, mode, strerror(errno));
+
   return file;
 }
 
 static inline size_t allsky_safe_fread(void *ptr, size_t size, size_t count,
                                        FILE *stream) {
-  assert(ptr != NULL && stream != NULL);
+  if (!ptr || !stream)
+    return 0;
+
   size_t result = fread(ptr, size, count, stream);
-  assert(result == count);
+  if (result != count)
+    fprintf(stderr, "allsky_safe_fread: read %zu of %zu items (%s)\n", result,
+            count, ferror(stream) ? strerror(errno) : "end of file");
+
   return result;
 }
 
 static inline size_t allsky_safe_fwrite(const void *ptr, size_t size,
                                         size_t count, FILE *stream) {
-  assert(ptr != NULL && stream != NULL);
+  if (!ptr || !stream)
+    return 0;
+
   size_t result = fwrite(ptr, size, count, stream);
-  assert(result == count);
+  if (result != count)
+    fprintf(stderr, "allsky_safe_fwrite: wrote %zu of %zu items: %s\n", result,
+            count, strerror(errno));
+
   return result;
 }
 
-static inline void allsky_safe_fclose(FILE *stream) {
-  assert(stream != NULL);
+/* Returns 0 on success, EOF on error - like fclose() itself. */
+static inline int allsky_safe_fclose(FILE *stream) {
+  if (!stream)
+    return 0;
+
   int status = fclose(stream);
-  assert(status == 0);
+  if (status != 0)
+    fprintf(stderr, "allsky_safe_fclose: close failed: %s\n", strerror(errno));
+
+  return status;
 }
 
 static inline int allsky_safe_mkdir(const char *path, mode_t mode) {
