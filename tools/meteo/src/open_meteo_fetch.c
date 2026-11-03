@@ -43,22 +43,26 @@ static size_t write_callback(void *data, size_t size, size_t nmemb, void *userp)
     return total;
 }
 
-int fetch_open_meteo_weather(double latitude, double longitude, time_t timestamp, char **out_json) {
+int fetch_open_meteo_weather(double latitude, double longitude, const int *elevation, time_t timestamp, char **out_json) {
     char url[MAX_URL_LEN];
+    char elevation_param[32] = "";
+    if (elevation)
+        snprintf(elevation_param, sizeof(elevation_param), "&elevation=%d", *elevation);
+
     struct tm *utc_time = gmtime(&timestamp);
     char iso_time[32];
     strftime(iso_time, sizeof(iso_time), "%Y-%m-%dT%H:00", utc_time);
 
     snprintf(url, MAX_URL_LEN,
         "https://api.open-meteo.com/v1/forecast?"
-        "latitude=%.4f&longitude=%.4f"
+        "latitude=%.4f&longitude=%.4f%s"
         "&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,"
         "pressure_msl,surface_pressure,cloud_cover,cloud_cover_low,"
         "cloud_cover_mid,cloud_cover_high,visibility,"
         "wind_speed_10m,wind_direction_10m,wind_speed_300hPa"
         "&timezone=UTC"
         "&start_date=%.4d-%.2d-%.2d&end_date=%.4d-%.2d-%.2d",
-        latitude, longitude,
+        latitude, longitude, elevation_param,
         utc_time->tm_year + 1900, utc_time->tm_mon + 1, utc_time->tm_mday,
         utc_time->tm_year + 1900, utc_time->tm_mon + 1, utc_time->tm_mday
     );

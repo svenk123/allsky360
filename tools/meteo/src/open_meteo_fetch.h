@@ -36,7 +36,9 @@ typedef struct {
     double wind_speed_300hPa;    // Wind speed at 300 hPa / 9.2 km altitude (km/h)
 } open_meteo_weather_t;
 
-int fetch_open_meteo_weather(double latitude, double longitude, time_t timestamp, char **out_json);
+/* elevation: station height in metres for the downscaling of Open-Meteo
+ * (surface_pressure, temperature); NULL uses its 90 m elevation model. */
+int fetch_open_meteo_weather(double latitude, double longitude, const int *elevation, time_t timestamp, char **out_json);
 
 /**
  * @brief Parse weather data from Open-Meteo JSON response for a specific hour.

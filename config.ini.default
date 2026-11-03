@@ -11,7 +11,10 @@
 #   51.2349N = 51.2349      33.9249S = -33.9249
 #   7.4479E  = 7.4479       74.0060W = -74.0060
 # Invalid values are reported in the log and the default is used instead.
-# location_altitude: metres above sea level
+# location_altitude: metres above sea level. The meteo tool passes it to
+# Open-Meteo as "elevation" (height correction of surface_pressure,
+# temperature and dew point); without it Open-Meteo uses its own terrain
+# model, which can be off by a few hundred metres.
 location_latitude=51.2349N
 location_longitude=7.4479E
 location_altitude=114

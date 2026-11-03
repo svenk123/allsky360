@@ -24,6 +24,7 @@ typedef struct {
     double location_latitude;
     double location_longitude;
     int location_altitude;
+    int location_altitude_set;   /* 1: location_altitude was given in config.ini */
     char database_directory[NAME_MAX+1];
 
 } config_t;

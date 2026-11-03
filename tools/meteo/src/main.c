@@ -155,14 +155,21 @@ int main(int argc, char *argv[]) {
   if (debug) {
     printf("Latitude:  %.6f\n", latitude);
     printf("Longitude: %.6f\n", longitude);
+    if (config.location_altitude_set)
+      printf("Elevation: %d m\n", config.location_altitude);
+    else
+      printf("Elevation: not configured, Open-Meteo elevation model\n");
     printf("Timestamp: %ld (%s)\n", timestamp, ctime(&timestamp));
   }
 
   open_meteo_weather_t weather;
   char *json_raw = NULL;
 
-  if (fetch_open_meteo_weather(latitude, longitude, timestamp, &json_raw) !=
-      0) {
+  if (fetch_open_meteo_weather(latitude, longitude,
+                               config.location_altitude_set
+                                   ? &config.location_altitude
+                                   : NULL,
+                               timestamp, &json_raw) != 0) {
     fprintf(stderr, "Fehler beim Abrufen der Wetterdaten\n");
 
     return 1;

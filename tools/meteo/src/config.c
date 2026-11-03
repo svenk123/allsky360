@@ -35,6 +35,7 @@ int load_config(const char *filename, config_t *config) {
     config->location_latitude=50.1109f;
     config->location_longitude=8.6821f;
     config->location_altitude=100;
+    config->location_altitude_set=0;
     snprintf(config->database_directory, sizeof(config->database_directory), "/opt/allsky360/database");
 
     char line[1024], key[64], value[512];
@@ -79,8 +80,17 @@ int load_config(const char *filename, config_t *config) {
                 if (parse_lat_lon(value, 0, &config->location_longitude) != 0)
                     fprintf(stderr, "WARNING: config.ini: invalid location_longitude '%s', using %.4f\n", value, config->location_longitude);
             }
-            else if (strcmp(key, "location_altitude") == 0)
-                config->location_altitude = atoi(value);
+            else if (strcmp(key, "location_altitude") == 0) {
+                char *end;
+                long alt = strtol(value, &end, 10);
+                while (*end == ' ' || *end == '\t') end++;
+                if (end != value && *end == '\0' && alt >= -500 && alt <= 9000) {
+                    config->location_altitude = (int)alt;
+                    config->location_altitude_set = 1;
+                } else if (*value != '\0') {
+                    fprintf(stderr, "WARNING: config.ini: invalid location_altitude '%s', using the elevation model of Open-Meteo\n", value);
+                }
+            }
             else if (strcmp(key, "database_directory") == 0) {
                 if (strlen(value) >= sizeof(config->database_directory))
                     fprintf(stderr, "WARNING: config.ini: database_directory longer than %zu characters - truncated\n", sizeof(config->database_directory) - 1);
