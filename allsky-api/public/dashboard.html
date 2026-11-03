@@ -131,15 +131,13 @@
       text-transform: uppercase; letter-spacing: 0.09em;
       z-index: 2; pointer-events: none;
     }
+    /* Size and position are set by layoutPanorama() */
     #panorama {
       display: block;
-      height: 100%;
-      width: auto;
-      max-width: none;
       position: absolute;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%);
+      top: 0; left: 0;
+      max-width: none;
+      visibility: hidden;   /* shown by updatePanoZoom() once it is sized */
     }
     #panorama-overlay {
       position: absolute; top: 0; left: 0;
@@ -147,8 +145,6 @@
     }
     #pano-inner {
       position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      transform-origin: center center;
-      will-change: transform;
       cursor: grab;
     }
     #pano-inner.dragging { cursor: grabbing; }
@@ -866,7 +862,10 @@
     let zoomFactor = 1.0;
     let panX = 0, panY = 0;
 
-    // Panorama zoom/pan state
+    // Panorama zoom/pan state. panoZoom is relative to "fit width":
+    // 1.0 = whole panorama across the widget (default and minimum).
+    const PANO_ZOOM_MIN = 1.0;
+    const PANO_ZOOM_MAX = 16.0;
     let panoZoom      = 1.0;
     let panoPanX      = 0, panoPanY = 0;
     let panoIsDragging = false;
@@ -967,14 +966,21 @@
 
     panoContainer.addEventListener("wheel", (e) => {
       e.preventDefault();
-      const factor = e.deltaY < 0 ? 1.15 : (1 / 1.15);
-      panoZoom *= factor;
-      if (panoZoom < 1.0) { panoZoom = 1.0; panoPanX = 0; panoPanY = 0; }
-      updatePanoZoom();
+      const rect = panoContainer.getBoundingClientRect();
+      // Zoom around the mouse position
+      panoZoomBy(e.deltaY < 0 ? 1.15 : (1 / 1.15),
+                 e.clientX - rect.left, e.clientY - rect.top);
     }, { passive: false });
 
+    panoContainer.addEventListener("dblclick", (e) => {
+      if (e.target.closest(".pano-zoom-controls")) return;
+      panoResetZoom();
+    });
+
     panoContainer.addEventListener("mousedown", (e) => {
-      if (panoZoom <= 1.0 && panoramaEl.offsetWidth <= panoContainer.offsetWidth) return;
+      if (e.button !== 0 || e.target.closest(".pano-zoom-controls")) return;
+      const r = panoRect();
+      if (!r || (r.w <= r.cw && r.h <= r.ch)) return;   // nothing to pan
       e.preventDefault();                         // block native image drag
       panoIsDragging = true;
       panoDragStartX = e.clientX - panoPanX;
@@ -999,6 +1005,16 @@
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup",   onUp);
     });
+
+    // Fit every loaded panorama. Registered once here, before the first src is
+    // set: an onload assigned after the src can miss a fast (cached) load and
+    // leave the image at its natural size until "reset zoom" is clicked.
+    panoramaEl.addEventListener("load", () => { try { updatePanoZoom(); } catch (e) {} });
+    if (panoramaEl.complete && panoramaEl.naturalWidth) updatePanoZoom();
+
+    // Re-fit when the widget changes size (window resize, layout changes)
+    if (typeof ResizeObserver === "function")
+      new ResizeObserver(() => updatePanoZoom()).observe(panoContainer);
 
     function updateZoomAndPan() {
       const imgEl2 = document.getElementById("image");
@@ -1045,22 +1061,56 @@
     }
 
     // ── Panorama zoom/pan functions ──────────────────────────────────
+    // Displayed size of the panorama: at panoZoom 1 its width equals the
+    // widget width. Pan offsets are clamped so the image cannot be dragged
+    // out of view; an axis that fits completely stays centred.
+    function panoRect() {
+      const img = panoramaEl;
+      if (!img || !img.naturalWidth || !img.naturalHeight) return null;
+      const cw = panoContainer.clientWidth;
+      const ch = panoContainer.clientHeight;
+      if (!cw || !ch) return null;
+      const w = cw * panoZoom;
+      const h = w * img.naturalHeight / img.naturalWidth;
+      const maxX = Math.max(0, (w - cw) / 2);
+      const maxY = Math.max(0, (h - ch) / 2);
+      panoPanX = Math.min(maxX, Math.max(-maxX, panoPanX));
+      panoPanY = Math.min(maxY, Math.max(-maxY, panoPanY));
+      return { cw, ch, w, h,
+               left: (cw - w) / 2 + panoPanX,
+               top:  (ch - h) / 2 + panoPanY };
+    }
+
     function updatePanoZoom() {
-      const inner = document.getElementById("pano-inner");
-      if (!inner) return;
-      inner.style.transform = `translate(${panoPanX}px, ${panoPanY}px) scale(${panoZoom})`;
+      const r = panoRect();
+      if (!r) return;
+      panoramaEl.style.left   = `${r.left}px`;
+      panoramaEl.style.top    = `${r.top}px`;
+      panoramaEl.style.width  = `${r.w}px`;
+      panoramaEl.style.height = `${r.h}px`;
+      panoramaEl.style.visibility = "visible";
+      updatePanoramaOverlay();
     }
-    function panoZoomIn() {
-      panoZoom *= 1.2;
+
+    // Zoom by factor, keeping the point (px, py) of the widget in place
+    function panoZoomBy(factor, px, py) {
+      const old = panoRect();
+      const z = Math.min(PANO_ZOOM_MAX, Math.max(PANO_ZOOM_MIN, panoZoom * factor));
+      if (!old || z === panoZoom) { panoZoom = z; updatePanoZoom(); return; }
+      if (px === undefined) { px = old.cw / 2; py = old.ch / 2; }
+      // Image point under (px, py), relative to the image centre
+      const f = z / panoZoom;
+      const ix = px - (old.left + old.w / 2);
+      const iy = py - (old.top + old.h / 2);
+      panoZoom = z;
+      panoPanX += ix - ix * f;
+      panoPanY += iy - iy * f;
       updatePanoZoom();
     }
-    function panoZoomOut() {
-      panoZoom /= 1.2;
-      if (panoZoom < 1.0) { panoZoom = 1.0; panoPanX = 0; panoPanY = 0; }
-      updatePanoZoom();
-    }
+    function panoZoomIn()  { panoZoomBy(1.2); }
+    function panoZoomOut() { panoZoomBy(1 / 1.2); }
     function panoResetZoom() {
-      panoZoom = 1.0; panoPanX = 0; panoPanY = 0;
+      panoZoom = PANO_ZOOM_MIN; panoPanX = 0; panoPanY = 0;
       updatePanoZoom();
     }
 
@@ -1406,7 +1456,6 @@
           imageEl.onerror = () => { loading = false; lastImageLoadTime = Date.now(); };
         }
 
-        panoramaEl.onload  = () => { try { updatePanoramaOverlay(); } catch (e) {} };
         panoramaEl.onerror = () => {};
 
         if (!imageMeta) {
@@ -1955,21 +2004,30 @@
       const panoImg = document.getElementById("panorama");
       if (!panoImg || !panoImg.complete || panoImg.naturalWidth === 0) return;
 
-      const containerRect = panoImg.parentElement.getBoundingClientRect();
-      const ratio = panoImg.naturalWidth / panoImg.naturalHeight;
-      const ah    = containerRect.height;
-      const aw    = containerRect.height * ratio;
-
-      canvas.width  = aw;
-      canvas.height = ah;
-      const offX = (containerRect.width - aw) / 2;
-      canvas.style.left   = `${offX}px`;
-      canvas.style.top    = `0px`;
-      canvas.style.width  = `${aw}px`;
-      canvas.style.height = `${ah}px`;
+      // The canvas covers only the visible widget area (a canvas as large as
+      // the zoomed image would need hundreds of MB); the drawing is shifted
+      // to the image position, so labels keep their size at every zoom level.
+      const r = panoRect();
+      if (!r) return;
+      const aw  = r.w, ah = r.h;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width  = Math.round(r.cw * dpr);
+      canvas.height = Math.round(r.ch * dpr);
+      canvas.style.left   = "0px";
+      canvas.style.top    = "0px";
+      canvas.style.width  = `${r.cw}px`;
+      canvas.style.height = `${r.ch}px`;
 
       const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, aw, ah);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, r.cw, r.ch);
+      ctx.translate(r.left, r.top);
+
+      // Visible part of the image in image coordinates: scales and labels
+      // stay at the visible edges when zoomed in
+      const xL = Math.max(0, -r.left);
+      const xR = Math.min(aw, r.cw - r.left);
+      const yB = Math.min(ah, r.ch - r.top);
 
       ctx.fillStyle   = "rgba(255,80,80,0.85)";
       ctx.strokeStyle = "rgba(255,80,80,0.85)";
@@ -1984,21 +2042,21 @@
       ];
       dirs.forEach(d => {
         const x = (d.deg / 360) * aw;
-        ctx.beginPath(); ctx.moveTo(x, ah - 12); ctx.lineTo(x, ah); ctx.stroke();
-        ctx.fillText(d.label, x, ah - 24);
+        ctx.beginPath(); ctx.moveTo(x, yB - 12); ctx.lineTo(x, yB); ctx.stroke();
+        ctx.fillText(d.label, x, yB - 24);
       });
 
       ctx.textAlign = "right"; ctx.textBaseline = "middle";
       for (let i = 0; i <= 90; i += 15) {
         const y = ah - (i / 90) * ah;
-        ctx.beginPath(); ctx.moveTo(aw - 8, y); ctx.lineTo(aw, y); ctx.stroke();
-        if (i !== 0 && i !== 90) ctx.fillText(`${i}°`, aw - 10, y);
+        ctx.beginPath(); ctx.moveTo(xR - 8, y); ctx.lineTo(xR, y); ctx.stroke();
+        if (i !== 0 && i !== 90) ctx.fillText(`${i}°`, xR - 10, y);
       }
       ctx.textAlign = "left";
       for (let i = 0; i <= 90; i += 15) {
         const y = ah - (i / 90) * ah;
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(8, y); ctx.stroke();
-        if (i !== 0 && i !== 90) ctx.fillText(`${i}°`, 10, y);
+        ctx.beginPath(); ctx.moveTo(xL, y); ctx.lineTo(xL + 8, y); ctx.stroke();
+        if (i !== 0 && i !== 90) ctx.fillText(`${i}°`, xL + 10, y);
       }
 
       if (showAzimutalGrid) {

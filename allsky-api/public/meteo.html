@@ -41,6 +41,46 @@
       overflow-x: hidden;
       padding: 8px 8px 20px;
     }
+
+    /* ── STATION SENSORS (allsky360-sensors) ────────────────────── */
+    .sensor-live {
+      height: 100%;
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 10px 12px;
+      overflow-y: auto;
+    }
+    .sensor-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .sensor-head-title { font-size: 12px; font-weight: 600; color: #e5e7eb; }
+    .sensor-head-meta { font-size: 11px; color: #6b7280; font-variant-numeric: tabular-nums; }
+    .sensor-tiles {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 8px;
+    }
+    .s-tile {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px;
+      padding: 7px 9px;
+      min-width: 0;
+    }
+    .s-label {
+      font-size: 10px; font-weight: 700; color: #6b7280;
+      text-transform: uppercase; letter-spacing: 0.07em;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .s-value {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 2px;
+      font-size: 20px; font-weight: 600; color: #e5e7eb;
+      font-variant-numeric: tabular-nums;
+    }
+    .s-unit { font-size: 11px; font-weight: 500; color: #9ca3af; }
+    .s-sub { margin-top: 1px; font-size: 10px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .s-tile.s-warn { border-color: rgba(245,158,11,0.35); }
+    .s-tile.s-warn .s-value, .s-tile.s-warn .s-sub { color: #f59e0b; }
+    .s-compass { width: 20px; height: 20px; flex-shrink: 0; transition: transform 0.4s; }
+    .sensor-empty { font-size: 12px; color: #6b7280; }
   </style>
 </head>
 
@@ -55,7 +95,7 @@
       <img src="allsky360_256x256.png" alt="Allsky360" width="30" height="30" />
       <div class="hdr-brand-text">
         <div class="hdr-title">Allsky360</div>
-        <div class="hdr-crumb">Weather · Meteorological Data</div>
+        <div class="hdr-crumb">Weather · Forecast &amp; Station Sensors</div>
       </div>
     </a>
 
@@ -167,63 +207,94 @@
       <div id="meteo-scroll">
         <div class="grid-stack" id="meteo-grid">
 
-          <div class="grid-stack-item" gs-id="chart-temp" gs-x="0" gs-y="0" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="sensor-live" gs-x="0" gs-y="0" gs-w="12" gs-h="2">
+            <div class="grid-stack-item-content">
+              <div class="sensor-live">
+                <div class="sensor-head">
+                  <span class="sensor-head-title">Station sensors · latest reading</span>
+                  <span class="badge badge-gray" id="sensor-status"><span class="badge-dot"></span><span id="sensor-status-text">loading</span></span>
+                  <span class="sensor-head-meta" id="sensor-age"></span>
+                </div>
+                <div class="sensor-tiles" id="sensor-tiles"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-temp" gs-x="0" gs-y="2" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartTemp"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-humidity" gs-x="6" gs-y="0" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-humidity" gs-x="6" gs-y="2" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartHumidity"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-pressure" gs-x="0" gs-y="3" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-pressure" gs-x="0" gs-y="5" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartPressure"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-dew-point" gs-x="6" gs-y="3" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-dew-point" gs-x="6" gs-y="5" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartDewPoint"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-clouds" gs-x="0" gs-y="6" gs-w="6" gs-h="3">
-            <div class="grid-stack-item-content">
-              <canvas id="chartClouds"></canvas>
-            </div>
-          </div>
-
-          <div class="grid-stack-item" gs-id="chart-global-cloud" gs-x="6" gs-y="6" gs-w="6" gs-h="3">
-            <div class="grid-stack-item-content">
-              <canvas id="chartGlobalCloud"></canvas>
-            </div>
-          </div>
-
-          <div class="grid-stack-item" gs-id="chart-visibility" gs-x="0" gs-y="9" gs-w="6" gs-h="3">
-            <div class="grid-stack-item-content">
-              <canvas id="chartVisibility"></canvas>
-            </div>
-          </div>
-
-          <div class="grid-stack-item" gs-id="chart-jetstream" gs-x="6" gs-y="9" gs-w="6" gs-h="3">
-            <div class="grid-stack-item-content">
-              <canvas id="chartJetstream"></canvas>
-            </div>
-          </div>
-
-          <div class="grid-stack-item" gs-id="chart-wind-speed" gs-x="0" gs-y="12" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-wind-speed" gs-x="0" gs-y="8" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartWindSpeed"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-wind-dir" gs-x="6" gs-y="12" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-wind-dir" gs-x="6" gs-y="8" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartWindDir"></canvas>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-rain-light" gs-x="0" gs-y="11" gs-w="6" gs-h="3">
+            <div class="grid-stack-item-content">
+              <canvas id="chartRainLight"></canvas>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-air" gs-x="6" gs-y="11" gs-w="6" gs-h="3">
+            <div class="grid-stack-item-content">
+              <canvas id="chartAir"></canvas>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-clouds" gs-x="0" gs-y="14" gs-w="6" gs-h="3">
+            <div class="grid-stack-item-content">
+              <canvas id="chartClouds"></canvas>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-global-cloud" gs-x="6" gs-y="14" gs-w="6" gs-h="3">
+            <div class="grid-stack-item-content">
+              <canvas id="chartGlobalCloud"></canvas>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-visibility" gs-x="0" gs-y="17" gs-w="6" gs-h="3">
+            <div class="grid-stack-item-content">
+              <canvas id="chartVisibility"></canvas>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-jetstream" gs-x="6" gs-y="17" gs-w="6" gs-h="3">
+            <div class="grid-stack-item-content">
+              <canvas id="chartJetstream"></canvas>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-cabinet" gs-x="0" gs-y="20" gs-w="6" gs-h="3">
+            <div class="grid-stack-item-content">
+              <canvas id="chartCabinet"></canvas>
             </div>
           </div>
 
@@ -236,38 +307,97 @@
 
   <script>
     // ══════════════════════════════════════════════════════════════
+    //  HELPERS
+    // ══════════════════════════════════════════════════════════════
+    const MS_TO_KMH = 3.6;
+    // A reading is written every 5 minutes; older than this counts as stale
+    const SENSOR_STALE_S = 15 * 60;
+    // Draw station lines across single missing readings, break on longer gaps
+    const SENSOR_SPAN_MS = 15 * 60 * 1000;
+
+    const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+
+    // YYYY-MM-DD in local time (toISOString() would give the UTC date)
+    function localDateStr(d) {
+      const p = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    }
+
+    function localDayRange(dateStr) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const start = new Date(y, m - 1, d).getTime();
+      const end = new Date(y, m - 1, d + 1).getTime();
+      return { start, end };
+    }
+
+    function cardinal(deg) {
+      const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                    'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+      return dirs[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
+    }
+
+    // [{x: ms, y: value}] for Chart.js; non-numeric values become gaps
+    function xy(rows, fn) {
+      return rows.map(d => {
+        const v = fn(d);
+        return { x: d.timestamp * 1000, y: isNum(v) ? v : null };
+      });
+    }
+
+    // ══════════════════════════════════════════════════════════════
     //  CHART FACTORY
     // ══════════════════════════════════════════════════════════════
     const charts = {};
+    const AXIS_TICKS = { color: '#9ca3af', font: { size: 10 } };
+    const AXIS_GRID = { color: 'rgba(255,255,255,0.06)' };
 
-    function createChart(id, label, datasets, type = "line", showLegend = false) {
+    function line(label, color, extra = {}) {
+      return { label, data: [], borderColor: color, backgroundColor: color, fill: false,
+               pointRadius: 0, borderWidth: 1.5, tension: 0.15, ...extra };
+    }
+    // Station (sensor) series: dashed is the forecast, solid is measured
+    function station(label, color, extra = {}) {
+      return line(label, color, { spanGaps: SENSOR_SPAN_MS, borderWidth: 2, ...extra });
+    }
+
+    // y1: optional right axis { title, ...options }
+    function createChart(id, label, datasets, type = "line", showLegend = false, y = {}, y1 = null) {
+      const scales = {
+        x: {
+          type: 'time',
+          time: {
+            unit: 'hour',
+            tooltipFormat: 'HH:mm',
+            displayFormats: { hour: 'HH:mm', minute: 'HH:mm' }
+          },
+          ticks: { ...AXIS_TICKS, maxTicksLimit: 8 },
+          grid: AXIS_GRID
+        },
+        y: {
+          ticks: { ...AXIS_TICKS, callback: (v) => Number.isInteger(v) ? v.toString() : v.toFixed(1) },
+          grid: AXIS_GRID,
+          ...y
+        }
+      };
+      if (y1) {
+        const { title, ...rest } = y1;
+        scales.y1 = {
+          position: 'right',
+          ticks: AXIS_TICKS,
+          grid: { drawOnChartArea: false },
+          title: { display: !!title, text: title, color: '#6b7280', font: { size: 10 } },
+          ...rest
+        };
+      }
       return new Chart(document.getElementById(id), {
         type,
-        data: { labels: [], datasets },
+        data: { datasets },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           animation: false,
-          scales: {
-            x: {
-              type: 'time',
-              time: {
-                unit: 'minute',
-                tooltipFormat: 'HH:mm',
-                displayFormats: { hour: 'HH:mm', minute: 'HH:mm' }
-              },
-              ticks: { color: '#9ca3af', maxTicksLimit: 8, font: { size: 10 } },
-              grid: { color: 'rgba(255,255,255,0.06)' }
-            },
-            y: {
-              ticks: {
-                color: '#9ca3af',
-                font: { size: 10 },
-                callback: (v) => Number.isInteger(v) ? v.toString() : v.toFixed(1)
-              },
-              grid: { color: 'rgba(255,255,255,0.06)' }
-            }
-          },
+          interaction: { mode: 'nearest', axis: 'x', intersect: false },
+          scales,
           plugins: {
             title: {
               display: true,
@@ -278,7 +408,7 @@
             },
             legend: {
               display: showLegend,
-              labels: { color: '#9ca3af', boxWidth: 2, boxHeight: 2, font: { size: 11 } }
+              labels: { color: '#9ca3af', boxWidth: 10, boxHeight: 2, font: { size: 11 } }
             }
           }
         }
@@ -286,51 +416,61 @@
     }
 
     // ══════════════════════════════════════════════════════════════
-    //  DATA UPDATE / CLEAR
+    //  DATA UPDATE
     // ══════════════════════════════════════════════════════════════
-    function updateCharts(data) {
-      const ts = data.map(d => new Date(d.timestamp * 1000));
+    // Open-Meteo forecast (hourly) and station sensors (every 5 min) share
+    // the time axis of the selected local day.
+    function updateCharts(meteo, sensors, range) {
+      const set = (chart, ...series) => {
+        series.forEach((data, i) => { chart.data.datasets[i].data = data; });
+      };
 
-      charts.chartTemp.data.labels = ts;
-      charts.chartTemp.data.datasets[0].data = data.map(d => d.temperature);
+      set(charts.chartTemp,
+          xy(meteo, d => d.temperature),
+          xy(sensors, d => d.temperature));
+      set(charts.chartHumidity,
+          xy(meteo, d => d.humidity),
+          xy(sensors, d => d.humidity));
+      set(charts.chartPressure,
+          xy(meteo, d => d.pressure_msl),
+          xy(meteo, d => d.surface_pressure),
+          xy(sensors, d => d.pressure));
+      set(charts.chartDewPoint,
+          xy(meteo, d => d.dew_point),
+          xy(sensors, d => d.dew_point));
+      set(charts.chartWindSpeed,
+          xy(meteo, d => d.wind_speed_10m),
+          xy(sensors, d => isNum(d.wind_speed) ? d.wind_speed * MS_TO_KMH : null),
+          xy(sensors, d => isNum(d.ws_wind_speed) ? d.ws_wind_speed * MS_TO_KMH : null));
+      set(charts.chartWindDir,
+          xy(meteo, d => d.wind_dir_10m),
+          xy(sensors, d => d.wind_direction),
+          xy(sensors, d => d.ws_wind_direction));
+      set(charts.chartRainLight,
+          xy(sensors, d => d.rainfall),
+          xy(sensors, d => d.illuminance));
+      set(charts.chartAir,
+          xy(sensors, d => d.pm25),
+          xy(sensors, d => d.pm10),
+          xy(sensors, d => d.noise));
+      set(charts.chartCabinet,
+          xy(sensors, d => d.cabinet_temperature),
+          xy(sensors, d => d.cabinet_dew_point),
+          xy(sensors, d => d.cabinet_humidity));
+      set(charts.chartClouds,
+          xy(meteo, d => d.cloud_low),
+          xy(meteo, d => d.cloud_mid),
+          xy(meteo, d => d.cloud_high));
+      set(charts.chartGlobalCloud,
+          xy(meteo, d => d.cloud_cover));
+      set(charts.chartVisibility,
+          xy(meteo, d => isNum(d.visibility) ? d.visibility / 1000 : null));
+      set(charts.chartJetstream,
+          xy(meteo, d => d.wind_speed_300hPa));
 
-      charts.chartHumidity.data.labels = ts;
-      charts.chartHumidity.data.datasets[0].data = data.map(d => d.humidity);
-
-      charts.chartPressure.data.labels = ts;
-      charts.chartPressure.data.datasets[0].data = data.map(d => d.pressure_msl);
-      charts.chartPressure.data.datasets[1].data = data.map(d => d.surface_pressure);
-
-      charts.chartDewPoint.data.labels = ts;
-      charts.chartDewPoint.data.datasets[0].data = data.map(d => d.dew_point);
-
-      charts.chartClouds.data.labels = ts;
-      charts.chartClouds.data.datasets[0].data = data.map(d => d.cloud_low);
-      charts.chartClouds.data.datasets[1].data = data.map(d => d.cloud_mid);
-      charts.chartClouds.data.datasets[2].data = data.map(d => d.cloud_high);
-
-      charts.chartGlobalCloud.data.labels = ts;
-      charts.chartGlobalCloud.data.datasets[0].data = data.map(d => d.cloud_cover);
-
-      charts.chartVisibility.data.labels = ts;
-      charts.chartVisibility.data.datasets[0].data = data.map(d => d.visibility / 1000);
-
-      charts.chartJetstream.data.labels = ts;
-      charts.chartJetstream.data.datasets[0].data = data.map(d => d.wind_speed_300hPa);
-
-      charts.chartWindSpeed.data.labels = ts;
-      charts.chartWindSpeed.data.datasets[0].data = data.map(d => d.wind_speed_10m);
-
-      charts.chartWindDir.data.labels = ts;
-      charts.chartWindDir.data.datasets[0].data = data.map(d => d.wind_dir_10m);
-
-      Object.values(charts).forEach(c => c.update());
-    }
-
-    function clearAllCharts() {
       Object.values(charts).forEach(c => {
-        c.data.labels = [];
-        c.data.datasets.forEach(ds => ds.data = []);
+        c.options.scales.x.min = range.start;
+        c.options.scales.x.max = range.end;
         c.update();
       });
     }
@@ -338,19 +478,136 @@
     // ══════════════════════════════════════════════════════════════
     //  LOAD MEASUREMENTS
     // ══════════════════════════════════════════════════════════════
+    async function fetchRows(url) {
+      const res = await fetch(url);
+      if (res.status === 404) return [];
+      if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+      const json = await res.json();
+      return Array.isArray(json) ? json : [];
+    }
+
+    // The sensor tool writes one database per UTC day; a local day can span
+    // two of them, so fetch both and cut out the local day.
+    async function fetchSensorRows(range) {
+      const days = new Set([
+        new Date(range.start).toISOString().slice(0, 10),
+        new Date(range.end - 1).toISOString().slice(0, 10)
+      ]);
+      const parts = await Promise.all([...days].map(day =>
+        fetchRows(`/api/sensors?date=${day}`).catch(err => {
+          console.error("Failed to load sensor data:", err);
+          return [];
+        })));
+      return parts.flat()
+        .filter(d => d.timestamp * 1000 >= range.start && d.timestamp * 1000 < range.end)
+        .sort((a, b) => a.timestamp - b.timestamp);
+    }
+
     async function loadMeasurements() {
       const date = document.getElementById("datePicker").value;
       document.getElementById("hdr-date").textContent = date || '–';
+      if (!date) return;
+      const range = localDayRange(date);
+
+      const [meteo, sensors] = await Promise.all([
+        fetchRows(`/api/meteo?date=${date}`).catch(err => {
+          console.error("Failed to load meteo data:", err);
+          return [];
+        }),
+        fetchSensorRows(range)
+      ]);
+      updateCharts(meteo, sensors, range);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  LATEST SENSOR READING (latest_sensor_data.json, every 5 min)
+    // ══════════════════════════════════════════════════════════════
+    function fmt(v, digits) {
+      return isNum(v) ? v.toFixed(digits) : '–';
+    }
+
+    function compassSvg(deg) {
+      if (!isNum(deg)) return '';
+      // Arrow points where the wind blows to (meteorological direction + 180°)
+      return `<svg class="s-compass" viewBox="0 0 24 24" style="transform: rotate(${(deg + 180) % 360}deg)">
+        <circle cx="12" cy="12" r="10.5" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1.2"/>
+        <path d="M12 3.5 L16 14 L12 11.5 L8 14 Z" fill="#86efac"/>
+      </svg>`;
+    }
+
+    function tile(label, value, unit, sub = '', warn = false, extra = '') {
+      return `<div class="s-tile${warn ? ' s-warn' : ''}">
+        <div class="s-label" title="${label}">${label}</div>
+        <div class="s-value">${extra}<span>${value}</span><span class="s-unit">${value === '–' ? '' : unit}</span></div>
+        <div class="s-sub">${sub || '&nbsp;'}</div>
+      </div>`;
+    }
+
+    function renderSensorTiles(r) {
+      const spread = (t, td) => isNum(t) && isNum(td) ? t - td : null;
+      const outSpread = spread(r.temperature, r.dew_point);
+      const cabSpread = spread(r.cabinet_temperature, r.cabinet_dew_point);
+      // Condensation risk when the surface is less than 3 K above the dew point
+      const cabWarn = isNum(cabSpread) && cabSpread < 3;
+      const dewWarn = isNum(outSpread) && outSpread < 2;
+      const kmh = (v) => isNum(v) ? `${(v * MS_TO_KMH).toFixed(1)} km/h` : '';
+      const dirSub = (v) => isNum(v) ? cardinal(v) : '';
+
+      return [
+        tile('Temperature', fmt(r.temperature, 1), '°C'),
+        tile('Humidity', fmt(r.humidity, 0), '%'),
+        tile('Dew point', fmt(r.dew_point, 1), '°C',
+             isNum(outSpread) ? `${outSpread.toFixed(1)} K below air${dewWarn ? ' · dew likely' : ''}` : '', dewWarn),
+        tile('Pressure', fmt(r.pressure, 0), 'hPa'),
+        tile('Wind (anemometer)', fmt(r.wind_speed, 1), 'm/s', kmh(r.wind_speed)),
+        tile('Wind dir (vane)', fmt(r.wind_direction, 0), '°', dirSub(r.wind_direction), false,
+             compassSvg(r.wind_direction)),
+        tile('Wind (weather sensor)', fmt(r.ws_wind_speed, 1), 'm/s',
+             [kmh(r.ws_wind_speed), isNum(r.ws_wind_direction) ? `${r.ws_wind_direction.toFixed(0)}° ${cardinal(r.ws_wind_direction)}` : '']
+               .filter(Boolean).join(' · ')),
+        tile('Rain', fmt(r.rainfall, 1), 'mm'),
+        tile('Illuminance', isNum(r.illuminance) ? Math.round(r.illuminance).toLocaleString() : '–', 'lx'),
+        tile('Noise', fmt(r.noise, 0), 'dB'),
+        tile('PM2.5', fmt(r.pm25, 0), 'µg/m³'),
+        tile('PM10', fmt(r.pm10, 0), 'µg/m³'),
+        tile('Cabinet temp', fmt(r.cabinet_temperature, 1), '°C'),
+        tile('Cabinet humidity', fmt(r.cabinet_humidity, 0), '%'),
+        tile('Cabinet dew point', fmt(r.cabinet_dew_point, 1), '°C',
+             isNum(cabSpread) ? `${cabSpread.toFixed(1)} K margin${cabWarn ? ' · condensation risk' : ''}` : '', cabWarn)
+      ].join('');
+    }
+
+    function setSensorStatus(cls, text, age) {
+      const badge = document.getElementById('sensor-status');
+      badge.className = `badge ${cls}`;
+      document.getElementById('sensor-status-text').textContent = text;
+      document.getElementById('sensor-age').textContent = age;
+    }
+
+    async function loadLatestSensors() {
+      const tiles = document.getElementById('sensor-tiles');
       try {
-        const res = await fetch(`/api/meteo?date=${date}`);
-        if (res.status === 404) { clearAllCharts(); return; }
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const json = await res.json();
-        if (Array.isArray(json)) updateCharts(json);
-        else clearAllCharts();
+        const res = await fetch('latest_sensor_data.json');
+        if (res.status === 404) {
+          setSensorStatus('badge-gray', 'no data', '');
+          tiles.innerHTML = '<div class="sensor-empty">No sensor reading yet. Set the modbus_*_address keys in config.ini and enable allsky360-sensors.timer.</div>';
+          return;
+        }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const r = await res.json();
+        const ts = isNum(r.timestamp) ? new Date(r.timestamp * 1000) : null;
+        const ageS = ts ? Math.max(0, (Date.now() - ts.getTime()) / 1000) : Infinity;
+        const ageText = ts
+          ? `${ts.toLocaleString([], { dateStyle: 'short', timeStyle: 'medium' })} · ${ageS < 90 ? 'just now' : Math.round(ageS / 60) + ' min ago'}`
+          : '';
+        if (ageS > SENSOR_STALE_S)
+          setSensorStatus('badge-orange', 'stale', ageText + ' · check allsky360-sensors.timer');
+        else
+          setSensorStatus('badge-green', 'live', ageText);
+        tiles.innerHTML = renderSensorTiles(r);
       } catch (err) {
-        console.error("Failed to load meteo data:", err);
-        clearAllCharts();
+        console.error('Failed to load latest sensor data:', err);
+        setSensorStatus('badge-orange', 'error', String(err.message || err));
       }
     }
 
@@ -359,32 +616,69 @@
     // ══════════════════════════════════════════════════════════════
     function init() {
       const datePicker = document.getElementById("datePicker");
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localDateStr(new Date());
       datePicker.value = today;
       document.getElementById("hdr-date").textContent = today;
       datePicker.addEventListener("change", loadMeasurements);
 
+      const dashed = { borderDash: [5, 4], borderWidth: 1.25 };
+
       charts.chartTemp = createChart("chartTemp", "Temperature (°C)", [
-        { label: "Temperature", data: [], borderColor: "#f97316", fill: false, pointRadius: 0, tension: 0.15 }
-      ]);
+        line("Forecast", "#f97316", dashed),
+        station("Station", "#fb923c")
+      ], "line", true);
 
       charts.chartHumidity = createChart("chartHumidity", "Relative Humidity (%)", [
-        { label: "Humidity", data: [], borderColor: "#60a5fa", fill: false, pointRadius: 0, tension: 0.15 }
-      ]);
+        line("Forecast", "#60a5fa", dashed),
+        station("Station", "#93c5fd")
+      ], "line", true);
 
       charts.chartPressure = createChart("chartPressure", "Pressure (hPa)", [
-        { label: "MSL",     data: [], borderColor: "#a3e635", fill: false, pointRadius: 0, tension: 0.15 },
-        { label: "Surface", data: [], borderColor: "#22d3ee", fill: false, pointRadius: 0, tension: 0.15 }
+        line("Forecast MSL", "#a3e635", dashed),
+        line("Forecast surface", "#22d3ee", dashed),
+        station("Station", "#e5e7eb")
       ], "line", true);
 
       charts.chartDewPoint = createChart("chartDewPoint", "Dew Point (°C)", [
-        { label: "Dew point", data: [], borderColor: "#e5e7eb", fill: false, pointRadius: 0, tension: 0.15 }
-      ]);
+        line("Forecast", "#9ca3af", dashed),
+        station("Station", "#e5e7eb")
+      ], "line", true);
+
+      charts.chartWindSpeed = createChart("chartWindSpeed", "Wind Speed (km/h)", [
+        line("Forecast 10 m", "#86efac", dashed),
+        station("Anemometer", "#22c55e"),
+        station("Weather sensor", "#2dd4bf", { borderWidth: 1.25 })
+      ], "line", true, { min: 0 });
+
+      // Directions wrap at 360°, so the measured values are drawn as points
+      const dirPoints = { showLine: false, pointRadius: 1.8, pointHoverRadius: 3 };
+      charts.chartWindDir = createChart("chartWindDir", "Wind Direction (°)", [
+        line("Forecast 10 m", "#fca5a5", dashed),
+        station("Wind vane", "#f87171", dirPoints),
+        station("Weather sensor", "#fdba74", dirPoints)
+      ], "line", true, { min: 0, max: 360, ticks: { ...AXIS_TICKS, stepSize: 90 } });
+
+      charts.chartRainLight = createChart("chartRainLight", "Rain (mm) · Illuminance (lx)", [
+        station("Rain", "#38bdf8", { type: "bar", backgroundColor: "rgba(56,189,248,0.55)", yAxisID: "y" }),
+        station("Illuminance", "#facc15", { yAxisID: "y1" })
+      ], "line", true, { min: 0 }, { title: "lx", min: 0 });
+
+      charts.chartAir = createChart("chartAir", "Air Quality (µg/m³) · Noise (dB)", [
+        station("PM2.5", "#c084fc", { yAxisID: "y" }),
+        station("PM10", "#a78bfa", { yAxisID: "y", borderWidth: 1.25 }),
+        station("Noise", "#9ca3af", { yAxisID: "y1", borderDash: [2, 3], borderWidth: 1.25 })
+      ], "line", true, { min: 0 }, { title: "dB" });
+
+      charts.chartCabinet = createChart("chartCabinet", "Control Cabinet (°C · %)", [
+        station("Temperature", "#fb923c", { yAxisID: "y" }),
+        station("Dew point", "#e5e7eb", { yAxisID: "y", borderWidth: 1.25 }),
+        station("Humidity", "#60a5fa", { yAxisID: "y1", borderDash: [5, 4], borderWidth: 1.25 })
+      ], "line", true, {}, { title: "%", min: 0, max: 100 });
 
       charts.chartClouds = createChart("chartClouds", "Cloud Cover by Layer (%)", [
-        { label: "Low",  data: [], borderColor: "#6b7280", fill: false, pointRadius: 0, tension: 0.15 },
-        { label: "Mid",  data: [], borderColor: "#9ca3af", fill: false, pointRadius: 0, tension: 0.15 },
-        { label: "High", data: [], borderColor: "#e5e7eb", fill: false, pointRadius: 0, tension: 0.15 }
+        line("Low", "#6b7280"),
+        line("Mid", "#9ca3af"),
+        line("High", "#e5e7eb")
       ], "line", true);
 
       charts.chartGlobalCloud = createChart("chartGlobalCloud", "Total Cloud Cover (%)", [
@@ -392,23 +686,17 @@
       ], "bar");
 
       charts.chartVisibility = createChart("chartVisibility", "Visibility (km)", [
-        { label: "Visibility", data: [], borderColor: "#fbbf24", fill: false, pointRadius: 0, tension: 0.15 }
+        line("Visibility", "#fbbf24")
       ]);
 
       charts.chartJetstream = createChart("chartJetstream", "Jetstream @9.2 km (km/h)", [
-        { label: "Jetstream", data: [], borderColor: "#c084fc", fill: false, pointRadius: 0, tension: 0.15 }
-      ]);
-
-      charts.chartWindSpeed = createChart("chartWindSpeed", "Wind Speed 10 m (km/h)", [
-        { label: "Wind speed", data: [], borderColor: "#86efac", fill: false, pointRadius: 0, tension: 0.15 }
-      ]);
-
-      charts.chartWindDir = createChart("chartWindDir", "Wind Direction 10 m (°)", [
-        { label: "Wind direction", data: [], borderColor: "#fca5a5", fill: false, pointRadius: 0, tension: 0.15 }
+        line("Jetstream", "#c084fc")
       ]);
 
       loadMeasurements();
+      loadLatestSensors();
       setInterval(loadMeasurements, 60000);
+      setInterval(loadLatestSensors, 60000);
     }
 
     document.addEventListener("DOMContentLoaded", init);
@@ -448,18 +736,23 @@
         }
       };
 
-      const LS_KEY = 'allsky360.meteo1.layout.v1';
+      // v2: station sensor widgets added (older saved layouts are ignored)
+      const LS_KEY = 'allsky360.meteo1.layout.v2';
       const defaultLayout = [
-        { id: "chart-temp",         x: 0, y: 0,  w: 6, h: 3 },
-        { id: "chart-humidity",     x: 6, y: 0,  w: 6, h: 3 },
-        { id: "chart-pressure",     x: 0, y: 3,  w: 6, h: 3 },
-        { id: "chart-dew-point",    x: 6, y: 3,  w: 6, h: 3 },
-        { id: "chart-clouds",       x: 0, y: 6,  w: 6, h: 3 },
-        { id: "chart-global-cloud", x: 6, y: 6,  w: 6, h: 3 },
-        { id: "chart-visibility",   x: 0, y: 9,  w: 6, h: 3 },
-        { id: "chart-jetstream",    x: 6, y: 9,  w: 6, h: 3 },
-        { id: "chart-wind-speed",   x: 0, y: 12, w: 6, h: 3 },
-        { id: "chart-wind-dir",     x: 6, y: 12, w: 6, h: 3 }
+        { id: "sensor-live",        x: 0, y:  0, w: 12, h: 2 },
+        { id: "chart-temp",         x: 0, y:  2, w:  6, h: 3 },
+        { id: "chart-humidity",     x: 6, y:  2, w:  6, h: 3 },
+        { id: "chart-pressure",     x: 0, y:  5, w:  6, h: 3 },
+        { id: "chart-dew-point",    x: 6, y:  5, w:  6, h: 3 },
+        { id: "chart-wind-speed",   x: 0, y:  8, w:  6, h: 3 },
+        { id: "chart-wind-dir",     x: 6, y:  8, w:  6, h: 3 },
+        { id: "chart-rain-light",   x: 0, y: 11, w:  6, h: 3 },
+        { id: "chart-air",          x: 6, y: 11, w:  6, h: 3 },
+        { id: "chart-clouds",       x: 0, y: 14, w:  6, h: 3 },
+        { id: "chart-global-cloud", x: 6, y: 14, w:  6, h: 3 },
+        { id: "chart-visibility",   x: 0, y: 17, w:  6, h: 3 },
+        { id: "chart-jetstream",    x: 6, y: 17, w:  6, h: 3 },
+        { id: "chart-cabinet",      x: 0, y: 20, w:  6, h: 3 }
       ];
 
       function applyLayout(layout) {

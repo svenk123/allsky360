@@ -421,6 +421,11 @@ same file as the camera data). The last reading is also written to
 `allsky-api/public/latest_sensor_data.json` (served as `/latest_sensor_data.json`);
 the history of a day comes from `GET /api/sensors?date=YYYY-MM-DD`.
 
+The web page `meteo.html` (Weather) shows the latest reading as tiles (marked
+*stale* when it is older than 15 minutes, condensation warning for the control
+cabinet) and draws the station values next to the Open-Meteo forecast, plus
+charts for rain/illuminance, air quality/noise and the control cabinet.
+
 Check the last reading on the station:
 
 ```bash
