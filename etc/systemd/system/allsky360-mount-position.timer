@@ -3,6 +3,10 @@ Description=Run allsky360-mount-position every 1 minute
 
 [Timer]
 OnBootSec=2min
+# OnUnitActiveSec counts from the last run of the service, which systemd
+# forgets on daemon-reload: without this the timer never fires again after
+# a restart (make install) until the next boot.
+OnActiveSec=1min
 OnUnitActiveSec=1min
 AccuracySec=30s
 Persistent=true
