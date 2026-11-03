@@ -1140,11 +1140,17 @@
       showSunMoon = sunMoonCheckbox.checked;
       updateAllskyOverlay();
     }
+    // mount.json is only fetched while the "Mount" checkbox is on: without a
+    // configured mount the file does not exist and every request is a 404.
     async function loadMountData() {
+      if (!showMountPosition) return;
+      let data = null;
       try {
         const resp = await fetch('mount.json', { cache: "no-cache" });
-        mountData = resp.ok ? await resp.json() : null;
-      } catch { mountData = null; }
+        data = resp.ok ? await resp.json() : null;
+      } catch { data = null; }
+      if (!showMountPosition) return;   // switched off while the request was running
+      mountData = data;
       updateMountWidget();
       updateAllskyOverlay();
     }
@@ -2097,7 +2103,6 @@
     initTimeModeToggle(document.getElementById('time-mode-btn'));
     loadConfig();
     loadLatestImage();
-    loadMountData();
     loadSpektrumData();
     restartTimer();
     initCharts();
