@@ -176,8 +176,7 @@ int main(int argc, char *argv[]) {
   if (ret != 0) {
     printf("ret=%d\n", ret);
     fprintf(stderr, "Fehler beim Parsen der Wetterdaten\n");
-    if (!json_raw)
-      free(json_raw);
+    free(json_raw);
 
     return 0;
   }

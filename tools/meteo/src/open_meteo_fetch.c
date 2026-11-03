@@ -33,8 +33,10 @@ struct memory {
 static size_t write_callback(void *data, size_t size, size_t nmemb, void *userp) {
     size_t total = size * nmemb;
     struct memory *mem = (struct memory *)userp;
-    mem->response = realloc(mem->response, mem->size + total + 1);
-    if (!mem->response) return 0;
+    /* Keep the old buffer on failure, the caller frees it */
+    char *tmp = realloc(mem->response, mem->size + total + 1);
+    if (!tmp) return 0;
+    mem->response = tmp;
     memcpy(&(mem->response[mem->size]), data, total);
     mem->size += total;
     mem->response[mem->size] = 0;
@@ -70,6 +72,9 @@ int fetch_open_meteo_weather(double latitude, double longitude, time_t timestamp
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &chunk);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
+    curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
 
     CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
@@ -113,7 +118,7 @@ int parse_open_meteo_weather(const char *json_raw, time_t target, open_meteo_wea
     int n = json_object_array_length(j_time);
     for (int i = 0; i < n; i++) {
         const char *t = json_object_get_string(json_object_array_get_idx(j_time, i));
-        if (strcmp(t, target_hour) == 0) {
+        if (t && strcmp(t, target_hour) == 0) {
             matched_index = i;
             break;
         }

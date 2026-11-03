@@ -300,7 +300,7 @@ int main(int argc, const char *argv[]) {
 	/* Sentinel values: NULL / -1 / false = "not set on CLI" */
 	const char *cli_server  = NULL;
 	int         cli_port    = -1;
-	bool        cli_mount   = false;
+	const char *cli_mount   = NULL;
 	const char *config_path = NULL;
 	const char *output_path = NULL;
 	int timeout = 10;
@@ -334,9 +334,7 @@ int main(int argc, const char *argv[]) {
 				}
 				break;
 			case 'm':
-				strncpy(g_mount_name, optarg, sizeof(g_mount_name) - 1);
-				g_mount_name[sizeof(g_mount_name) - 1] = '\0';
-				cli_mount = true;
+				cli_mount = optarg;
 				break;
 			case 't':
 				timeout = atoi(optarg);
@@ -373,8 +371,10 @@ int main(int argc, const char *argv[]) {
 	/* CLI args override config file */
 	const char *server = cli_server ? cli_server : (srv_buf[0] ? srv_buf : NULL);
 	if (cli_port > 0) port = cli_port;
-	/* g_mount_name already set by -m; if not set by CLI, config parser filled it */
-	(void)cli_mount;
+	if (cli_mount) {
+		strncpy(g_mount_name, cli_mount, sizeof(g_mount_name) - 1);
+		g_mount_name[sizeof(g_mount_name) - 1] = '\0';
+	}
 
 	if (!server) {
 		fprintf(stderr, "Error: INDIGO server not specified. Use --host or --config.\n\n");
@@ -475,7 +475,10 @@ int main(int argc, const char *argv[]) {
 		fprintf(stderr, "Error: no response from mount \"%s\" on %s:%d\n",
 		        g_mount_name, server, port);
 		fprintf(stderr, "Tip: use -l / --list-mounts to see available mount names.\n");
-		if (out_fp != stdout) fclose(out_fp);
+		if (out_fp != stdout) {
+			fclose(out_fp);
+			remove(output_tmp); /* no stale .tmp files from periodic runs */
+		}
 		return 2;
 	}
 
