@@ -1,0 +1,53 @@
+[Unit]
+Description=Allsky360 fetch: RS485/Modbus sensors (oneshot)
+
+[Service]
+Type=oneshot
+User=allskyuser
+Group=allskygroup
+WorkingDirectory=/home/allskyuser/database
+ExecStart=/opt/allsky360/bin/allsky360-sensors -c /home/allskyuser/config.ini -d /home/allskyuser/database -f /opt/allsky360/allsky-api/public/latest_sensor_data.json
+# Hard limit for one run: 4 sensors x retries x timeout stays well below
+TimeoutStartSec=50s
+
+# --- Sandbox (review.md, SEC-09) ------------------------------------------
+# Like the other fetch tools, but instead of PrivateDevices= an allow list
+# for the serial port and the GPIO chip of the RS485 direction line.
+# allskyuser needs the groups dialout and gpio (make install adds them).
+# Check the result with: systemd-analyze security allsky360-sensors.service
+DevicePolicy=closed
+DeviceAllow=char-ttyTHS rw
+DeviceAllow=char-ttyS rw
+DeviceAllow=char-ttyUSB rw
+DeviceAllow=char-ttyACM rw
+DeviceAllow=char-gpiochip rw
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ReadWritePaths=/home/allskyuser/database /opt/allsky360/allsky-api/public
+# Other users' homes are hidden, only allskyuser's files are mapped in
+ProtectHome=tmpfs
+BindReadOnlyPaths=/home/allskyuser/config.ini
+BindPaths=/home/allskyuser/database
+PrivateTmp=yes
+PrivateNetwork=yes
+ProtectProc=invisible
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RemoveIPC=yes
+RestrictAddressFamilies=AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallErrorNumber=EPERM
+UMask=0022

@@ -47,6 +47,9 @@
 | SEC-10 | Dienststeuerung der API nie funktionsfähig: `LockPersonality` impliziert `NoNewPrivileges`, `sudo` verweigert → polkit statt sudoers | Medium | **erledigt** |
 | BUG-14 | `allsky360-aurora`: Double-Free bricht ab, sobald ein NOAA-Abruf fehlschlägt | High | **erledigt** |
 | INST-02 | Installation vereinfacht: `install.sh` (Preflight, Build als Benutzer, Assistent, Selbsttest), CUDA-Arch/Version automatisch, einheitliche INDIGO-Gerätenamen | Medium | **erledigt** |
+| FEAT-01 | RS485/Modbus-Sensoren (Wetter, Wind, Schaltschrank) → `allsky360-sensors`, Tabelle `sensors`, `/api/sensors` | – | **erledigt** |
+| DATA-02 | Tagesdatenbank: Kamera/Sensoren benennen nach UTC-Tag, Meteo/Aurora nach lokalem Tag (fällt nur bei Zeitzone ≠ UTC auf) | Low | offen |
+| HW-01 | Windmesser (Adresse 11) liefert in Register 0-3 stets 0, Ultraschall-Wettersensor gleichzeitig 3-5 m/s: blockiert, windgeschützt oder andere Register/Skalierung | – | offen (vor Ort prüfen) |
 | DATA-01 | NOAA hat `solar-wind/mag-2-hour.json` und `plasma-2-hour.json` abgeschaltet (404), Kp-Index wird nicht mehr gelesen (-1) | Medium | offen |
 | BUG-15 | `indigo_cameras -l` listet die Kamera nicht (zeitweise), `indigo_list_cameras` schon | Low | offen |
 | INST-01 | YOLO-Setup nutzt JetPack-6.1/Python-3.10-Wheels → `make yolo` (YOLO26, Torch cu130, Python 3.12) | High | **erledigt** (auf dem System: `sudo make yolo`) |

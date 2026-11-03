@@ -13,6 +13,7 @@ Here's what's in the `tools/` directory:
 * **location** – Calculates location-specific astronomical data (magnetic declination, etc.)
 * **allsky360-meteo** – Fetches weather data from Open-Meteo
 * **timelapse-cuda-nv** – Creates timelapse videos from image sequences, with GPU acceleration
+* **allsky360-sensors** – Reads the local RS485/Modbus sensors (weather sensor, anemometer, wind vane, control cabinet) into the daily database
 
 Each tool has its own Makefile, so you can build them individually if you want.
 
@@ -409,3 +410,94 @@ This installs all the tools along with the main `allsky360-camera` application.
 * The timelapse tool really needs an NVIDIA GPU to work well. If you try to run it without CUDA, it'll probably complain or be really slow.
 
 * All the tools follow the same coding standards and license (MIT) as the main application. If you want to modify them or add features, go for it!
+
+---
+
+## allsky360-sensors (RS485 / Modbus sensors)
+
+Reads the sensors on the station's RS485 bus once per run and stores one row
+in the table `sensors` of the daily database (`database_YYYYMMDD.db`, UTC day,
+same file as the camera data). The last reading is also written to
+`allsky-api/public/latest_sensor_data.json` (served as `/latest_sensor_data.json`);
+the history of a day comes from `GET /api/sensors?date=YYYY-MM-DD`.
+
+Check the last reading on the station:
+
+```bash
+cat /opt/allsky360/allsky-api/public/latest_sensor_data.json
+curl -s http://localhost:3000/latest_sensor_data.json
+sqlite3 -readonly -header -column /home/allskyuser/database/database_$(date -u +%Y%m%d).db \
+  "SELECT datetime(timestamp,'unixepoch','localtime') AS time, temperature, humidity,
+          pressure, wind_speed, wind_direction, cabinet_temperature
+   FROM sensors ORDER BY timestamp DESC LIMIT 5"
+```
+
+| Sensor | Values | config.ini |
+|---|---|---|
+| Weather sensor Halisense HLS-UWS-SDTHA | temperature, humidity, dew point, pressure, wind speed/direction, noise, PM2.5/PM10, illuminance, rain | `modbus_weather_*` |
+| Anemometer | wind speed (m/s = raw / scale) | `modbus_wind_speed_*` |
+| Wind vane | wind direction (+ mounting offset) | `modbus_wind_direction_*` |
+| Control cabinet sensor | temperature, humidity, dew point | `modbus_cabinet_*` |
+
+### Configuration
+
+All settings are `modbus_*` keys in `config.ini` (see the commented block in
+`config.ini.default`): serial device and baud rate, the GPIO that switches the
+RS485 transceiver direction (`modbus_gpio_line=-1` for adapters with automatic
+direction control), timeout, attempts, and per sensor the slave address and
+register. **Address `0` disables a sensor**; with all addresses `0` (the
+default) the tool does nothing. `sudo ./install.sh --configure` asks for the
+four addresses.
+
+Values outside plausible ranges (e.g. humidity > 100 %, pressure outside
+300-1100 hPa) are stored as `NULL`, as are values of sensors that did not
+answer.
+
+### Running automatically
+
+`allsky360-sensors.timer` starts the tool every 5 minutes (`OnUnitActiveSec=5min`,
+change it with `sudo systemctl edit allsky360-sensors.timer`). Like the other timers
+it is installed but not enabled by `make install`:
+
+```bash
+sudo systemctl enable --now allsky360-sensors.timer
+journalctl -u allsky360-sensors.service -f
+```
+
+The service account needs the groups `dialout` (serial port) and `gpio`
+(direction GPIO on the Jetson); `make install` adds them.
+
+### Manual usage
+
+```bash
+allsky360-sensors -c /home/allskyuser/config.ini -n -v   # read and print, no database
+allsky360-sensors -c config.ini -d /home/allskyuser/database -f latest_sensor_data.json
+```
+
+| Option | Meaning |
+|---|---|
+| `-c, --config FILE` | config.ini (required) |
+| `-d, --databasedir DIR` | override `database_directory` |
+| `-f, --outfile FILE` | also write the reading as JSON (atomic) |
+| `-n, --dry-run` | read and print, do not write the database |
+| `-v, --verbose` | print the configuration and every failed attempt with the received bytes |
+
+Exit status: `0` at least one sensor read (or none configured), `2` no
+configured sensor answered, `1` configuration, bus or database error.
+
+### Table `sensors`
+
+| Column | Unit | Source |
+|---|---|---|
+| `timestamp` | Unix time (UTC) | |
+| `temperature`, `humidity`, `dew_point` | °C, %RH, °C | weather sensor (dew point calculated) |
+| `pressure` | hPa | weather sensor |
+| `ws_wind_speed`, `ws_wind_direction` | m/s, ° | weather sensor |
+| `noise`, `pm25`, `pm10`, `illuminance`, `rainfall` | dB, µg/m³, µg/m³, lx, mm | weather sensor |
+| `solar_irradiance_raw` | raw | weather sensor, register unverified |
+| `wind_speed`, `wind_direction` | m/s, ° | anemometer, wind vane |
+| `cabinet_temperature`, `cabinet_humidity`, `cabinet_dew_point` | °C, %RH, °C | control cabinet sensor |
+
+The register maps are taken from the stand-alone test programs in
+`examples/` (weather-sensor, wind-speed, wind-direction, temp-humidity-sensor).
+

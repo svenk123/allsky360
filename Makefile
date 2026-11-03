@@ -211,6 +211,8 @@ deps:
 	@echo `date +%F\ %R:%S` Installing build dependencies...
 	@apt update
 	@apt -y install libjpeg-dev libcfitsio-dev libpng-dev libcairo-dev libnova-dev libjson-c-dev
+# RS485/Modbus sensor tool (direction GPIO of the transceiver)
+	@apt -y install libgpiod-dev
 	@apt -y install sqlite3 libsqlite3-dev
 	@apt -y install libcurl4-openssl-dev
 # dependencies for timelapse tool
@@ -332,7 +334,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cu
 endif
 
 # Build for utils
-tools: timelapse meteo aurora location mount-position cameras panorama list-cameras mount-status
+tools: timelapse meteo aurora location mount-position cameras panorama list-cameras mount-status sensors
 
 timelapse:
 	@echo "Building timelapse tool"
@@ -373,6 +375,10 @@ list-cameras:
 mount-status:
 	@echo "Building mount-status tool"
 	@$(MAKE) -C tools/indigo-mount-status
+
+sensors:
+	@echo "Building RS485/Modbus sensors tool"
+	@$(MAKE) -C tools/sensors
 
 # Build for unit tests
 tests: $(TESTBINS)
@@ -415,7 +421,7 @@ SYSTEMCTL         := systemctl
 # Units that need a configured config.ini and are started by the user
 START_MANUALLY_UNITS := allsky360-camera.service allsky360-aurora.timer \
                         allsky360-meteo.timer allsky360-location.timer \
-                        allsky360-mount-position.timer
+                        allsky360-mount-position.timer allsky360-sensors.timer
 
 APP_DIR           := /opt/allsky360/bin
 SYSTEMD_DIR       := /etc/systemd/system
@@ -446,6 +452,10 @@ user:
 	# Must be added to these groups to use the GPU
 	usermod -a -G video $(USERNAME)
 	usermod -a -G render $(USERNAME)
+	@# RS485 sensors: serial port (dialout) and the direction GPIO (gpio, Jetson)
+	@for g in dialout gpio; do \
+	    if getent group $$g >/dev/null; then usermod -a -G $$g $(USERNAME); fi; \
+	done
 	@echo "Creating home directory $(HOME_DIR)..."
 	$(INSTALL) -d -o $(USERNAME) -g $(GROUPNAME) -m 775 $(HOME_DIR)
 	@echo "Setting up bash environment for $(USERNAME)..."
@@ -536,6 +546,7 @@ binaries:
 	$(INSTALL) -o root -g root -m 755 tools/meteo/bin/allsky360-meteo $(APP_DIR)
 	$(INSTALL) -o root -g root -m 755 tools/aurora/bin/allsky360-aurora $(APP_DIR)
 	$(INSTALL) -o root -g root -m 755 tools/location/bin/allsky360-location $(APP_DIR)
+	$(INSTALL) -o root -g root -m 755 tools/sensors/bin/allsky360-sensors $(APP_DIR)
 	$(INSTALL) -o root -g root -m 755 tools/indigo-mount-position/bin/indigo_mount_position $(APP_DIR)
 	$(INSTALL) -o root -g root -m 755 tools/indigo-cameras/bin/indigo_cameras $(APP_DIR)
 config:
@@ -595,11 +606,13 @@ systemd:
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-aurora.service $(SYSTEMD_DIR)/
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-meteo.service $(SYSTEMD_DIR)/
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-location.service $(SYSTEMD_DIR)/
+	$(INSTALL) -m 644 etc/systemd/system/allsky360-sensors.service $(SYSTEMD_DIR)/
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-mount-position.service $(SYSTEMD_DIR)/
 	# Timer
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-aurora.timer $(SYSTEMD_DIR)/
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-meteo.timer $(SYSTEMD_DIR)/
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-location.timer $(SYSTEMD_DIR)/
+	$(INSTALL) -m 644 etc/systemd/system/allsky360-sensors.timer $(SYSTEMD_DIR)/
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-mount-position.timer $(SYSTEMD_DIR)/
 
 	# Reload unit files. Camera and timers are only enabled by the user.
@@ -763,6 +776,7 @@ uninstall:
 	rm -f $(APP_DIR)/allsky360-meteo
 	rm -f $(APP_DIR)/allsky360-aurora
 	rm -f $(APP_DIR)/allsky360-mount-position
+	rm -f $(APP_DIR)/allsky360-sensors $(APP_DIR)/indigo_mount_position $(APP_DIR)/indigo_cameras
 
 	@echo "Removing legacy cron files (replaced by systemd timers)..."
 	rm -f $(CRON_DIR)/allsky360 $(CRON_DIR)/allsky360-tools $(CRON_DIR)/allsky360-tools.cron
@@ -838,5 +852,5 @@ help:
 	@echo "  make help            - Show this help"
 	@echo "  make log             - View live logs"
 
-.PHONY: all clean install uninstall tests help FORCE polkit node-deps node-check node-build node-install yolo yolo-check yolov11
+.PHONY: all clean install uninstall tests help FORCE polkit sensors node-deps node-check node-build node-install yolo yolo-check yolov11
 

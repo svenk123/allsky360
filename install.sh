@@ -31,7 +31,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_USER="allskyuser"
 CONFIG_FILE="/home/${SERVICE_USER}/config.ini"
 INDIGO_ROOT="${INDIGO_ROOT:-$(cd "$REPO_DIR/.." && pwd)/indigo}"
-START_UNITS="allsky360-camera.service allsky360-aurora.timer allsky360-meteo.timer allsky360-location.timer allsky360-mount-position.timer"
+START_UNITS="allsky360-camera.service allsky360-aurora.timer allsky360-meteo.timer allsky360-location.timer allsky360-mount-position.timer allsky360-sensors.timer"
 MIN_FREE_GB=5
 
 # Options
@@ -224,6 +224,18 @@ configure() {
     choose_device v "Mount (empty = no mount)" "$(cfg_get indigo_mount)" "${mounts[@]+"${mounts[@]}"}"
     cfg_set indigo_mount "$v"
 
+    echo; echo "  ${C_B}RS485/Modbus sensors${C_0} (slave address, 0 = not connected)"
+    local key label
+    for key in weather:"Weather sensor" wind_speed:"Anemometer" wind_direction:"Wind vane" cabinet:"Control cabinet temp/humidity"; do
+        label="${key#*:}"; key="modbus_${key%%:*}_address"
+        while :; do
+            ask v "$label" "$(cfg_get "$key")"; v="${v:-0}"
+            [[ "$v" =~ ^[0-9]+$ ]] && [ "$v" -le 247 ] && break
+            echo "  ${C_R}0-247 please${C_0}"
+        done
+        cfg_set "$key" "$v"
+    done
+
     echo; echo "  ${C_B}Web UI service control${C_0}"
     if [ -z "$(cfg_get api-token)" ]; then
         local token
@@ -345,7 +357,7 @@ install_ai() {
 selftest() {
     step "Self-test"
     local bin=/opt/allsky360/bin
-    for b in allsky360-camera allsky360-timelapse allsky360-meteo allsky360-aurora allsky360-location indigo_mount_position; do
+    for b in allsky360-camera allsky360-timelapse allsky360-meteo allsky360-aurora allsky360-location allsky360-sensors indigo_mount_position; do
         if [ -x "$bin/$b" ]; then ok "$b installed"; else fail "$b missing in $bin"; fi
     done
     if "$bin/allsky360-camera" --help >/dev/null 2>&1; then ok "allsky360-camera starts (all libraries found)"

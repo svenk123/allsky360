@@ -1,0 +1,11 @@
+[Unit]
+Description=Read the RS485/Modbus sensors every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Unit=allsky360-sensors.service
+
+[Install]
+WantedBy=timers.target

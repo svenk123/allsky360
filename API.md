@@ -96,6 +96,38 @@ GET /api/image?date=2025-07-22
 
 ### Meteorological Data
 
+#### `GET /api/sensors`
+
+Returns the readings of the local RS485/Modbus sensors for a given day
+(table `sensors`, written every 5 minutes by `allsky360-sensors.service`).
+Values of sensors that are not configured or did not answer are `null`.
+
+**Query parameters**
+
+| Parameter | Type   | Required | Description                        |
+|-----------|--------|----------|------------------------------------|
+| `date`    | string | yes      | Date in `YYYY-MM-DD` format (UTC day) |
+
+**Response**
+
+HTTP 200 — JSON array of records with `timestamp` (Unix, UTC),
+`temperature`, `humidity`, `dew_point`, `pressure` (hPa), `ws_wind_speed`
+(m/s), `ws_wind_direction` (°), `noise` (dB), `pm25`, `pm10` (µg/m³),
+`illuminance` (lx), `rainfall` (mm), `wind_speed` (m/s, anemometer),
+`wind_direction` (°, wind vane), `cabinet_temperature`, `cabinet_humidity`,
+`cabinet_dew_point`. See TOOLS.md for the sources.
+
+**Error responses**
+
+| Status | Condition                                |
+|--------|------------------------------------------|
+| 400    | `date` parameter missing or malformed    |
+| 404    | no database or no sensor data for that day |
+
+The latest reading is also available as `latest_sensor_data.json`.
+
+---
+
 #### `GET /api/meteo`
 
 Returns hourly weather forecast/analysis records for a given day from the

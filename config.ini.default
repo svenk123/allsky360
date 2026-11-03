@@ -112,6 +112,50 @@ indigo_camera="Uranus-C @ indigo_server"
 indigo_mount=
 indigo_capture_timeout=30
 
+# RS485 / Modbus RTU sensors (allsky360-sensors, run every 5 minutes by
+# allsky360-sensors.timer). Values go into the table 'sensors' of the daily
+# database and into allsky-api/public/latest_sensor_data.json.
+# A sensor address of 0 disables that sensor; with all addresses 0 the tool
+# does nothing. Example addresses of the reference station:
+#   weather sensor 5, anemometer 11, wind vane 12, control cabinet 13
+# Find the addresses on the bus with examples/modbus-scan.
+######################
+# Serial port and RS485 transceiver
+modbus_device=/dev/ttyTHS1
+modbus_baudrate=4800
+# GPIO that switches the transceiver direction (DE/RE): high = send.
+# Jetson: /dev/gpiochip0 line 112 (PR.04, UART1_RTS).
+# -1 = transceiver with automatic direction control (e.g. USB-RS485 adapter)
+modbus_gpio_chip=/dev/gpiochip0
+modbus_gpio_line=112
+# Wait for an answer (the sensors need up to ~1 s) and attempts per request
+modbus_timeout_ms=1200
+modbus_retries=3
+# Read function: 3 = holding registers, 4 = input registers
+modbus_function=3
+
+# Weather sensor Halisense HLS-UWS-SDTHA: temperature, humidity, pressure,
+# wind, noise, PM2.5/PM10, illuminance, rain (block from 0x01F4)
+modbus_weather_address=0
+modbus_weather_register=0x01F4
+# Mounting correction of its wind direction, added modulo 360
+modbus_weather_wind_direction_offset=0
+
+# Anemometer: wind speed = raw value / scale in m/s
+modbus_wind_speed_address=0
+modbus_wind_speed_register=1
+modbus_wind_speed_scale=1.0
+
+# Wind vane: 0-359 degrees, offset = mounting correction added modulo 360
+modbus_wind_direction_address=0
+modbus_wind_direction_register=1
+modbus_wind_direction_offset=0
+
+# Temperature/humidity sensor in the control cabinet
+# (humidity at the register, temperature at register + 1)
+modbus_cabinet_address=0
+modbus_cabinet_register=0
+
 # Camera settings
 #########################
 camera_max_exposure=60.0

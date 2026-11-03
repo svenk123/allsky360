@@ -118,6 +118,7 @@ Each tool has its own Makefile and produces a binary in its `bin/` subdirectory:
 - `tools/timelapse/` — GPU-accelerated JPEG→MP4 timelapse (nvJPEG + NVENC)
 - `tools/aurora/` — fetches NOAA/ESA aurora/Kp data → SQLite
 - `tools/meteo/` — fetches Open-Meteo weather data → SQLite
+- `tools/sensors/` — reads the RS485/Modbus sensors (weather sensor, anemometer, wind vane, cabinet temp/humidity) every 5 minutes → table `sensors` in the daily DB; own Modbus RTU master with GPIO direction switching (libgpiod v1), settings `modbus_*` in config.ini
 - `tools/location/` — calculates magnetic declination and astronomical data
 - `tools/panorama/` — panorama stitching
 - `tools/indigo-list-cameras/` — lists INDIGO-connected cameras

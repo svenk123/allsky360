@@ -753,6 +753,11 @@ int load_config(const char *filename, config_t *config) {
         /* intentionally ignored */
       }
 
+      /* Consumed by the RS485 sensor tool (tools/sensors), not by this daemon. */
+      else if (strncmp(key, "modbus_", 7) == 0) {
+        /* intentionally ignored */
+      }
+
       /* Anything else is a typo or a stale setting. Report it once per process:
        * load_config() runs on every capture cycle, so warning every time would
        * flood the log. */

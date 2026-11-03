@@ -22,7 +22,8 @@ polkit.addRule(function (action, subject) {
         "allsky360-aurora.service",
         "allsky360-meteo.service",
         "allsky360-location.service",
-        "allsky360-mount-position.service"
+        "allsky360-mount-position.service",
+        "allsky360-sensors.service"
     ];
     var verbs = ["start", "stop", "restart"];
 

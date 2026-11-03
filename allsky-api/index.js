@@ -81,7 +81,8 @@ const ALLOWED_SERVICES = [
     'allsky360-meteo.service',
     'allsky360-location.service',
     'allsky360-aurora.service',
-    'allsky360-mount-position.service'
+    'allsky360-mount-position.service',
+    'allsky360-sensors.service'
 ];
 
 // Helper function to execute systemctl commands
@@ -339,6 +340,39 @@ const server = http.createServer((req, res) => {
             if (err) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: err.message }));
+            } else {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(rows));
+            }
+            db.close();
+        });
+
+    // API call: /api/sensors?date=YYYY-MM-DD (RS485/Modbus sensors, allsky360-sensors)
+    } else if (pathname === '/api/sensors') {
+        const date = parsed.query.date;
+        if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ error: "Invalid or missing date (expected YYYY-MM-DD)" }));
+        }
+
+        const yyyymmdd = date.replace(/-/g, '');
+        const dbFile = `database_${yyyymmdd}.db`;
+        const dbFullPath = path.join(DB_PATH, dbFile);
+
+        if (!fs.existsSync(dbFullPath)) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ error: "Database not found for date " + date }));
+        }
+
+        const db = new sqlite3.Database(dbFullPath, sqlite3.OPEN_READONLY);
+        const sql = `SELECT timestamp, temperature, humidity, dew_point, pressure, ws_wind_speed, ws_wind_direction, noise, pm25, pm10, illuminance, rainfall, wind_speed, wind_direction, cabinet_temperature, cabinet_humidity, cabinet_dew_point FROM sensors ORDER BY timestamp ASC`;
+
+        db.all(sql, [], (err, rows) => {
+            if (err) {
+                // Days before the sensor tool was installed have no table
+                const missing = /no such table/.test(err.message);
+                res.writeHead(missing ? 404 : 500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: missing ? "No sensor data for date " + date : err.message }));
             } else {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(rows));
