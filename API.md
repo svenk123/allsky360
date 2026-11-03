@@ -405,7 +405,8 @@ status of allsky360 systemd services. The API runs `systemctl` directly
 (no sudo, no shell) as `allskyuser`. Querying the status needs no rights;
 start/stop/restart are authorised by the polkit rule
 `/etc/polkit-1/rules.d/50-allsky360.rules` (installed by `make install`),
-which allows exactly these three actions on the units listed below.
+which allows exactly these three actions on the units listed below and on
+the timers of the timer-driven services.
 
 **Allowed services**
 
@@ -413,11 +414,18 @@ which allows exactly these three actions on the units listed below.
 |---------------------------------|-----------------------------------|
 | `allsky360-camera.service`      | Main camera capture daemon        |
 | `allsky360-api.service`         | Node.js web API server            |
-| `allsky360-meteo.service`       | Meteorological data fetcher       |
-| `allsky360-aurora.service`      | Aurora / space weather fetcher    |
+| `allsky360-meteo.service`       | Meteorological data fetcher (timer-driven) |
+| `allsky360-aurora.service`      | Aurora / space weather fetcher (timer-driven) |
 | `allsky360-mount-position.service` | Mount position service (timer-driven) |
+| `allsky360-sensors.service`     | RS485 sensors (timer-driven)      |
 
 Requests for any service not in the list above are rejected with HTTP 500.
+
+**Timer-driven services** are `Type=oneshot` units started by an
+`allsky360-*.timer`; between two runs the service itself is `inactive`.
+For them `start` and `stop` act on the timer (switch the schedule on/off,
+not persistent across reboots), `restart` triggers one run of the service
+now without waiting for it to finish (`systemctl --no-block start`).
 
 **Authentication for start/stop/restart**
 
@@ -456,6 +464,8 @@ HTTP 200 — JSON object:
 | `service` | string | Name of the queried service                          |
 | `status`  | string | Always `"success"` on HTTP 200                       |
 | `output`  | string | Systemd active state string: `active`, `inactive`, `failed`, etc. |
+| `timer`   | string | Timer-driven services only: active state of the timer (`active` = scheduled) |
+| `process` | boolean | `allsky360-camera.service` only: the camera binary runs outside systemd (e.g. `make camera-run`) |
 
 **Error responses**
 
@@ -474,7 +484,8 @@ GET /api/services/status?service=allsky360-camera.service
 {
   "service": "allsky360-camera.service",
   "status": "success",
-  "output": "active"
+  "output": "active",
+  "process": true
 }
 ```
 

@@ -22,7 +22,12 @@ polkit.addRule(function (action, subject) {
         "allsky360-aurora.service",
         "allsky360-meteo.service",
         "allsky360-mount-position.service",
-        "allsky360-sensors.service"
+        "allsky360-sensors.service",
+        // start/stop of the timer-driven services switch their timers
+        "allsky360-aurora.timer",
+        "allsky360-meteo.timer",
+        "allsky360-mount-position.timer",
+        "allsky360-sensors.timer"
     ];
     var verbs = ["start", "stop", "restart"];
 

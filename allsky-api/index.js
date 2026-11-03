@@ -84,10 +84,29 @@ const ALLOWED_SERVICES = [
     'allsky360-sensors.service'
 ];
 
+// Services of Type=oneshot that are started by a timer. Between two runs the
+// service itself is "inactive"; whether it is switched on is the state of the
+// timer. start/stop act on the timer, restart runs the service once now.
+const TIMER_UNITS = {
+    'allsky360-meteo.service': 'allsky360-meteo.timer',
+    'allsky360-aurora.service': 'allsky360-aurora.timer',
+    'allsky360-mount-position.service': 'allsky360-mount-position.timer',
+    'allsky360-sensors.service': 'allsky360-sensors.timer'
+};
+
+// Services whose binary may also run outside systemd ("make camera-run"
+// stops the service and runs the camera in the foreground). Matched against
+// the full command line, the process name (comm) is cut to 15 characters.
+const PROCESS_PATTERNS = {
+    'allsky360-camera.service': '^([^ ]*/)?allsky360-camera( |$)'
+};
+
+const ALLOWED_UNITS = ALLOWED_SERVICES.concat(Object.values(TIMER_UNITS));
+
 // Helper function to execute systemctl commands
-async function executeSystemctl(command, service) {
+async function executeSystemctl(command, service, extraArgs = []) {
     try {
-        if (!ALLOWED_SERVICES.includes(service)) {
+        if (!ALLOWED_UNITS.includes(service)) {
             throw new Error(`Service ${service} is not allowed`);
         }
 
@@ -97,7 +116,7 @@ async function executeSystemctl(command, service) {
         // execFile, not exec: no shell is involved, the arguments are passed
         // as they are. --no-ask-password: fail instead of waiting for an agent.
         const { stdout, stderr } = await execFileAsync(
-            SYSTEMCTL_PATH, ['--no-ask-password', command, service], { timeout: 30000 });
+            SYSTEMCTL_PATH, ['--no-ask-password', ...extraArgs, command, service], { timeout: 30000 });
 
         return {
             success: true,
@@ -121,6 +140,43 @@ async function executeSystemctl(command, service) {
             stderr: (error.stderr || '').trim()
         };
     }
+}
+
+/**
+ * State of a service for the web page: "output" is the is-active state of the
+ * service, "timer" the state of its timer (timer-driven services only),
+ * "process" whether its binary runs outside systemd (see PROCESS_PATTERNS).
+ */
+async function serviceStatus(service) {
+    const result = await executeSystemctl('is-active', service);
+    if (!result.success) return result;
+
+    result.output = result.stdout;
+    if (TIMER_UNITS[service]) {
+        const timer = await executeSystemctl('is-active', TIMER_UNITS[service]);
+        result.timer = timer.stdout || 'unknown';
+    }
+    if (PROCESS_PATTERNS[service]) {
+        try {
+            await execFileAsync('pgrep', ['-f', PROCESS_PATTERNS[service]], { timeout: 5000 });
+            result.process = true;
+        } catch {
+            result.process = false;    // exit code 1: no matching process
+        }
+    }
+    return result;
+}
+
+/**
+ * systemctl verb, unit and options for a start/stop/restart request.
+ * Timer-driven services: start/stop switch the timer, restart triggers one
+ * run of the service now (--no-block: do not wait for the oneshot to finish).
+ */
+function controlCommand(action, service) {
+    const timer = TIMER_UNITS[service];
+    if (!timer) return { verb: action, unit: service, args: [] };
+    if (action === 'restart') return { verb: 'start', unit: service, args: ['--no-block'] };
+    return { verb: action, unit: timer, args: [] };
 }
 
 /**
@@ -516,13 +572,15 @@ const server = http.createServer((req, res) => {
             return res.end(JSON.stringify({ error: "Missing service parameter" }));
         }
 
-        executeSystemctl('is-active', service).then(result => {
+        serviceStatus(service).then(result => {
             if (result.success) {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
                     service: service,
                     status: 'success',
-                    output: result.stdout   // e.g. "active", "inactive", "failed"
+                    output: result.output,   // e.g. "active", "inactive", "failed"
+                    timer: result.timer,     // timer-driven services only
+                    process: result.process  // camera: runs outside systemd
                 }));
             } else {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -547,7 +605,8 @@ const server = http.createServer((req, res) => {
             return res.end(JSON.stringify({ error: "Missing service parameter" }));
         }
 
-        executeSystemctl('start', service).then(result => {
+        const cmd = controlCommand('start', service);
+        executeSystemctl(cmd.verb, cmd.unit, cmd.args).then(result => {
             if (result.success) {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
@@ -580,7 +639,8 @@ const server = http.createServer((req, res) => {
             return res.end(JSON.stringify({ error: "Missing service parameter" }));
         }
 
-        executeSystemctl('stop', service).then(result => {
+        const cmd = controlCommand('stop', service);
+        executeSystemctl(cmd.verb, cmd.unit, cmd.args).then(result => {
             if (result.success) {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
@@ -613,7 +673,8 @@ const server = http.createServer((req, res) => {
             return res.end(JSON.stringify({ error: "Missing service parameter" }));
         }
 
-        executeSystemctl('restart', service).then(result => {
+        const cmd = controlCommand('restart', service);
+        executeSystemctl(cmd.verb, cmd.unit, cmd.args).then(result => {
             if (result.success) {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({

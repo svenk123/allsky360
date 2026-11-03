@@ -51,6 +51,8 @@
     }
     .svc-card.running { border-color: rgba(34,197,94,0.25); }
     .svc-card.stopped { border-color: rgba(239,68,68,0.2); }
+    .svc-card.scheduled { border-color: rgba(34,197,94,0.25); }
+    .svc-card.manual { border-color: rgba(245,158,11,0.3); }
     .svc-dot {
       width: 8px; height: 8px;
       border-radius: 50%;
@@ -60,6 +62,10 @@
     }
     .svc-dot.running { background: #22c55e; box-shadow: 0 0 8px rgba(34,197,94,0.5); }
     .svc-dot.stopped { background: #ef4444; }
+    /* timer active, service waits for its next run */
+    .svc-dot.scheduled { background: transparent; border: 2px solid #22c55e; width: 6px; height: 6px; }
+    /* running outside systemd (make camera-run) */
+    .svc-dot.manual { background: #f59e0b; box-shadow: 0 0 8px rgba(245,158,11,0.5); }
     .svc-dot.loading {
       background: #6b7280;
       animation: pulse-dot 1.2s ease-in-out infinite;
@@ -423,23 +429,29 @@
     const SERVICES = [
       { id: 'allsky360-camera.service',   label: 'Camera',   desc: 'Image capture service'  },
       { id: 'allsky360-api.service',      label: 'API',      desc: 'Web API service'         },
-      { id: 'allsky360-meteo.service',    label: 'Meteo',    desc: 'Weather data service'   },
-      { id: 'allsky360-aurora.service',   label: 'Aurora',   desc: 'Aurora data service'    },
-      { id: 'allsky360-mount-position.service', label: 'Mount', desc: 'Mount position service' },
-      { id: 'allsky360-sensors.service',  label: 'Sensors',  desc: 'RS485 sensors (one reading)' },
+      { id: 'allsky360-meteo.service',    label: 'Meteo',    desc: 'Weather data service',   timer: true },
+      { id: 'allsky360-aurora.service',   label: 'Aurora',   desc: 'Aurora data service',    timer: true },
+      { id: 'allsky360-mount-position.service', label: 'Mount', desc: 'Mount position service', timer: true },
+      { id: 'allsky360-sensors.service',  label: 'Sensors',  desc: 'RS485 sensors (one reading)', timer: true },
     ];
 
-    function parseStatus(output) {
-      if (!output) return 'unknown';
-      const s = output.trim().toLowerCase();
-      if (s === 'active')                                  return 'running';
-      if (s === 'inactive' || s === 'failed' || s === 'dead') return 'stopped';
+    // data: answer of api/services/status. Timer-driven services (oneshot)
+    // are "inactive" between their runs, the timer tells whether they are on.
+    // The camera can also run outside systemd (make camera-run).
+    function parseStatus(data) {
+      const s = (data.output || '').trim().toLowerCase();
+      if (s === 'active' || s === 'activating' || s === 'reloading') return 'running';
+      if (data.process === true)                                     return 'manual';
+      if (data.timer === 'active' || data.timer === 'activating')    return 'scheduled';
+      if (s === 'inactive' || s === 'failed' || s === 'dead' || s === 'deactivating') return 'stopped';
       return 'unknown';
     }
 
     function statusLabel(s) {
-      if (s === 'running') return 'Running';
-      if (s === 'stopped') return 'Stopped';
+      if (s === 'running')   return 'Running';
+      if (s === 'scheduled') return 'Scheduled (timer active)';
+      if (s === 'manual')    return 'Running (outside systemd)';
+      if (s === 'stopped')   return 'Stopped';
       return 'Unknown';
     }
 
@@ -455,9 +467,9 @@
               <div class="svc-status-text" id="svc-status-${svc.id}">Checking…</div>
             </div>
             <div class="svc-btns">
-              <button class="svc-btn svc-btn-start"   onclick="controlService('${svc.id}','start')"   title="Start ${svc.label}">Start</button>
-              <button class="svc-btn svc-btn-restart" onclick="controlService('${svc.id}','restart')" title="Restart ${svc.label}">Restart</button>
-              <button class="svc-btn svc-btn-stop"    onclick="controlService('${svc.id}','stop')"    title="Stop ${svc.label}">Stop</button>
+              <button class="svc-btn svc-btn-start"   onclick="controlService('${svc.id}','start')"   title="${svc.timer ? 'Start the timer of' : 'Start'} ${svc.label}">Start</button>
+              <button class="svc-btn svc-btn-restart" onclick="controlService('${svc.id}','restart')" title="${svc.timer ? 'Run ' + svc.label + ' once now' : 'Restart ' + svc.label}">${svc.timer ? 'Run now' : 'Restart'}</button>
+              <button class="svc-btn svc-btn-stop"    onclick="controlService('${svc.id}','stop')"    title="${svc.timer ? 'Stop the timer of' : 'Stop'} ${svc.label}">Stop</button>
             </div>
           </div>`;
       });
@@ -477,7 +489,7 @@
       try {
         const res  = await fetch(`api/services/status?service=${encodeURIComponent(serviceId)}`);
         const data = await res.json();
-        setServiceStatus(serviceId, parseStatus(data.output || ''));
+        setServiceStatus(serviceId, parseStatus(data));
       } catch {
         setServiceStatus(serviceId, 'unknown');
       }
@@ -512,8 +524,9 @@
     async function controlService(serviceId, action) {
       const msg = document.getElementById('msg-bar');
       const svcLabel = SERVICES.find(s => s.id === serviceId)?.label || serviceId;
-      const actionLabel = action === 'start' ? 'Starting' : action === 'stop' ? 'Stopping' : 'Restarting';
-      const doneLabel   = action === 'start' ? 'started'  : action === 'stop' ? 'stopped'  : 'restarted';
+      const isTimer     = SERVICES.find(s => s.id === serviceId)?.timer;
+      const actionLabel = action === 'start' ? 'Starting' : action === 'stop' ? 'Stopping' : isTimer ? 'Running' : 'Restarting';
+      const doneLabel   = action === 'start' ? 'started'  : action === 'stop' ? 'stopped'  : isTimer ? 'triggered' : 'restarted';
       msg.className = '';
       msg.textContent = `${actionLabel} ${svcLabel}…`;
       setServiceStatus(serviceId, 'loading');
