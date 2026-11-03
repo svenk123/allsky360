@@ -81,6 +81,52 @@
     .s-tile.s-warn .s-value, .s-tile.s-warn .s-sub { color: #f59e0b; }
     .s-compass { width: 20px; height: 20px; flex-shrink: 0; transition: transform 0.4s; }
     .sensor-empty { font-size: 12px; color: #6b7280; }
+
+    /* ── FORECAST (forecast_meteo.json, next 24 h) ──────────────── */
+    .fc-wrap {
+      height: 100%;
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 6px 12px 10px;
+      min-width: 0;
+    }
+    /* like the Chart.js titles of the other widgets */
+    .fc-title { text-align: center; font-size: 12px; font-weight: 600; color: #e5e7eb; }
+    .fc-summary { display: flex; flex-wrap: wrap; gap: 6px; }
+    .fc-scroll { flex: 1; min-height: 0; overflow: auto; }
+    .fc-table {
+      display: grid;
+      /* label column + one column per hour */
+      grid-template-columns: 100px repeat(var(--fc-cols), minmax(34px, 1fr));
+      font-size: 10px; font-variant-numeric: tabular-nums;
+      color: #d1d5db;
+      min-width: max-content;
+    }
+    .fc-lbl {
+      position: sticky; left: 0; z-index: 1;
+      /* opaque: card colour (rgba(255,255,255,0.04) over #0d1117) */
+      background: #171c22;
+      color: #6b7280; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+      font-size: 9px;
+      display: flex; align-items: center;
+      padding-right: 6px;
+      white-space: nowrap;
+    }
+    .fc-c {
+      height: 19px;
+      display: flex; align-items: center; justify-content: center;
+      border-left: 1px solid rgba(255,255,255,0.03);
+      white-space: nowrap;
+    }
+    .fc-c.night { background: rgba(0,0,0,0.28); }
+    .fc-c.now { box-shadow: inset 2px 0 0 #3b82f6; }
+    .fc-hour { color: #9ca3af; font-weight: 600; }
+    .fc-hour.midnight { color: #e5e7eb; }
+    .fc-cloud { border-radius: 3px; margin: 1px; font-weight: 600; }
+    .fc-dim { color: #4b5563; }
+    .fc-drop { width: 8px; height: 10px; margin-right: 1px; flex: none; fill: #38bdf8; }
+    .fc-warn { color: #f59e0b; font-weight: 600; }
+    .fc-rain { color: #38bdf8; font-weight: 600; }
+    .fc-empty { font-size: 12px; color: #6b7280; }
   </style>
 </head>
 
@@ -91,7 +137,7 @@
 
   <!-- ═══════════════════ HEADER ════════════════════════════════════ -->
   <header id="app-header">
-    <a class="hdr-brand" href="dashboard1.html">
+    <a class="hdr-brand" href="dashboard.html">
       <img src="allsky360_256x256.png" alt="Allsky360" width="30" height="30" />
       <div class="hdr-brand-text">
         <div class="hdr-title">Allsky360</div>
@@ -111,81 +157,8 @@
   <div id="main-layout">
 
     <!-- ── ICON NAV ─────────────────────────────────────────────── -->
-    <nav id="icon-nav">
-      <a href="index.html" class="nav-item" title="Home">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-          <polyline points="9 22 9 12 15 12 15 22"></polyline>
-        </svg>
-      </a>
-      <a href="dashboard.html" class="nav-item" title="Dashboard">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="7" height="7"></rect>
-          <rect x="14" y="3" width="7" height="7"></rect>
-          <rect x="14" y="14" width="7" height="7"></rect>
-          <rect x="3" y="14" width="7" height="7"></rect>
-        </svg>
-      </a>
-      <div class="nav-sep"></div>
-      <a href="archive.html" class="nav-item" title="Archive">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="21 8 21 21 3 21 3 8"></polyline>
-          <rect x="1" y="3" width="22" height="5"></rect>
-          <line x1="10" y1="12" x2="14" y2="12"></line>
-        </svg>
-      </a>
-      <a href="videos.html" class="nav-item" title="Videos">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="23 7 16 12 23 17 23 7"></polygon>
-          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-        </svg>
-      </a>
-      <a href="graphs.html" class="nav-item" title="Graphs">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="20" x2="18" y2="10"></line>
-          <line x1="12" y1="20" x2="12" y2="4"></line>
-          <line x1="6"  y1="20" x2="6"  y2="14"></line>
-        </svg>
-      </a>
-      <a href="meteo.html" class="nav-item active" title="Weather">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
-        </svg>
-      </a>
-      <a href="aurora.html" class="nav-item" title="Aurora">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-        </svg>
-      </a>
-      <div class="nav-sep"></div>
-      <a href="aircraft.html" class="nav-item" title="Aircraft">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 16l-4-4V6a2 2 0 0 0-4 0v6l-4 4H3l2 3h5l2-1 2 1h5l2-3z"></path>
-        </svg>
-      </a>
-      <a href="hdr.html" class="nav-item" title="HDR Debug">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-          <polyline points="9 22 9 12 15 12 15 22"></polyline>
-        </svg>
-      </a>
-      <a href="config.html" class="nav-item" title="Config">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-        </svg>
-      </a>
-      <a href="calibration.html" class="nav-item" title="Calibration">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8"  x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          <line x1="2"  y1="12" x2="22"  y2="12"></line>
-          <line x1="12" y1="2"  x2="12"  y2="22"></line>
-        </svg>
-      </a>
-    </nav>
+    <nav id="icon-nav"></nav>
+    <script>renderIconNav();</script>
 
     <!-- ── METEO MAIN ─────────────────────────────────────────────── -->
     <main id="meteo-main">
@@ -211,89 +184,94 @@
           <div class="grid-stack-item" gs-id="sensor-live" gs-x="0" gs-y="0" gs-w="12" gs-h="2">
             <div class="grid-stack-item-content">
               <div class="sensor-live">
-                <div class="sensor-head">
-                  <span class="sensor-head-title">Station sensors · latest reading</span>
-                  <span class="badge badge-gray" id="sensor-status"><span class="badge-dot"></span><span id="sensor-status-text">loading</span></span>
-                  <span class="sensor-head-meta" id="sensor-age"></span>
-                </div>
                 <div class="sensor-tiles" id="sensor-tiles"></div>
               </div>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-temp" gs-x="0" gs-y="2" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="forecast" gs-x="0" gs-y="2" gs-w="12" gs-h="3">
+            <div class="grid-stack-item-content">
+              <div class="fc-wrap">
+                <div class="fc-title" id="fc-title">Forecast</div>
+                <div class="fc-summary" id="fc-summary"></div>
+                <div class="fc-scroll"><div class="fc-table" id="fc-table"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-temp" gs-x="0" gs-y="5" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartTemp"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-humidity" gs-x="6" gs-y="2" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-humidity" gs-x="6" gs-y="5" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartHumidity"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-pressure" gs-x="0" gs-y="5" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-pressure" gs-x="0" gs-y="8" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartPressure"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-dew-point" gs-x="6" gs-y="5" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-dew-point" gs-x="6" gs-y="8" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartDewPoint"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-wind-speed" gs-x="0" gs-y="8" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-wind-speed" gs-x="0" gs-y="11" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartWindSpeed"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-wind-dir" gs-x="6" gs-y="8" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-wind-dir" gs-x="6" gs-y="11" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartWindDir"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-rain-light" gs-x="0" gs-y="11" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-rain-light" gs-x="0" gs-y="14" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartRainLight"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-air" gs-x="6" gs-y="11" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-air" gs-x="6" gs-y="14" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartAir"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-clouds" gs-x="0" gs-y="14" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-clouds" gs-x="0" gs-y="17" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartClouds"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-global-cloud" gs-x="6" gs-y="14" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-global-cloud" gs-x="6" gs-y="17" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartGlobalCloud"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-visibility" gs-x="0" gs-y="17" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-visibility" gs-x="0" gs-y="20" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartVisibility"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-jetstream" gs-x="6" gs-y="17" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-jetstream" gs-x="6" gs-y="20" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartJetstream"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-cabinet" gs-x="0" gs-y="20" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-cabinet" gs-x="0" gs-y="23" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartCabinet"></canvas>
             </div>
@@ -546,11 +524,9 @@
       ].join('');
     }
 
+    // No header line: the reading time and state are the tooltip of the tiles
     function setSensorStatus(cls, text, age) {
-      const badge = document.getElementById('sensor-status');
-      badge.className = `badge ${cls}`;
-      document.getElementById('sensor-status-text').textContent = text;
-      document.getElementById('sensor-age').textContent = age;
+      document.getElementById('sensor-tiles').title = [text, age].filter(Boolean).join(' · ');
     }
 
     async function loadLatestSensors() {
@@ -581,6 +557,145 @@
     }
 
     // ══════════════════════════════════════════════════════════════
+    //  FORECAST (forecast_meteo.json, written every 30 min by the meteo tool)
+    // ══════════════════════════════════════════════════════════════
+    // Older than this the timer has probably stopped (runs every 30 min)
+    const FORECAST_STALE_S = 90 * 60;
+    // Thresholds and helpers shared with the dashboard (allsky-common.js)
+    const CLEAR_MAX = FORECAST_CLEAR_MAX;
+    const CLEAR_MIN_HOURS = FORECAST_CLEAR_MIN_HOURS;
+    const RAIN_LIKELY = FORECAST_RAIN_LIKELY;
+    const DEW_SPREAD_WARN = FORECAST_DEW_SPREAD_WARN;
+    const GUST_WARN = FORECAST_GUST_WARN;
+    const span = hourSpanText;
+    // water drop in front of the dew spread when dew is likely
+    const DROP_ICON = '<svg class="fc-drop" viewBox="0 0 24 30" aria-hidden="true"><path d="M12 1C12 1 2 13 2 19a10 10 0 0 0 20 0C22 13 12 1 12 1z"/></svg>';
+
+    function chip(cls, text, title = '') {
+      return `<span class="badge ${cls}"${title ? ` title="${title}"` : ''}>${text}</span>`;
+    }
+
+    // Summary of the coming night (the first dark stretch in the forecast)
+    function forecastSummary(hours) {
+      const chips = [];
+      const t = forecastTonight(hours);
+      if (t.night) {
+        const label = t.night[0] === 0 ? 'Night' : 'Tonight';
+        if (t.clear.length)
+          chips.push(chip('badge-green', t.clear.map(r => span(t.nightHours, r)).join(', '),
+                          `Dark hours with total cloud cover ≤ ${CLEAR_MAX} %, at least ${CLEAR_MIN_HOURS} h`));
+        else
+          chips.push(chip('badge-gray', `${label}: no clear stretch expected`,
+                          `No ${CLEAR_MIN_HOURS} dark hours in a row with total cloud cover ≤ ${CLEAR_MAX} %`));
+      }
+      if (t.rain)
+        chips.push(chip('badge-blue', `Rain likely ${span(hours, t.rain)}`,
+                        `Precipitation probability ≥ ${RAIN_LIKELY} %`));
+      if (t.maxGust >= GUST_WARN)
+        chips.push(chip('badge-orange', `Gusts up to ${t.maxGust.toFixed(0)} km/h`));
+      return chips.join('');
+    }
+
+    function renderForecastTable(hours) {
+      const nowS = Date.now() / 1000;
+      const cell = (h, cls, html, title = '') => {
+        const night = h.is_day === 0 ? ' night' : '';
+        const now = nowS >= h.timestamp && nowS < h.timestamp + 3600 ? ' now' : '';
+        return `<div class="fc-c${night}${now} ${cls}"${title ? ` title="${title}"` : ''}>${html}</div>`;
+      };
+      const cloudCell = (h, v) => {
+        if (!isNum(v)) return cell(h, 'fc-dim', '–');
+        // dark text on the light colours of overcast sky
+        const fg = v >= 60 ? '#111827' : '#e5e7eb';
+        return cell(h, '', `<span class="fc-cloud" style="background:${cloudCoverToRGB(v)};color:${fg};width:100%;text-align:center">${Math.round(v)}</span>`);
+      };
+      const row = (label, fn) => `<div class="fc-lbl">${label}</div>` + hours.map(fn).join('');
+
+      const rows = [
+        row('Time', h => {
+          const t = formatClock(h.timestamp);
+          return cell(h, `fc-hour${t === '00:00' ? ' midnight' : ''}`, t, formatDateTime(h.timestamp, { seconds: false }));
+        }),
+        row('Clouds %', h => cloudCell(h, h.cloud_cover)),
+        row('· low', h => cloudCell(h, h.cloud_low)),
+        row('· mid', h => cloudCell(h, h.cloud_mid)),
+        row('· high', h => cloudCell(h, h.cloud_high)),
+        row('Rain %', h => {
+          const p = h.precipitation_probability, mm = h.precipitation;
+          if (!isNum(p)) return cell(h, 'fc-dim', '–');
+          const title = isNum(mm) ? `${mm.toFixed(1)} mm` : '';
+          return cell(h, p >= RAIN_LIKELY ? 'fc-rain' : (p === 0 ? 'fc-dim' : ''), p.toFixed(0), title);
+        }),
+        row('Temp °C', h => cell(h, '', fmt(h.temperature, 1))),
+        row('Dew spread', h => {
+          if (!isNum(h.temperature) || !isNum(h.dew_point)) return cell(h, 'fc-dim', '–');
+          const d = h.temperature - h.dew_point;
+          const dew = d < DEW_SPREAD_WARN;
+          return cell(h, dew ? 'fc-warn' : '', (dew ? DROP_ICON : '') + d.toFixed(1),
+                      `Dew point ${h.dew_point.toFixed(1)} °C, humidity ${fmt(h.humidity, 0)} %` +
+                      (dew ? ` · dew risk (less than ${DEW_SPREAD_WARN} K)` : ''));
+        }),
+        row('Wind km/h', h => cell(h, '', fmt(h.wind_speed_10m, 0),
+                                   isNum(h.wind_dir_10m) ? `${h.wind_dir_10m.toFixed(0)}° ${cardinal(h.wind_dir_10m)}` : '')),
+        row('Gusts', h => cell(h, isNum(h.wind_gusts_10m) && h.wind_gusts_10m >= GUST_WARN ? 'fc-warn' : '',
+                               fmt(h.wind_gusts_10m, 0))),
+        row('Jetstream (km/h)', h => {
+          const v = h.wind_speed_300hPa;
+          if (!isNum(v)) return cell(h, 'fc-dim', '–');
+          // same colour scale as the seeing label on the dashboard
+          return cell(h, '', `<span style="color:${getSeeingColor(v)};font-weight:600">${v.toFixed(0)}</span>`,
+                      'Wind at 300 hPa (9.2 km), rough hint for seeing');
+        })
+      ];
+      const table = document.getElementById('fc-table');
+      table.style.setProperty('--fc-cols', hours.length);
+      table.innerHTML = rows.join('');
+    }
+
+    // Only the title is shown: the state and update time are its tooltip
+    function setForecastStatus(cls, text, meta) {
+      document.getElementById('fc-title').title = [text, meta].filter(Boolean).join(' · ');
+    }
+
+    async function loadForecast() {
+      const summary = document.getElementById('fc-summary');
+      const table = document.getElementById('fc-table');
+      try {
+        const res = await fetch('forecast_meteo.json', { cache: 'no-cache' });
+        if (res.status === 404) {
+          setForecastStatus('badge-gray', 'no data', '');
+          summary.innerHTML = '';
+          table.innerHTML = '<div class="fc-empty">No forecast yet. allsky360-meteo.service writes it with --forecastfile (every 30 minutes).</div>';
+          return;
+        }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const f = await res.json();
+        // Drop hours that are already over (the file is up to 30 min old)
+        const nowS = Date.now() / 1000;
+        const hours = (Array.isArray(f.hours) ? f.hours : [])
+          .filter(h => isNum(h.timestamp) && h.timestamp + 3600 > nowS);
+        if (!hours.length) throw new Error('no current hours in forecast_meteo.json');
+
+        const ageS = isNum(f.generated) ? Math.max(0, nowS - f.generated) : Infinity;
+        const meta = [
+          isNum(f.generated) ? `updated ${formatClock(f.generated)} · ${Math.round(ageS / 60)} min ago` : '',
+          'Open-Meteo',
+          isNum(f.elevation) ? `${f.elevation.toFixed(0)} m` : ''
+        ].filter(Boolean).join(' · ');
+        if (ageS > FORECAST_STALE_S)
+          setForecastStatus('badge-orange', 'stale', meta + ' · check allsky360-meteo.timer');
+        else
+          setForecastStatus('badge-green', 'current', meta);
+
+        summary.innerHTML = forecastSummary(hours);
+        renderForecastTable(hours);
+      } catch (err) {
+        console.error('Failed to load the forecast:', err);
+        setForecastStatus('badge-orange', 'error', String(err.message || err));
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════
     //  INIT
     // ══════════════════════════════════════════════════════════════
     function init() {
@@ -598,6 +713,7 @@
         shownToday = t;
         loadMeasurements();
         loadLatestSensors();
+        loadForecast();
       });
 
       const dashed = { borderDash: [5, 4], borderWidth: 1.25 };
@@ -674,8 +790,10 @@
 
       loadMeasurements();
       loadLatestSensors();
+      loadForecast();
       setInterval(loadMeasurements, 60000);
       setInterval(loadLatestSensors, 60000);
+      setInterval(loadForecast, 5 * 60000);
     }
 
     document.addEventListener("DOMContentLoaded", init);
@@ -715,23 +833,24 @@
         }
       };
 
-      // v2: station sensor widgets added (older saved layouts are ignored)
-      const LS_KEY = 'allsky360.meteo1.layout.v2';
+      // v3: forecast timeline added (older saved layouts are ignored)
+      const LS_KEY = 'allsky360.meteo1.layout.v3';
       const defaultLayout = [
         { id: "sensor-live",        x: 0, y:  0, w: 12, h: 2 },
-        { id: "chart-temp",         x: 0, y:  2, w:  6, h: 3 },
-        { id: "chart-humidity",     x: 6, y:  2, w:  6, h: 3 },
-        { id: "chart-pressure",     x: 0, y:  5, w:  6, h: 3 },
-        { id: "chart-dew-point",    x: 6, y:  5, w:  6, h: 3 },
-        { id: "chart-wind-speed",   x: 0, y:  8, w:  6, h: 3 },
-        { id: "chart-wind-dir",     x: 6, y:  8, w:  6, h: 3 },
-        { id: "chart-rain-light",   x: 0, y: 11, w:  6, h: 3 },
-        { id: "chart-air",          x: 6, y: 11, w:  6, h: 3 },
-        { id: "chart-clouds",       x: 0, y: 14, w:  6, h: 3 },
-        { id: "chart-global-cloud", x: 6, y: 14, w:  6, h: 3 },
-        { id: "chart-visibility",   x: 0, y: 17, w:  6, h: 3 },
-        { id: "chart-jetstream",    x: 6, y: 17, w:  6, h: 3 },
-        { id: "chart-cabinet",      x: 0, y: 20, w:  6, h: 3 }
+        { id: "forecast",           x: 0, y:  2, w: 12, h: 3 },
+        { id: "chart-temp",         x: 0, y:  5, w:  6, h: 3 },
+        { id: "chart-humidity",     x: 6, y:  5, w:  6, h: 3 },
+        { id: "chart-pressure",     x: 0, y:  8, w:  6, h: 3 },
+        { id: "chart-dew-point",    x: 6, y:  8, w:  6, h: 3 },
+        { id: "chart-wind-speed",   x: 0, y: 11, w:  6, h: 3 },
+        { id: "chart-wind-dir",     x: 6, y: 11, w:  6, h: 3 },
+        { id: "chart-rain-light",   x: 0, y: 14, w:  6, h: 3 },
+        { id: "chart-air",          x: 6, y: 14, w:  6, h: 3 },
+        { id: "chart-clouds",       x: 0, y: 17, w:  6, h: 3 },
+        { id: "chart-global-cloud", x: 6, y: 17, w:  6, h: 3 },
+        { id: "chart-visibility",   x: 0, y: 20, w:  6, h: 3 },
+        { id: "chart-jetstream",    x: 6, y: 20, w:  6, h: 3 },
+        { id: "chart-cabinet",      x: 0, y: 23, w:  6, h: 3 }
       ];
 
       function applyLayout(layout) {

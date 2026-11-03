@@ -36,17 +36,8 @@
 
     <!-- Navigation Menu -->
     <nav id="nav-menu" class="nav-menu">
-      <ul class="nav-list">
-        <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
-        <li><a href="archive.html" class="nav-link">Archive</a></li>
-        <li><a href="videos.html" class="nav-link">Videos</a></li>
-        <li><a href="graphs.html" class="nav-link">Graphs</a></li>
-        <li><a href="meteo.html" class="nav-link">Weather</a></li>
-        <li><a href="aurora.html" class="nav-link">Aurora</a></li>
-        <li><a href="config.html" class="nav-link">Config</a></li>
-        <li><a href="calibration.html" class="nav-link">Calibration</a></li>
-        <li><a href="processing.html" class="nav-link">Processing</a></li>
-      </ul>
+      <ul class="nav-list" id="nav-list"></ul>
+      <script>renderTextNav(document.getElementById('nav-list'), [{ href: 'panorama.html', title: 'Panorama' }, { href: 'processing.html', title: 'Processing' }]);</script>
     </nav>
   </div>
 

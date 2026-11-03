@@ -456,7 +456,7 @@ now without waiting for it to finish (`systemctl --no-block start`).
 - the header `X-API-Token` matching `api-token` in `config.ini` (otherwise HTTP 401).
 
 If `api-token` is empty in `config.ini`, these endpoints are disabled and return HTTP 403.
-The web UI (`config.html`) asks for the token on the first control action and keeps it
+The web UI (`status.html`) asks for the token on the first control action and keeps it
 in the browser's `sessionStorage` until the tab is closed. `status` needs no token.
 
 ```
@@ -566,6 +566,57 @@ Restarts a systemd service.
 **Response**
 
 HTTP 200 — JSON object with fields `service`, `action` (`"restart"`), `status`, `output`.
+
+---
+
+### System Status
+
+#### `GET /api/system/status`
+
+Health of the whole station for `status.html` and the status dot on the System Status
+icon of the navigation (every page polls it once a minute). Read only, no token. The
+answer is cached for 5 seconds. Everything is read without privileges (`systemctl show`,
+`systemctl list-timers`, `/sys/class/thermal`, `statfs`); the logic is in
+`allsky-api/system_status.js`.
+
+**Response** (shortened)
+
+```json
+{
+  "generated": 1793717870,
+  "overall": "error",
+  "checks": [
+    { "id": "allsky360-mount-position.service", "label": "Mount position",
+      "level": "error", "text": "last run failed (exit-code, exit 2)" },
+    { "id": "image", "label": "Latest image", "level": "ok", "text": "2 min old" }
+  ],
+  "services": [
+    { "unit": "allsky360-meteo.service", "label": "Meteo (Open-Meteo)",
+      "active": "inactive", "result": "success", "enabled": "static",
+      "last_start": 1793717153, "last_exit": 1793717153, "exit_status": 0,
+      "timer": { "unit": "allsky360-meteo.timer", "active": "active", "enabled": "enabled",
+                 "next": 1793718953, "last": 1793717153, "interval": 1800 } }
+  ],
+  "image": { "timestamp": 1793717728, "age_s": 142, "path": "images/20261103/image-20261103145528.jpg" },
+  "data": { "sensors": { "timestamp": 1793717753, "age_s": 117 }, "meteo": { ... },
+            "forecast": { ... }, "aurora": { ... } },
+  "host": { "hostname": "nano3", "uptime_s": 66060, "load": [0.7, 0.72, 0.7], "cpus": 6,
+            "mem_total": 7912693760, "mem_available": 2510508032 },
+  "temperatures": [ { "name": "tj", "celsius": 56.7 } ],
+  "disks": [ { "used_by": ["images", "database", "system"], "total": 981..., "free": 887..., "free_pct": 90.3 } ],
+  "databases": { "count": 1, "bytes": 49152, "oldest": "20261103", "newest": "20261103" },
+  "cabinet": { "temperature": 10.6, "humidity": 72.9, "dew_point": 5.9, "timestamp": 1793717753 }
+}
+```
+
+- `level` is `ok`, `warn`, `error` or `off` (a timer that is switched off and not enabled,
+  for example the mount position without a mount). `overall` is the worst level.
+- Checks: every service (timer active and a next run scheduled, last run successful, last
+  run not older than 3 timer intervals), age of the latest image (warning after 10 min,
+  error after 30 min), SoC junction temperature (85 / 95 °C), free disk space (10 / 5 %),
+  control cabinet more than 2 K above its dew point.
+- All times are Unix seconds (UTC). `data.*.timestamp` is the time field of the data file,
+  for `latest_meteo_data.json` (no time field) its modification time.
 
 ---
 

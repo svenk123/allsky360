@@ -18,9 +18,6 @@
   <script src="js/allsky-common.js"></script>
   <script src="js/meteors.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.4.0/dist/chartjs-plugin-annotation.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.js"></script>
   <script src="js/astronomia.bundle.min.js" defer
     onerror="var s=document.createElement('script'); s.defer=true; s.src='https://cdn.jsdelivr.net/npm/astronomia@1.12.0/build/astronomia.umd.min.js'; document.head.appendChild(s);"></script>
 
@@ -153,88 +150,24 @@
       display: flex; gap: 4px; z-index: 3;
     }
 
-    /* ── BOTTOM ROW ─────────────────────────────────────────────── */
-    #bottom-row {
-      display: flex;
-      gap: 9px;
-      flex-shrink: 0;
-      height: 158px;
+    /* ── CONDITIONS (right sidebar) ────────────────────────────── */
+    .h2-sub { font-weight: 400; color: #6b7280; text-transform: none; letter-spacing: 0; }
+    .metadata-section > div span.warn { color: #f59e0b; }
+    .metadata-section > div span.bad  { color: #ef4444; }
+    .metadata-section > div span.good { color: #22c55e; }
+    .cloud-swatch {
+      display: inline-block; width: 1.2em; height: 0.8em;
+      border-radius: 2px; vertical-align: -1px; margin-left: 4px;
     }
-
-    #histogram-card {
-      flex: 1;
-      min-width: 0;
-      padding: 8px 10px;
-      overflow: hidden;
-    }
-    #histogram-card h3 {
-      font-size: 10px; font-weight: 700; color: #6b7280;
-      text-transform: uppercase; letter-spacing: 0.09em;
-      margin-bottom: 4px;
-    }
-    #histogram {
-      display: block;
-      width: 100%;
-      border-radius: 4px;
-      background: rgba(0,0,0,0.35);
-      /* height controlled by updateRGBHistogram (canvas.height = 100) */
-    }
-    #histogram-stats {
-      display: flex; flex-wrap: wrap; gap: 0 10px;
-      font-size: 10px; color: #6b7280; margin-top: 4px;
-    }
-    #histogram-stats > div { margin-bottom: 0 !important; }
-
-    #countdown-card {
-      flex-shrink: 0;
-      width: 120px;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      text-align: center; gap: 2px;
-    }
-    #cntd-label { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em; }
-    #cntd-value { font-size: 32px; font-weight: 700; color: #22c55e; line-height: 1; }
-    #cntd-sub { font-size: 10px; color: #6b7280; }
-    #countdown { display: none; }
-
-    #gallery-card { flex-shrink: 0; padding: 10px 12px; }
-    #gallery-card h3 {
-      font-size: 10px; font-weight: 700; color: #6b7280;
-      text-transform: uppercase; letter-spacing: 0.09em;
-      margin-bottom: 5px;
-    }
-    .exposure-gallery { display: flex; gap: 4px; height: 68px; }
-    .exposure-gallery img {
-      height: 100%; width: auto;
-      border-radius: 6px; object-fit: cover;
-      border: 1px solid rgba(255,255,255,0.1);
-    }
-
-    /* ── RIGHT SIDEBAR – CHART CARDS ────────────────────────────── */
-    .chart-section {
-      font-size: 10px; font-weight: 700; color: #4b5563;
-      text-transform: uppercase; letter-spacing: 0.1em;
-      padding: 6px 2px 4px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-      margin-bottom: 2px;
-    }
-    .chart-mini-card {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.07);
-      border-radius: 12px;
-      padding: 8px 10px;
-    }
-    .chart-mini-card canvas {
-      width: 100% !important;
-      height: 100px !important;
-    }
+    .cond-link { border: none !important; margin-top: 6px; }
+    .cond-note { font-size: 11px; color: #6b7280; border: none !important; }
 
     /* ── ANIMATIONS ─────────────────────────────────────────────── */
     @keyframes fadeInUp {
       from { opacity:0; transform:translateY(10px); }
       to   { opacity:1; transform:translateY(0); }
     }
-    .card, .chart-mini-card {
+    .card {
       animation: fadeInUp 0.35s ease-out both;
     }
   </style>
@@ -252,7 +185,7 @@
       <img src="allsky360_256x256.png" alt="Allsky360" width="30" height="30" />
       <div class="hdr-brand-text">
         <div class="hdr-title">Allsky360</div>
-        <div class="hdr-crumb">Dashboard - Live View</div>
+        <div class="hdr-crumb">Dashboard · Live View</div>
       </div>
     </a>
 
@@ -271,81 +204,8 @@
   <div id="main-layout">
 
     <!-- ── ICON NAV ─────────────────────────────────────────────── -->
-    <nav id="icon-nav">
-      <a href="index.html" class="nav-item" title="Home">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-          <polyline points="9 22 9 12 15 12 15 22"></polyline>
-        </svg>
-      </a>
-      <a href="dashboard.html" class="nav-item active" title="Dashboard">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="7" height="7"></rect>
-          <rect x="14" y="3" width="7" height="7"></rect>
-          <rect x="14" y="14" width="7" height="7"></rect>
-          <rect x="3" y="14" width="7" height="7"></rect>
-        </svg>
-      </a>
-      <div class="nav-sep"></div>
-      <a href="archive.html" class="nav-item" title="Archive">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="21 8 21 21 3 21 3 8"></polyline>
-          <rect x="1" y="3" width="22" height="5"></rect>
-          <line x1="10" y1="12" x2="14" y2="12"></line>
-        </svg>
-      </a>
-      <a href="videos.html" class="nav-item" title="Videos">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="23 7 16 12 23 17 23 7"></polygon>
-          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-        </svg>
-      </a>
-      <a href="graphs.html" class="nav-item" title="Graphs">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="20" x2="18" y2="10"></line>
-          <line x1="12" y1="20" x2="12" y2="4"></line>
-          <line x1="6"  y1="20" x2="6"  y2="14"></line>
-        </svg>
-      </a>
-      <a href="meteo.html" class="nav-item" title="Weather">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
-        </svg>
-      </a>
-      <a href="aurora.html" class="nav-item" title="Aurora">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-        </svg>
-      </a>
-      <div class="nav-sep"></div>
-      <a href="aircraft.html" class="nav-item" title="Aircraft">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 16l-4-4V6a2 2 0 0 0-4 0v6l-4 4H3l2 3h5l2-1 2 1h5l2-3z"></path>
-        </svg>
-      </a>
-      <a href="hdr.html" class="nav-item" title="HDR Debug">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-          <polyline points="9 22 9 12 15 12 15 22"></polyline>
-        </svg>
-      </a>
-      <a href="config.html" class="nav-item" title="Config">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-        </svg>
-      </a>
-      <a href="calibration.html" class="nav-item" title="Calibration">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8"  x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          <line x1="2"  y1="12" x2="22"  y2="12"></line>
-          <line x1="12" y1="2"  x2="12"  y2="22"></line>
-        </svg>
-      </a>
-    </nav>
+    <nav id="icon-nav"></nav>
+    <script>renderIconNav();</script>
 
     <!-- ── LEFT SIDEBAR ──────────────────────────────────────────── -->
     <aside id="left-sidebar" class="sidebar">
@@ -355,22 +215,10 @@
       </div>
 
       <div class="card">
-        <div id="location"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
-      </div>
-
-      <div class="card">
         <div id="sunandmoon"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
         <div style="position:relative;height:130px;margin-top:8px;">
           <canvas id="chartSunMoonAltitude"></canvas>
         </div>
-      </div>
-
-      <div class="card">
-        <div id="weather"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
-      </div>
-
-      <div class="card">
-        <div id="aurora"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
       </div>
 
       <div class="card" id="mount-card" style="display:none;">
@@ -456,22 +304,6 @@
             </div>
           </div>
 
-          <!-- Bottom row -->
-          <div id="bottom-row">
-
-            <div class="card" id="histogram-card">
-              <h3>Histogram</h3>
-              <canvas id="histogram" width="512" height="100"></canvas>
-              <div id="histogram-stats"></div>
-            </div>
-
-<div class="card" id="gallery-card">
-              <h3>HDR Exposures</h3>
-              <div id="exposure-gallery" class="exposure-gallery"></div>
-            </div>
-
-          </div><!-- #bottom-row -->
-
         </div><!-- #side-panel -->
 
       </div><!-- #allsky-panel -->
@@ -481,37 +313,17 @@
     <!-- ── RIGHT SIDEBAR ─────────────────────────────────────────── -->
     <aside id="right-sidebar" class="sidebar">
 
-      <div class="chart-section">Camera Statistics</div>
-      <div class="chart-mini-card"><canvas id="chartExposure"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartGain"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartNoise"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartSQM"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartStars"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartFocus"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartHDR"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartBrightness"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartMeanBrightnessRGB"></canvas></div>
+      <div class="card">
+        <div id="weather"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
+      </div>
 
-      <div class="chart-section">Weather</div>
-      <div class="chart-mini-card"><canvas id="chartTemp"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartHumidity"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartPressure"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartDewPoint"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartClouds"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartGlobalCloud"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartVisibility"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartJetstream"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartWindSpeed"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartWindDir"></canvas></div>
+      <div class="card">
+        <div id="tonight"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
+      </div>
 
-      <div class="chart-section">Aurora &amp; Space Weather</div>
-      <div class="chart-mini-card"><canvas id="chartProbabilityCombined"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartKpIndex"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartBt"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartBz"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartDensity"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartSpeed"></canvas></div>
-      <div class="chart-mini-card"><canvas id="chartTemperature"></canvas></div>
+      <div class="card">
+        <div id="aurora"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
+      </div>
 
     </aside>
 
@@ -522,15 +334,6 @@
     //  CHARTS
     // ══════════════════════════════════════════════════════════════
     const charts = {};
-
-    let sunTimes = {
-      startOfDay:   new Date(),
-      dawnStart:    new Date(),
-      dawnEnd:      new Date(),
-      duskStart:    new Date(),
-      duskEnd:      new Date(),
-      nextDawnStart:new Date()
-    };
 
     const backgroundSunPlugin = {
       id: 'backgroundSun',
@@ -556,226 +359,8 @@
       }
     };
 
-    function createChart(ctxId, label, datasets, type = "line", showLegend = false, logScale = false, yAxisMin = null, yAxisMax = null) {
-      const canvas = document.getElementById(ctxId);
-      if (!canvas) { console.warn(`Canvas '${ctxId}' not found`); return null; }
-      const ctx = canvas.getContext('2d');
-      return new Chart(ctx, {
-        type,
-        data: { labels: [], datasets },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: {
-              type: 'time',
-              time: { unit: 'minute', tooltipFormat: 'HH:mm', displayFormats: { hour: 'HH:mm', minute: 'HH:mm' } },
-              // Labels in the display time zone (station or UTC), not the browser's
-              ticks: chartTimeTicks({ color: '#6b7280', maxTicksLimit: 5 }),
-              grid: { color: 'rgba(255,255,255,0.06)' }
-            },
-            y: {
-              type: logScale ? 'logarithmic' : 'linear',
-              min: yAxisMin !== null ? yAxisMin : (logScale ? 0.00001 : undefined),
-              max: yAxisMax !== null ? yAxisMax : undefined,
-              beginAtZero: yAxisMin === null && yAxisMax === null,
-              ticks: {
-                color: '#6b7280',
-                callback: function(v) { return logScale ? v.toFixed(6) : v.toString(); }
-              },
-              grid: { color: 'rgba(255,255,255,0.06)' }
-            }
-          },
-          plugins: {
-            title: { display: true, text: label, color: '#9ca3af', font: { size: 11 }, padding: { bottom: 4 } },
-            legend: { display: showLegend, labels: { color: '#9ca3af', boxWidth: 2, boxHeight: 2, font: { size: 10 } } },
-            tooltip: { callbacks: { title: chartTooltipTitle } },
-            backgroundSun: {
-              periods: [
-                { start: sunTimes.startOfDay,   end: sunTimes.dawnStart,    color: 'rgba(0,0,100,0.3)' },
-                { start: sunTimes.dawnStart,     end: sunTimes.dawnEnd,      color: 'rgba(128,128,128,0.3)' },
-                { start: sunTimes.dawnEnd,       end: sunTimes.duskStart,    color: 'rgba(160,190,255,0.3)' },
-                { start: sunTimes.duskStart,     end: sunTimes.duskEnd,      color: 'rgba(128,128,128,0.3)' },
-                { start: sunTimes.duskEnd,       end: sunTimes.nextDawnStart,color: 'rgba(0,0,100,0.3)' }
-              ]
-            }
-          }
-        }
-      });
-    }
-
-    function updateCharts(data) {
-      const ts = data.map(p => new Date(p.timestamp * 1000));
-      if (charts.chartExposure)         { charts.chartExposure.data.labels = ts;         charts.chartExposure.data.datasets[0].data         = data.map(p => p.exposure); }
-      if (charts.chartGain)             { charts.chartGain.data.labels = ts;             charts.chartGain.data.datasets[0].data             = data.map(p => p.gain); }
-      if (charts.chartNoise)            { charts.chartNoise.data.labels = ts;            charts.chartNoise.data.datasets[0].data            = data.map(p => p.noise); }
-      if (charts.chartSQM)              { charts.chartSQM.data.labels = ts;              charts.chartSQM.data.datasets[0].data              = data.map(p => p.sqm); }
-      if (charts.chartStars)            { charts.chartStars.data.labels = ts;            charts.chartStars.data.datasets[0].data            = data.map(p => p.stars); }
-      if (charts.chartFocus)            { charts.chartFocus.data.labels = ts;            charts.chartFocus.data.datasets[0].data            = data.map(p => p.focus); }
-      if (charts.chartHDR)              { charts.chartHDR.data.labels = ts;              charts.chartHDR.data.datasets[0].data              = data.map(p => p.hdr); }
-      if (charts.chartBrightness)       { charts.chartBrightness.data.labels = ts;       charts.chartBrightness.data.datasets[0].data       = data.map(p => p.brightness); }
-      if (charts.chartMeanBrightnessRGB){ charts.chartMeanBrightnessRGB.data.labels = ts; charts.chartMeanBrightnessRGB.data.datasets[0].data = data.map(p => p.mean_r); charts.chartMeanBrightnessRGB.data.datasets[1].data = data.map(p => p.mean_g); charts.chartMeanBrightnessRGB.data.datasets[2].data = data.map(p => p.mean_b); }
-      Object.values(charts).forEach(c => { if (c) c.update(); });
-    }
-
-    function updateMeteoCharts(data) {
-      const ts = data.map(d => new Date(d.timestamp * 1000));
-      if (charts.chartTemp)        { charts.chartTemp.data.labels        = ts; charts.chartTemp.data.datasets[0].data        = data.map(d => d.temperature); }
-      if (charts.chartHumidity)    { charts.chartHumidity.data.labels    = ts; charts.chartHumidity.data.datasets[0].data    = data.map(d => d.humidity); }
-      if (charts.chartPressure)    { charts.chartPressure.data.labels    = ts; charts.chartPressure.data.datasets[0].data    = data.map(d => d.pressure_msl); charts.chartPressure.data.datasets[1].data = data.map(d => d.surface_pressure); }
-      if (charts.chartDewPoint)    { charts.chartDewPoint.data.labels    = ts; charts.chartDewPoint.data.datasets[0].data    = data.map(d => d.dew_point); }
-      if (charts.chartClouds)      { charts.chartClouds.data.labels      = ts; charts.chartClouds.data.datasets[0].data      = data.map(d => d.cloud_low); charts.chartClouds.data.datasets[1].data = data.map(d => d.cloud_mid); charts.chartClouds.data.datasets[2].data = data.map(d => d.cloud_high); }
-      if (charts.chartGlobalCloud) { charts.chartGlobalCloud.data.labels = ts; charts.chartGlobalCloud.data.datasets[0].data = data.map(d => d.cloud_cover); }
-      if (charts.chartVisibility)  { charts.chartVisibility.data.labels  = ts; charts.chartVisibility.data.datasets[0].data  = data.map(d => d.visibility / 1000); }
-      if (charts.chartJetstream)   { charts.chartJetstream.data.labels   = ts; charts.chartJetstream.data.datasets[0].data   = data.map(d => d.wind_speed_300hPa); }
-      if (charts.chartWindSpeed)   { charts.chartWindSpeed.data.labels   = ts; charts.chartWindSpeed.data.datasets[0].data   = data.map(d => d.wind_speed_10m); }
-      if (charts.chartWindDir)     { charts.chartWindDir.data.labels     = ts; charts.chartWindDir.data.datasets[0].data     = data.map(d => d.wind_dir_10m); }
-      Object.values(charts).forEach(c => { if (c) c.update(); });
-    }
-
-    function updateAuroraCharts(data) {
-      const ts = data.map(d => new Date(d.timestamp * 1000));
-      if (charts.chartProbabilityCombined) { charts.chartProbabilityCombined.data.labels = ts; charts.chartProbabilityCombined.data.datasets[0].data = data.map(d => d.probability_percent); charts.chartProbabilityCombined.data.datasets[1].data = data.map(d => d.probability_max); charts.chartProbabilityCombined.data.datasets[2].data = data.map(d => d.probability_avg); }
-      if (charts.chartKpIndex)  { charts.chartKpIndex.data.labels  = ts; charts.chartKpIndex.data.datasets[0].data  = data.map(d => d.kp_index); }
-      if (charts.chartBt)       { charts.chartBt.data.labels       = ts; charts.chartBt.data.datasets[0].data       = data.map(d => d.bt); }
-      if (charts.chartBz)       { charts.chartBz.data.labels       = ts; charts.chartBz.data.datasets[0].data       = data.map(d => d.bz); }
-      if (charts.chartDensity)  { charts.chartDensity.data.labels  = ts; charts.chartDensity.data.datasets[0].data  = data.map(d => d.density); }
-      if (charts.chartSpeed)    { charts.chartSpeed.data.labels    = ts; charts.chartSpeed.data.datasets[0].data    = data.map(d => d.speed); }
-      if (charts.chartTemperature){ charts.chartTemperature.data.labels = ts; charts.chartTemperature.data.datasets[0].data = data.map(d => d.temperature); }
-      Object.values(charts).forEach(c => { if (c) c.update(); });
-    }
-
-    function clearAllCharts() {
-      Object.values(charts).forEach(c => { if (c) { c.data.labels = []; c.data.datasets.forEach(ds => ds.data = []); c.update(); } });
-    }
-
-    // "Today" is the calendar day in the display time zone (station or UTC);
-    // the daily databases are UTC days, fetchDayRows() joins the one or two
-    // that the day spans.
-    async function loadMeasurements() {
-      try {
-        const rows = await fetchDayRows('/api/image', dayStringInZone());
-        if (rows.length) updateCharts(rows); else clearAllCharts();
-      } catch (err) { console.error("Failed to load measurement data:", err); clearAllCharts(); }
-    }
-
-    async function loadMeteoData() {
-      try {
-        updateMeteoCharts(await fetchDayRows('/api/meteo', dayStringInZone()));
-      } catch (err) { console.error("Failed to load meteo data:", err); }
-    }
-
-    async function loadAuroraData() {
-      try {
-        updateAuroraCharts(await fetchDayRows('/api/aurora', dayStringInZone()));
-      } catch (err) { console.error("Failed to load aurora data:", err); }
-    }
-
-    function updateSunTimes(date, lat, lon) {
-      if (!lat || !lon) return;
-      sunTimes.startOfDay   = new Date(startOfDayInZone(new Date(date).getTime() / 1000) * 1000);
-      sunTimes.dawnStart    = new Date(sunTimes.startOfDay.getTime() + 6  * 3600000);
-      sunTimes.dawnEnd      = new Date(sunTimes.startOfDay.getTime() + 8  * 3600000);
-      sunTimes.duskStart    = new Date(sunTimes.startOfDay.getTime() + 18 * 3600000);
-      sunTimes.duskEnd      = new Date(sunTimes.startOfDay.getTime() + 20 * 3600000);
-      sunTimes.nextDawnStart= new Date(sunTimes.startOfDay.getTime() + 30 * 3600000);
-    }
-
     function initCharts() {
       Chart.register(backgroundSunPlugin);
-
-      charts.chartExposure = createChart("chartExposure", "Exposure (s)",
-        [{ label:"Exposure (s)", data:[], borderColor:"orange", fill:false, pointRadius:0 }],
-        "line", false, true);
-
-      charts.chartGain = createChart("chartGain", "Gain",
-        [{ label:"Gain", data:[], borderColor:"#3b82f6", fill:false, pointRadius:0 }],
-        "line", false, false, 0, 350);
-
-      charts.chartNoise = createChart("chartNoise", "Noise Level",
-        [{ label:"Sigma noise", data:[], borderColor:"#ef4444", fill:false, pointRadius:0 }]);
-
-      charts.chartSQM = createChart("chartSQM", "SQM",
-        [{ label:"SQM", data:[], borderColor:"#22c55e", fill:false, pointRadius:0 }],
-        "line", false, false, 0, 22);
-
-      charts.chartStars = createChart("chartStars", "Stars count",
-        [{ label:"Star count", data:[], borderColor:"#fbbf24", fill:false, pointRadius:0 }]);
-
-      charts.chartFocus = createChart("chartFocus", "Focus",
-        [{ label:"Focus", data:[], borderColor:"orange", fill:false, pointRadius:0 }]);
-
-      charts.chartHDR = createChart("chartHDR", "HDR",
-        [{ label:"HDR exposures", data:[], backgroundColor:"#8b5cf6", fill:false, pointRadius:0 }],
-        "bar", false, false, 0, 5);
-
-      charts.chartBrightness = createChart("chartBrightness", "Median Brightness (G)",
-        [{ label:"Median (green)", data:[], borderColor:"lime", fill:false, pointRadius:0 }]);
-
-      charts.chartMeanBrightnessRGB = createChart("chartMeanBrightnessRGB", "Mean Brightness (RGB)", [
-        { label:"Mean (red)",   data:[], borderColor:"#ef4444", fill:false, pointRadius:0 },
-        { label:"Mean (green)", data:[], borderColor:"#22c55e", fill:false, pointRadius:0 },
-        { label:"Mean (blue)",  data:[], borderColor:"#3b82f6", fill:false, pointRadius:0 }
-      ], "line", true);
-
-      charts.chartTemp = createChart("chartTemp", "Temperature (°C)",
-        [{ label:"Temperature", data:[], borderColor:"orange", fill:false, pointRadius:0 }]);
-
-      charts.chartHumidity = createChart("chartHumidity", "Rel. humidity (%)",
-        [{ label:"Humidity", data:[], borderColor:"#3b82f6", fill:false, pointRadius:0 }]);
-
-      charts.chartPressure = createChart("chartPressure", "Pressure (hPa)", [
-        { label:"MSL",     data:[], borderColor:"lime", fill:false, pointRadius:0 },
-        { label:"Surface", data:[], borderColor:"cyan", fill:false, pointRadius:0 }
-      ], "line", true);
-
-      charts.chartDewPoint = createChart("chartDewPoint", "Dew point (°C)",
-        [{ label:"Dew point", data:[], borderColor:"white", fill:false, pointRadius:0 }]);
-
-      charts.chartClouds = createChart("chartClouds", "Cloud cover (%)", [
-        { label:"Low",  data:[], borderColor:"gray",   fill:false, pointRadius:0 },
-        { label:"Mid",  data:[], borderColor:"silver", fill:false, pointRadius:0 },
-        { label:"High", data:[], borderColor:"white",  fill:false, pointRadius:0 }
-      ], "line", true);
-
-      charts.chartGlobalCloud = createChart("chartGlobalCloud", "Global cloud cover (%)",
-        [{ label:"Cloud cover", data:[], backgroundColor:"lightblue" }], "bar");
-
-      charts.chartVisibility = createChart("chartVisibility", "Visibility (km)",
-        [{ label:"Visibility", data:[], borderColor:"gold", fill:false, pointRadius:0 }]);
-
-      charts.chartJetstream = createChart("chartJetstream", "Jetstream @9.2km (km/h)",
-        [{ label:"Jetstream", data:[], borderColor:"violet", fill:false, pointRadius:0 }]);
-
-      charts.chartWindSpeed = createChart("chartWindSpeed", "Wind speed (km/h)",
-        [{ label:"Wind", data:[], borderColor:"lightgreen", fill:false, pointRadius:0 }]);
-
-      charts.chartWindDir = createChart("chartWindDir", "Wind direction (°)",
-        [{ label:"Wind Dir", data:[], borderColor:"lightcoral", fill:false, pointRadius:0 }]);
-
-      charts.chartProbabilityCombined = createChart("chartProbabilityCombined", "Aurora Probability (%)", [
-        { label:"Probability %",     data:[], borderColor:"#00ff88", backgroundColor:"#00ff8820", fill:true, pointRadius:0 },
-        { label:"Max Probability %", data:[], borderColor:"#ff6600", fill:false, pointRadius:0 },
-        { label:"Avg Probability %", data:[], borderColor:"#ffaa00", fill:false, pointRadius:0 }
-      ], "line", true, false, 0, 100);
-
-      charts.chartKpIndex = createChart("chartKpIndex", "Kp Index",
-        [{ label:"Kp Index", data:[], borderColor:"#ff2288", backgroundColor:"#ff228820", fill:true, pointRadius:0 }], "bar");
-
-      charts.chartBt = createChart("chartBt", "Bt (Magnetic Field Total)",
-        [{ label:"Bt", data:[], borderColor:"#4488ff", fill:false, pointRadius:0 }]);
-
-      charts.chartBz = createChart("chartBz", "Bz (Magnetic Field Z)",
-        [{ label:"Bz", data:[], borderColor:"#88aaff", fill:false, pointRadius:0 }]);
-
-      charts.chartDensity = createChart("chartDensity", "Solar Wind Density",
-        [{ label:"Density", data:[], borderColor:"#aa44ff", fill:false, pointRadius:0 }]);
-
-      charts.chartSpeed = createChart("chartSpeed", "Solar Wind Speed",
-        [{ label:"Speed", data:[], borderColor:"#ff4444", fill:false, pointRadius:0 }]);
-
-      charts.chartTemperature = createChart("chartTemperature", "Solar Wind Temperature",
-        [{ label:"Temperature", data:[], borderColor:"#ffaa44", fill:false, pointRadius:0 }]);
 
       // Sun/Moon altitude chart (linear x-axis)
       const sunMoonCanvas = document.getElementById("chartSunMoonAltitude");
@@ -815,9 +400,7 @@
         });
       }
 
-      loadMeasurements();
-      loadMeteoData();
-      loadAuroraData();
+      loadConditions();
       // Station time zone learnt or UTC/local switched: show everything anew
       // loadLatestImage() returns at once while a load is running: retry
       // until it is free, so the switch is never lost
@@ -826,14 +409,152 @@
         loadLatestImage();
       };
       window.addEventListener('allsky-timezone-change', () => {
-        loadMeasurements();
-        loadMeteoData();
-        loadAuroraData();
+        loadConditions();
         reloadImagePanel();
       });
-      setInterval(loadMeasurements, 60000);
-      setInterval(loadMeteoData,    60000);
-      setInterval(loadAuroraData,   60000);
+      setInterval(loadConditions, 60000);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  CONDITIONS (right sidebar): station sensors, forecast, aurora
+    // ══════════════════════════════════════════════════════════════
+    const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+    const SENSOR_FRESH_S = 30 * 60;      // older station readings: model values instead
+    const FORECAST_STALE_S = 90 * 60;    // the meteo timer runs every 30 min
+    const AURORA_STALE_S = 30 * 60;      // the aurora timer runs every 5 min
+
+    function cardinal(deg) {
+      const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                    'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+      return dirs[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
+    }
+    const row = (label, value, cls = '', title = '') =>
+      `<div${title ? ` title="${title}"` : ''}>${label} <span${cls ? ` class="${cls}"` : ''}>${value}</span></div>`;
+    const cloudSwatch = (v) => `<span class="cloud-swatch" style="background:${cloudCoverToRGB(v)}"></span>`;
+
+    async function fetchJson(url) {
+      try {
+        const r = await fetch(url, { cache: 'no-cache' });
+        return r.ok ? await r.json() : null;
+      } catch { return null; }
+    }
+
+    // Measured values of the station; the Open-Meteo model only fills in
+    // what the station cannot measure (clouds, jetstream) or when the
+    // sensors are missing or stale
+    function renderWeather(sensor, model) {
+      const now = Date.now() / 1000;
+      const fresh = sensor && isNum(sensor.timestamp) && now - sensor.timestamp < SENSOR_FRESH_S;
+      const src = fresh ? `station · ${formatClock(sensor.timestamp)}` : model ? 'Open-Meteo model' : '';
+      let html = `<div class="metadata-section"><h2>Weather${src ? ` <span class="h2-sub">· ${src}</span>` : ''}</h2>`;
+      const w = fresh ? sensor : model;
+      if (w) {
+        if (isNum(w.temperature)) html += row('Temperature', `${w.temperature.toFixed(1)} °C`);
+        if (isNum(w.humidity))    html += row('Humidity', `${w.humidity.toFixed(0)} %`);
+        if (isNum(w.temperature) && isNum(w.dew_point)) {
+          const spread = w.temperature - w.dew_point;
+          html += row('Dew point', `${w.dew_point.toFixed(1)} °C · ${spread.toFixed(1)} K`,
+                      spread < FORECAST_DEW_SPREAD_WARN ? 'warn' : '', 'Dew point and how far the air is above it');
+        }
+        if (fresh) {
+          if (isNum(sensor.pressure)) html += row('Pressure', `${sensor.pressure.toFixed(0)} hPa`);
+          // anemometer first, the weather sensor's wind otherwise (m/s)
+          const ws = isNum(sensor.wind_speed) ? sensor.wind_speed : sensor.ws_wind_speed;
+          const wd = isNum(sensor.wind_speed) ? sensor.wind_direction : sensor.ws_wind_direction;
+          if (isNum(ws)) html += row('Wind', `${(ws * 3.6).toFixed(0)} km/h${isNum(wd) ? ' ' + cardinal(wd) : ''}`);
+          if (isNum(sensor.rainfall) && sensor.rainfall > 0) html += row('Rain', `${sensor.rainfall.toFixed(1)} mm`, 'warn');
+        } else {
+          if (isNum(w.pressure_msl)) html += row('Pressure MSL', `${w.pressure_msl.toFixed(0)} hPa`);
+          if (isNum(w.wind_speed_10m))
+            html += row('Wind 10 m', `${w.wind_speed_10m.toFixed(0)} km/h${isNum(w.wind_dir_10m) ? ' ' + cardinal(w.wind_dir_10m) : ''}`);
+        }
+      }
+      if (model) {
+        if (isNum(model.cloud_cover))
+          html += row('Clouds (model)', `${model.cloud_cover.toFixed(0)} %${cloudSwatch(model.cloud_cover)}`, '',
+                      ['low', 'mid', 'high'].map(k => isNum(model['cloud_' + k]) ? `${k} ${model['cloud_' + k].toFixed(0)} %` : '').filter(Boolean).join(' · '));
+        if (isNum(model.wind_speed_300hPa))
+          html += row('Seeing (jetstream)', `${model.wind_speed_300hPa.toFixed(0)} km/h ${getSeeingLabel(model.wind_speed_300hPa)}`);
+      }
+      if (!w && !model) html += '<div class="cond-note">No weather data yet.</div>';
+      html += '<div class="cond-link"><a href="meteo.html">Weather &amp; sensors →</a></div></div>';
+      document.getElementById('weather').innerHTML = html;
+    }
+
+    // The coming night from forecast_meteo.json (written by the meteo tool)
+    function renderTonight(fc) {
+      const now = Date.now() / 1000;
+      const hours = (fc && Array.isArray(fc.hours) ? fc.hours : []).filter(h => isNum(h.timestamp) && h.timestamp + 3600 > now);
+      let html = '<div class="metadata-section"><h2>Tonight <span class="h2-sub">· forecast</span></h2>';
+      if (!hours.length) {
+        html += '<div class="cond-note">No forecast yet (allsky360-meteo.timer writes it every 30 min).</div>';
+      } else {
+        const t = forecastTonight(hours);
+        if (t.night) {
+          const nh = t.nightHours;
+          html += row(t.night[0] === 0 ? 'Dark until' : 'Dark',
+                      t.night[0] === 0 ? formatClock(nh[nh.length - 1].timestamp + 3600) : hourSpanText(hours, t.night));
+          html += row('Clear sky', t.clear.length ? t.clear.map(r => hourSpanText(nh, r)).join('<br>') : 'not expected',
+                      t.clear.length ? 'good' : '', `Total cloud cover ≤ ${FORECAST_CLEAR_MAX} % for at least ${FORECAST_CLEAR_MIN_HOURS} h`);
+          const jets = nh.map(h => h.wind_speed_300hPa).filter(isNum);
+          if (jets.length) {
+            const avg = jets.reduce((a, b) => a + b, 0) / jets.length;
+            html += row('Seeing', `${Math.min(...jets).toFixed(0)}–${Math.max(...jets).toFixed(0)} km/h ${getSeeingLabel(avg)}`,
+                        '', 'Jetstream at 9.2 km during the dark hours');
+          }
+          if (t.dewHours.length)
+            html += row('Dew risk', `${t.dewHours.length} h`, 'warn', `Air less than ${FORECAST_DEW_SPREAD_WARN} K above the dew point`);
+        } else {
+          html += row('Dark', 'not within 24 h');
+        }
+        if (t.rain) html += row('Rain likely', hourSpanText(hours, t.rain), 'warn');
+        if (t.maxGust >= FORECAST_GUST_WARN) html += row('Gusts', `up to ${t.maxGust.toFixed(0)} km/h`, 'warn');
+        if (isNum(fc.generated) && now - fc.generated > FORECAST_STALE_S)
+          html += `<div class="cond-note">Forecast from ${formatDateTime(fc.generated, { seconds: false })}: check allsky360-meteo.timer</div>`;
+      }
+      html += '<div class="cond-link"><a href="meteo.html">Hourly forecast →</a></div></div>';
+      document.getElementById('tonight').innerHTML = html;
+    }
+
+    // Rough assessment for mid latitudes: the probability is the OVATION
+    // value at the station, Kp and a southward Bz drive activity
+    function auroraLevel(a) {
+      const p = isNum(a.probability_percent) ? a.probability_percent : 0;
+      if (p >= 10 || (isNum(a.kp_index) && a.kp_index >= 6)) return { text: 'chance of aurora', cls: 'good' };
+      if ((isNum(a.kp_index) && a.kp_index >= 4) || (isNum(a.bz) && a.bz <= -5)) return { text: 'active', cls: 'warn' };
+      return { text: 'quiet', cls: '' };
+    }
+    function renderAurora(a) {
+      let html = '<div class="metadata-section">';
+      if (!a) {
+        html += '<h2>Aurora</h2><div class="cond-note">No aurora data yet.</div>';
+      } else {
+        const level = auroraLevel(a);
+        html += `<h2>Aurora <span class="h2-sub">· <span class="${level.cls}" style="font-weight:600">${level.text}</span></span></h2>`;
+        html += row('Kp index', fmtNum(a.kp_index, 1), isNum(a.kp_index) && a.kp_index >= 5 ? 'good' : '');
+        html += row('Probability', `${fmtNum(a.probability_percent, 0)} %`);
+        html += row('Bz', isNum(a.bz) ? `${a.bz.toFixed(1)} nT${a.bz < 0 ? ' (south)' : ''}` : '–',
+                    isNum(a.bz) && a.bz <= -10 ? 'bad' : isNum(a.bz) && a.bz <= -5 ? 'warn' : '',
+                    'Southward (negative) Bz couples the solar wind to the magnetosphere');
+        html += row('Solar wind', isNum(a.speed) ? `${a.speed.toFixed(0)} km/s` : '–');
+        const obs = a.observation_time;
+        if (isNum(obs) && Date.now() / 1000 - obs > AURORA_STALE_S)
+          html += `<div class="cond-note">Data from ${formatDateTime(obs, { seconds: false })}: check allsky360-aurora.timer</div>`;
+      }
+      html += '<div class="cond-link"><a href="aurora.html">Space weather →</a></div></div>';
+      document.getElementById('aurora').innerHTML = html;
+    }
+
+    async function loadConditions() {
+      const [sensor, model, forecast, aurora] = await Promise.all([
+        fetchJson('latest_sensor_data.json'),
+        fetchJson('latest_meteo_data.json'),
+        fetchJson('forecast_meteo.json'),
+        fetchJson('latest_aurora_data.json')
+      ]);
+      try { renderWeather(sensor, model); } catch (e) { console.error('weather card:', e); }
+      try { renderTonight(forecast); } catch (e) { console.error('tonight card:', e); }
+      try { renderAurora(aurora); } catch (e) { console.error('aurora card:', e); }
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -841,27 +562,17 @@
     // ══════════════════════════════════════════════════════════════
     const imageEl      = document.getElementById("image");
     const imageDataEl  = document.getElementById("image-data");
-    const locationEl   = document.getElementById("location");
     const sunandmoonEl = document.getElementById("sunandmoon");
-    const weatherEl    = document.getElementById("weather");
-    const auroraEl     = document.getElementById("aurora");
     const timerEl      = document.getElementById("timer");
-    const exposureGallery = document.getElementById("exposure-gallery");
     const panoramaEl   = document.getElementById("panorama");
 
-    let showExposures = true;
     let latestImagePath  = "";
     let latestPanoramaPath = "";
     let refreshInterval  = 10;
     let loading          = false;
     let loadingConfig    = false;
-    const exposureImgs   = [];
-    let maxHdrImages     = 5;
     let lastImageLoadTime = Date.now();
     let timerTimeout     = null;
-    let mean_target      = 0;
-    let mean_brightness  = 0;
-    let useLogHistogram  = false;
 
     let mouseX = null;
     let mouseY = null;
@@ -1438,27 +1149,12 @@
           imageMeta = await r.json();
         } catch { /* optional */ }
 
-        // Weather metadata
-        let weatherMeta = null;
-        try {
-          const r = await fetch('latest_meteo_data.json', { cache: "no-cache" });
-          weatherMeta = await r.json();
-        } catch { /* optional */ }
-
-        // Aurora metadata
-        let auroraMeta = null;
-        try {
-          const r = await fetch('latest_aurora_data.json', { cache: "no-cache" });
-          auroraMeta = await r.json();
-        } catch { /* optional */ }
-
         const handleImageLoaded = () => {
           // Reset loading state FIRST — before anything that might throw — so the
           // timer is never stuck even if overlay rendering fails.
           loading = false;
           lastImageLoadTime = Date.now();
           try { updateAllskyOverlay(); } catch (e) { console.warn("overlay update error:", e); }
-          setTimeout(() => { updateHistogramWithRetry(imageEl); }, 100);
         };
 
         if (imageAlreadyLoaded) {
@@ -1472,10 +1168,7 @@
 
         if (!imageMeta) {
           if (imageDataEl)  imageDataEl.innerHTML  = "";
-          if (locationEl)   locationEl.innerHTML   = "";
           if (sunandmoonEl) sunandmoonEl.innerHTML = "";
-          if (weatherEl)    weatherEl.innerHTML    = "";
-          if (auroraEl)     auroraEl.innerHTML     = "";
           loading = false;
           refreshInterval = 10;
           lastImageLoadTime = Date.now();
@@ -1484,9 +1177,6 @@
           return;
         }
 
-        maxHdrImages    = imageMeta.hdr;
-        mean_target     = imageMeta.target_brightness;
-        mean_brightness = imageMeta.mean_brightness;
         imageTimestamp  = imageMeta.timestamp;
         timezoneOffset  = imageMeta.timezone_offset;
 
@@ -1497,7 +1187,7 @@
         restartTimer();
 
         // Update header badges
-        updateHeaderBadges(imageMeta, weatherMeta, auroraMeta);
+        updateHeaderBadges(imageMeta);
 
         // Update sky overlay badges
         updateSkyBadges(imageMeta);
@@ -1538,18 +1228,6 @@
         // Set image-data immediately — independent of sun/moon calculations
         if (imageDataEl) imageDataEl.innerHTML = imageDataHtml;
 
-        // Location HTML — set immediately, no external dependencies
-        const locationHtml = `<div class="metadata-section">
-          <h2>Location</h2>
-          <div>Longitude <span>${longitude != null ? longitude.toFixed(4) : "N/A"}</span></div>
-          <div>Latitude  <span>${latitude  != null ? latitude.toFixed(4)  : "N/A"}</span></div>
-          <div>Altitude  <span>${altitude ?? "?"} m</span></div>
-          <div style="border:none; margin-top:6px;">
-            <a href="https://maps.google.com/?q=${latitude},${longitude}" target="_blank">→ Google Maps</a>
-          </div>
-        </div>`;
-        if (locationEl) locationEl.innerHTML = locationHtml;
-
         // Sun/Moon HTML — requires astronomia library (loaded with defer); wrap so failures
         // don't block the widgets above. On first load the library may not be ready yet.
         try {
@@ -1583,46 +1261,6 @@
             '<div class="metadata-section"><h2>Sun &amp; Moon</h2><p style="color:#888;margin:8px 0">Calculating...</p></div>';
         }
 
-        // Weather
-        let weatherHtml = '';
-        if (weatherMeta) {
-          weatherHtml = `<div class="metadata-section">
-            <h2>Weather</h2>
-            <div>Temperature (°C) <span>${weatherMeta.temperature.toFixed(1)}</span></div>
-            <div>Humidity (%)     <span>${weatherMeta.humidity.toFixed(1)}</span></div>
-            <div>Dew point (°C)   <span>${weatherMeta.dew_point.toFixed(1)}</span></div>
-            <div>Pressure MSL     <span>${weatherMeta.pressure_msl.toFixed(1)} hPa</span></div>
-            <div>Surface pres.    <span>${weatherMeta.surface_pressure.toFixed(1)} hPa</span></div>
-            <div>Cloud low (%)    <span>${weatherMeta.cloud_low.toFixed(1)} <span style="display:inline-block;width:1.2em;height:0.8em;background:${cloudCoverToRGB(weatherMeta.cloud_low)};border-radius:2px;"></span></span></div>
-            <div>Cloud mid (%)    <span>${weatherMeta.cloud_mid.toFixed(1)} <span style="display:inline-block;width:1.2em;height:0.8em;background:${cloudCoverToRGB(weatherMeta.cloud_mid)};border-radius:2px;"></span></span></div>
-            <div>Cloud high (%)   <span>${weatherMeta.cloud_high.toFixed(1)} <span style="display:inline-block;width:1.2em;height:0.8em;background:${cloudCoverToRGB(weatherMeta.cloud_high)};border-radius:2px;"></span></span></div>
-            <div>Visibility (km)  <span>${(weatherMeta.visibility * 0.001).toFixed(0)}</span></div>
-            <div>Wind 10m (km/h)  <span>${weatherMeta.wind_speed_10m.toFixed(1)}</span></div>
-            <div>Wind dir (°)     <span>${weatherMeta.wind_dir_10m.toFixed(0)}</span></div>
-            <div>Jetstream (km/h) <span>${weatherMeta.wind_speed_300hPa.toFixed(1)} ${getSeeingLabel(weatherMeta.wind_speed_300hPa)}</span></div>
-          </div>`;
-        }
-        if (weatherEl) weatherEl.innerHTML = weatherHtml;
-
-        // Aurora
-        let auroraHtml = '';
-        if (auroraMeta) {
-          auroraHtml = `<div class="metadata-section">
-            <h2>Aurora</h2>
-            <div>Probability (%)     <span>${fmtNum(auroraMeta.probability_percent, 1)}</span></div>
-            <div>Max probability (%) <span>${fmtNum(auroraMeta.probability_max, 1)}</span></div>
-            <div>Avg probability (%) <span>${fmtNum(auroraMeta.probability_avg, 1)}</span></div>
-            <div>Kp Index            <span>${fmtNum(auroraMeta.kp_index, 1)}</span></div>
-            <div>Bt (nT)             <span>${fmtNum(auroraMeta.bt, 1)}</span></div>
-            <div>Bz (nT)             <span>${fmtNum(auroraMeta.bz, 1)}</span></div>
-            <div>SW Density          <span>${fmtNum(auroraMeta.density, 1)}</span></div>
-            <div>SW Speed            <span>${fmtNum(auroraMeta.speed, 0)}</span></div>
-            <div>SW Temp             <span>${fmtNum(auroraMeta.temperature, 0)} K</span></div>
-          </div>`;
-        }
-        if (auroraEl) auroraEl.innerHTML = auroraHtml;
-
-        updateExposureGallery();
         updateSunMoonAltitudeChart();
 
       } catch (err) {
@@ -1633,7 +1271,7 @@
       }
     }
 
-    function updateHeaderBadges(imageMeta, weatherMeta, auroraMeta) {
+    function updateHeaderBadges(imageMeta) {
       const modeEl  = document.getElementById('hdr-mode');
       const starsEl = document.getElementById('hdr-stars');
       if (modeEl) modeEl.textContent = imageMeta.night_mode ? '🌙 Night' : '☀️ Day';
@@ -1649,21 +1287,6 @@
       if (modeEl)  modeEl.textContent  = imageMeta.night_mode ? '🌙 Night' : '☀️ Day';
       if (sqmEl)   sqmEl.textContent   = imageMeta.night_mode ? `SQM ${imageMeta.sqm.toFixed(1)}` : 'SQM --';
       if (starsEl) starsEl.textContent = imageMeta.night_mode ? `${imageMeta.stars} ★` : '--';
-    }
-
-    function updateExposureGallery() {
-      while (exposureImgs.length > maxHdrImages) {
-        exposureGallery.removeChild(exposureImgs.pop());
-      }
-      while (exposureImgs.length < maxHdrImages) {
-        const el = document.createElement("img");
-        el.alt = `Exposure t${exposureImgs.length}`;
-        exposureGallery.appendChild(el);
-        exposureImgs.push(el);
-      }
-      for (let i = 0; i < maxHdrImages; i++) {
-        exposureImgs[i].src = `images/latest_image_t${i}.jpg`;
-      }
     }
 
     function updateSunMoonAltitudeChart() {
@@ -1988,28 +1611,6 @@
     }, { passive: true });
 
     // ══════════════════════════════════════════════════════════════
-    //  HISTOGRAM
-    // ══════════════════════════════════════════════════════════════
-    function updateHistogramWithRetry(imgEl3, maxRetries = 6) {
-      const delays = [200, 500, 1000, 2000, 3000, 5000];
-      function tryUpdate(n) {
-        const histCanvas = document.getElementById("histogram");
-        if (!imgEl3 || !imgEl3.complete || imgEl3.naturalWidth === 0 || !histCanvas) {
-          if (n <= maxRetries) setTimeout(() => tryUpdate(n + 1), delays[n - 1] ?? 2000);
-          return;
-        }
-        if (typeof updateRGBHistogram !== 'function') return;
-        requestAnimationFrame(() => {
-          try {
-            const ok = updateRGBHistogram(imgEl3, histCanvas);
-            if (!ok && n <= maxRetries) setTimeout(() => tryUpdate(n + 1), delays[n - 1] ?? 2000);
-          } catch { if (n <= maxRetries) setTimeout(() => tryUpdate(n + 1), delays[n - 1] ?? 2000); }
-        });
-      }
-      tryUpdate(1);
-    }
-
-    // ══════════════════════════════════════════════════════════════
     //  PANORAMA OVERLAY
     // ══════════════════════════════════════════════════════════════
     function updatePanoramaOverlay() {
@@ -2091,10 +1692,6 @@
     window.addEventListener("resize", () => {
       updateAllskyOverlay();
       updatePanoramaOverlay();
-      const histCanvas = document.getElementById("histogram");
-      if (imageEl && histCanvas && imageEl.complete && typeof updateRGBHistogram === 'function') {
-        updateHistogramWithRetry(imageEl, 2);
-      }
     });
 
     // ══════════════════════════════════════════════════════════════

@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Allsky360 – Statistics</title>
+  <title>Allsky360 – Camera Statistics</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180" />
@@ -46,6 +46,21 @@
       padding: 8px 8px 20px;
     }
 
+
+    /* ── LATEST IMAGE: histogram and HDR exposures (from the dashboard) ── */
+    .cam-card { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; overflow: hidden; }
+    .cam-title { text-align: center; font-size: 12px; font-weight: 600; color: #e5e7eb; }
+    .cam-title span { font-weight: 400; color: #6b7280; }
+    #histogram { display: block; width: 100%; flex: 1; min-height: 0; border-radius: 6px; background: rgba(0,0,0,0.35); }
+    #histogram-stats { display: flex; flex-wrap: wrap; gap: 0 12px; font-size: 11px; color: #6b7280; }
+    #histogram-stats > div { margin-bottom: 0 !important; }
+    .exposure-gallery { flex: 1; min-height: 0; display: flex; gap: 6px; overflow-x: auto; }
+    .exposure-gallery figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+    .exposure-gallery img {
+      flex: 1; min-height: 0; max-width: 100%; width: auto; object-fit: contain;
+      border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: #000;
+    }
+    .exposure-gallery figcaption { font-size: 10px; color: #6b7280; font-variant-numeric: tabular-nums; white-space: nowrap; }
   </style>
 </head>
 
@@ -60,7 +75,7 @@
       <img src="allsky360_256x256.png" alt="Allsky360" width="30" height="30" />
       <div class="hdr-brand-text">
         <div class="hdr-title">Allsky360</div>
-        <div class="hdr-crumb">Statistics · Sensor Graphs</div>
+        <div class="hdr-crumb">Camera · Statistics</div>
       </div>
     </a>
 
@@ -76,81 +91,8 @@
   <div id="main-layout">
 
     <!-- ── ICON NAV ─────────────────────────────────────────────── -->
-    <nav id="icon-nav">
-      <a href="index.html" class="nav-item" title="Home">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-          <polyline points="9 22 9 12 15 12 15 22"></polyline>
-        </svg>
-      </a>
-      <a href="dashboard.html" class="nav-item" title="Dashboard">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="7" height="7"></rect>
-          <rect x="14" y="3" width="7" height="7"></rect>
-          <rect x="14" y="14" width="7" height="7"></rect>
-          <rect x="3" y="14" width="7" height="7"></rect>
-        </svg>
-      </a>
-      <div class="nav-sep"></div>
-      <a href="archive.html" class="nav-item" title="Archive">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="21 8 21 21 3 21 3 8"></polyline>
-          <rect x="1" y="3" width="22" height="5"></rect>
-          <line x1="10" y1="12" x2="14" y2="12"></line>
-        </svg>
-      </a>
-      <a href="videos.html" class="nav-item" title="Videos">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="23 7 16 12 23 17 23 7"></polygon>
-          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
-        </svg>
-      </a>
-      <a href="graphs.html" class="nav-item active" title="Graphs">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="20" x2="18" y2="10"></line>
-          <line x1="12" y1="20" x2="12" y2="4"></line>
-          <line x1="6"  y1="20" x2="6"  y2="14"></line>
-        </svg>
-      </a>
-      <a href="meteo.html" class="nav-item" title="Weather">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
-        </svg>
-      </a>
-      <a href="aurora.html" class="nav-item" title="Aurora">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-        </svg>
-      </a>
-      <div class="nav-sep"></div>
-      <a href="aircraft.html" class="nav-item" title="Aircraft">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 16l-4-4V6a2 2 0 0 0-4 0v6l-4 4H3l2 3h5l2-1 2 1h5l2-3z"></path>
-        </svg>
-      </a>
-      <a href="hdr.html" class="nav-item" title="HDR Debug">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-          <polyline points="9 22 9 12 15 12 15 22"></polyline>
-        </svg>
-      </a>
-      <a href="config.html" class="nav-item" title="Config">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-        </svg>
-      </a>
-      <a href="calibration.html" class="nav-item" title="Calibration">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8"  x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          <line x1="2"  y1="12" x2="22"  y2="12"></line>
-          <line x1="12" y1="2"  x2="12"  y2="22"></line>
-        </svg>
-      </a>
-    </nav>
+    <nav id="icon-nav"></nav>
+    <script>renderIconNav();</script>
 
     <!-- ── GRAPHS MAIN ────────────────────────────────────────────── -->
     <main id="graphs-main">
@@ -173,55 +115,70 @@
       <div id="graphs-scroll">
         <div class="grid-stack" id="graphs-grid">
 
-          <div class="grid-stack-item" gs-id="chart-exposure" gs-x="0" gs-y="0" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="latest-histogram" gs-x="0" gs-y="0" gs-w="7" gs-h="2">
+            <div class="grid-stack-item-content cam-card">
+              <div class="cam-title">Histogram · latest image <span id="hist-time"></span></div>
+              <canvas id="histogram" width="512" height="100"></canvas>
+              <div id="histogram-stats"></div>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="hdr-gallery" gs-x="7" gs-y="0" gs-w="5" gs-h="2">
+            <div class="grid-stack-item-content cam-card">
+              <div class="cam-title">HDR exposures · latest image</div>
+              <div id="exposure-gallery" class="exposure-gallery"></div>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-exposure" gs-x="0" gs-y="2" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartExposure"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-gain" gs-x="6" gs-y="0" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-gain" gs-x="6" gs-y="2" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartGain"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-noise" gs-x="0" gs-y="3" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-noise" gs-x="0" gs-y="5" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartNoise"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-sqm" gs-x="6" gs-y="3" gs-w="3" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-sqm" gs-x="6" gs-y="5" gs-w="3" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartSQM"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-stars" gs-x="9" gs-y="3" gs-w="3" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-stars" gs-x="9" gs-y="5" gs-w="3" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartStars"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-hdr" gs-x="0" gs-y="6" gs-w="4" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-hdr" gs-x="0" gs-y="8" gs-w="4" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartHDR"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-focus" gs-x="4" gs-y="6" gs-w="4" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-focus" gs-x="4" gs-y="8" gs-w="4" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartFocus"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-brightness" gs-x="8" gs-y="6" gs-w="4" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-brightness" gs-x="8" gs-y="8" gs-w="4" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartBrightness"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-mean-brightness-rgb" gs-x="0" gs-y="9" gs-w="12" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-mean-brightness-rgb" gs-x="0" gs-y="11" gs-w="12" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartMeanBrightnessRGB"></canvas>
             </div>
@@ -519,7 +476,55 @@
       setInterval(loadMeasurements, captureIntervalSec * 1000);
     }
 
+    // ══════════════════════════════════════════════════════════════
+    //  LATEST IMAGE: histogram and HDR exposures (were on the dashboard)
+    // ══════════════════════════════════════════════════════════════
+    const histImg = new Image();
+    let latestStamp = '';
+    let latestTimestamp = null;
+
+    function renderExposureGallery(meta, stamp) {
+      const n = meta && meta.hdr > 0 ? meta.hdr : 1;
+      const exp = (i) => meta && typeof meta[`exposure_t${i}`] === 'number' ? ` · ${meta[`exposure_t${i}`].toPrecision(3)} s` : '';
+      // ?v= the image time: the latest_image_t*.jpg files keep their names
+      document.getElementById('exposure-gallery').innerHTML = Array.from({ length: n }, (_, i) =>
+        `<figure><img src="images/latest_image_t${i}.jpg?v=${stamp}" alt="Exposure t${i}" loading="lazy">` +
+        `<figcaption>t${i}${exp(i)}</figcaption></figure>`).join('');
+    }
+
+    async function loadLatestCamera() {
+      try {
+        const res = await fetch('api/latest_image', { cache: 'no-cache' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const li = await res.json();
+        const stamp = `${li.date}${li.image}`;
+        latestTimestamp = li.image_timestamp ?? null;
+        document.getElementById('hist-time').textContent = latestTimestamp ? '· ' + formatDateTime(latestTimestamp) : '';
+        if (stamp === latestStamp) return;
+        latestStamp = stamp;
+
+        let meta = null;
+        try {
+          const r = await fetch(`images/${li.date}/image-${stamp}.json`, { cache: 'no-cache' });
+          if (r.ok) meta = await r.json();
+        } catch { /* optional */ }
+        renderExposureGallery(meta, stamp);
+
+        histImg.onload = () => updateRGBHistogram(histImg, document.getElementById('histogram'));
+        histImg.src = `images/${li.date}/image-${stamp}.${li.filetype || 'jpg'}`;
+      } catch (err) {
+        console.error('Failed to load the latest image:', err);
+      }
+    }
+
     document.addEventListener("DOMContentLoaded", init);
+    document.addEventListener("DOMContentLoaded", () => {
+      loadLatestCamera();
+      setInterval(loadLatestCamera, 60000);
+      window.addEventListener('allsky-timezone-change', () => {
+        if (latestTimestamp) document.getElementById('hist-time').textContent = '· ' + formatDateTime(latestTimestamp);
+      });
+    });
 
     // ══════════════════════════════════════════════════════════════
     //  GRIDSTACK
@@ -556,17 +561,20 @@
         }
       };
 
-      const LS_KEY = 'allsky360.graphs1.layout.v1';
+      const LS_KEY = 'allsky360.graphs1.layout.v2';
+      // v2: histogram and HDR exposures moved here from the dashboard
       const defaultLayout = [
-        { id: "chart-exposure",           x: 0, y: 0,  w: 6,  h: 3 },
-        { id: "chart-gain",               x: 6, y: 0,  w: 6,  h: 3 },
-        { id: "chart-noise",              x: 0, y: 3,  w: 6,  h: 3 },
-        { id: "chart-sqm",                x: 6, y: 3,  w: 3,  h: 3 },
-        { id: "chart-stars",              x: 9, y: 3,  w: 3,  h: 3 },
-        { id: "chart-hdr",                x: 0, y: 6,  w: 4,  h: 3 },
-        { id: "chart-focus",              x: 4, y: 6,  w: 4,  h: 3 },
-        { id: "chart-brightness",         x: 8, y: 6,  w: 4,  h: 3 },
-        { id: "chart-mean-brightness-rgb",x: 0, y: 9,  w: 12, h: 3 }
+        { id: "latest-histogram",         x: 0, y:  0, w: 7,  h: 2 },
+        { id: "hdr-gallery",              x: 7, y:  0, w: 5,  h: 2 },
+        { id: "chart-exposure",           x: 0, y:  2,  w: 6,  h: 3 },
+        { id: "chart-gain",               x: 6, y:  2,  w: 6,  h: 3 },
+        { id: "chart-noise",              x: 0, y:  5,  w: 6,  h: 3 },
+        { id: "chart-sqm",                x: 6, y:  5,  w: 3,  h: 3 },
+        { id: "chart-stars",              x: 9, y:  5,  w: 3,  h: 3 },
+        { id: "chart-hdr",                x: 0, y:  8,  w: 4,  h: 3 },
+        { id: "chart-focus",              x: 4, y:  8,  w: 4,  h: 3 },
+        { id: "chart-brightness",         x: 8, y:  8,  w: 4,  h: 3 },
+        { id: "chart-mean-brightness-rgb",x: 0, y: 11,  w: 12, h: 3 }
       ];
 
       function applyLayout(layout) {

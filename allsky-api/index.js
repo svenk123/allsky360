@@ -103,6 +103,18 @@ const PROCESS_PATTERNS = {
 
 const ALLOWED_UNITS = ALLOWED_SERVICES.concat(Object.values(TIMER_UNITS));
 
+// GET /api/system/status: health of services, timers, data, disk, temperatures
+const { createSystemStatus } = require('./system_status');
+const systemStatus = createSystemStatus({
+    systemctl: SYSTEMCTL_PATH,
+    execFileAsync,
+    services: ALLOWED_SERVICES,
+    timerUnits: TIMER_UNITS,
+    processPatterns: PROCESS_PATTERNS,
+    publicPath: PUBLIC_PATH,
+    dbPath: DB_PATH
+});
+
 // Helper function to execute systemctl commands
 async function executeSystemctl(command, service, extraArgs = []) {
     try {
@@ -563,6 +575,16 @@ const server = http.createServer((req, res) => {
             res.end(JSON.stringify({ running: false, processes: [] }));
         });
 
+    // API call: /api/system/status (read only, no token: like /api/services/status)
+    } else if (pathname === '/api/system/status') {
+        systemStatus().then(status => {
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+            res.end(JSON.stringify(status));
+        }).catch(err => {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Failed to read the system status', detail: err.message }));
+        });
+
     // API call: /api/services/status?service=SERVICE_NAME
     } else if (pathname === '/api/services/status') {
         const service = parsed.query.service;
@@ -696,7 +718,7 @@ const server = http.createServer((req, res) => {
             }
         });
 
-    // Root: / -> index.html
+    // Root: / -> dashboard.html
     } else if (pathname === '/' || pathname === '/dashboard.html') {
         serveFile(req, res, path.join(PUBLIC_PATH, 'dashboard.html'));
 

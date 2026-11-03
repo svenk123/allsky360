@@ -204,6 +204,83 @@ function initTimeModeToggle(el) {
 
 // Kept for the pages: the offset argument is ignored, the zone comes from
 // the station configuration and the viewer's choice.
+// ── Icon navigation (left bar), shared by all pages ───────────────────
+// One place for the page list: a page only has <nav id="icon-nav"></nav>
+// followed by <script>renderIconNav();</script> (synchronous, no flicker).
+// null is a separator between the groups.
+const __NAV_SVG = (body) =>
+  `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${body}</svg>`;
+const NAV_ITEMS = [
+  { href: 'index.html', title: 'Home', icon: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline>' },
+  { href: 'dashboard.html', title: 'Dashboard', icon: '<rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect>' },
+  null,
+  { href: 'archive.html', title: 'Archive', icon: '<polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line>' },
+  { href: 'videos.html', title: 'Videos', icon: '<polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>' },
+  null,
+  { href: 'meteo.html', title: 'Weather', icon: '<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>' },
+  { href: 'aurora.html', title: 'Aurora', icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>' },
+  { href: 'aircraft.html', title: 'Aircraft', icon: '<path d="M21 16l-4-4V6a2 2 0 0 0-4 0v6l-4 4H3l2 3h5l2-1 2 1h5l2-3z"></path>' },
+  null,
+  { href: 'graphs.html', title: 'Camera Statistics', icon: '<line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line>' },
+  { href: 'hdr.html', title: 'HDR Debug', icon: '<circle cx="12" cy="12" r="3"></circle><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline>' },
+  { href: 'calibration.html', title: 'Calibration', icon: '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="12" y2="22"></line>' },
+  { href: 'status.html', title: 'System Status', health: true, icon: '<rect x="2" y="3" width="20" height="7" rx="2"></rect><rect x="2" y="14" width="20" height="7" rx="2"></rect><line x1="6" y1="6.5" x2="6.01" y2="6.5"></line><line x1="6" y1="17.5" x2="6.01" y2="17.5"></line>' },
+  { href: 'config.html', title: 'Config', icon: '<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>' }
+];
+
+// File name of the current page; the API serves dashboard.html for /
+function __currentPage() {
+  return location.pathname.split('/').pop() || 'dashboard.html';
+}
+
+function renderIconNav(nav = document.getElementById('icon-nav')) {
+  if (!nav) return;
+  const page = __currentPage();
+  nav.innerHTML = NAV_ITEMS.map(item => item === null
+    ? '<div class="nav-sep"></div>'
+    : `<a href="${item.href}" class="nav-item${item.href === page ? ' active' : ''}"${item.health ? ' id="nav-health"' : ''} title="${item.title}" aria-label="${item.title}"${item.href === page ? ' aria-current="page"' : ''}>${__NAV_SVG(item.icon)}</a>`
+  ).join('');
+  __startNavHealth();
+}
+
+// Warning/error dot on the System Status icon on every page: polls
+// api/system/status once a minute (the API caches it for a few seconds)
+let __navHealthTimer = null;
+function setNavHealth(status) {
+  const el = document.getElementById('nav-health');
+  if (!el) return;
+  const problems = (status?.checks || []).filter(c => c.level === 'warn' || c.level === 'error');
+  if (status && (status.overall === 'warn' || status.overall === 'error')) {
+    el.dataset.health = status.overall;
+    el.title = 'System Status · ' + problems.map(c => `${c.label}: ${c.text}`).join(' · ');
+  } else {
+    delete el.dataset.health;
+    el.title = status ? 'System Status · all OK' : 'System Status';
+  }
+  el.setAttribute('aria-label', el.title);
+}
+async function __pollNavHealth() {
+  try {
+    const res = await fetch('api/system/status', { cache: 'no-store' });
+    setNavHealth(res.ok ? await res.json() : null);
+  } catch { setNavHealth(null); }
+}
+function __startNavHealth() {
+  if (__navHealthTimer !== null || !document.getElementById('nav-health')) return;
+  __navHealthTimer = setInterval(__pollNavHealth, 60000);
+  __pollNavHealth();
+}
+
+// Text menu of the older pages (processing.html, panorama.html) from the
+// same page list; extra: [{href, title}] pages only these menus show
+function renderTextNav(list, extra = []) {
+  if (!list) return;
+  const page = __currentPage();
+  list.innerHTML = [...NAV_ITEMS.filter(Boolean), ...extra].map(item =>
+    `<li><a href="${item.href}" class="nav-link${item.href === page ? ' active' : ''}">${item.title}</a></li>`
+  ).join('');
+}
+
 function formatTimestamp(unixTime, _timezoneOffsetSeconds = null) {
   return formatDateTime(unixTime);
 }
@@ -282,28 +359,71 @@ function fmtNum(value, digits = 1, fallback = '–') {
   return (typeof value === 'number' && Number.isFinite(value)) ? value.toFixed(digits) : fallback;
 }
 
+// ── Forecast helpers (forecast_meteo.json; meteo.html and dashboard.html) ──
+// An hour counts as clear sky up to this total cloud cover (%)
+const FORECAST_CLEAR_MAX = 25;
+// Clear stretches shorter than this (hours) are not listed
+const FORECAST_CLEAR_MIN_HOURS = 2;
+// Precipitation probability (%) from which rain is shown as likely
+const FORECAST_RAIN_LIKELY = 50;
+// Dew risk when the air is less than this above the dew point (K)
+const FORECAST_DEW_SPREAD_WARN = 2;
+// Gusts from this speed are highlighted (km/h)
+const FORECAST_GUST_WARN = 40;
+
+// Contiguous runs [first, last] of indices where pred(hours[i]) holds
+function hourRuns(hours, pred) {
+  const out = [];
+  let start = -1;
+  hours.forEach((h, i) => {
+    if (pred(h)) { if (start < 0) start = i; }
+    else if (start >= 0) { out.push([start, i - 1]); start = -1; }
+  });
+  if (start >= 0) out.push([start, hours.length - 1]);
+  return out;
+}
+
+// "21:00–04:00 (7 h)": end is the end of the last hour
+function hourSpanText(hours, [a, b]) {
+  return `${formatClock(hours[a].timestamp)}–${formatClock(hours[b].timestamp + 3600)} (${b - a + 1} h)`;
+}
+
+// The coming night of an hourly forecast: night = first run of dark hours
+// (is_day 0) as [first, last] in hours, nightHours = those hours, clear =
+// clear stretches of at least FORECAST_CLEAR_MIN_HOURS within nightHours,
+// dewHours = night hours close to the dew point, rain = first run of likely
+// rain in hours, maxGust = highest gust (km/h) of all hours
+function forecastTonight(hours) {
+  const num = (v) => typeof v === 'number' && Number.isFinite(v);
+  const night = hourRuns(hours, h => h.is_day === 0)[0] || null;
+  const nightHours = night ? hours.slice(night[0], night[1] + 1) : [];
+  const clear = hourRuns(nightHours, h => num(h.cloud_cover) && h.cloud_cover <= FORECAST_CLEAR_MAX)
+    .filter(([a, b]) => b - a + 1 >= FORECAST_CLEAR_MIN_HOURS);
+  const dewHours = nightHours.filter(h => num(h.temperature) && num(h.dew_point) &&
+                                         h.temperature - h.dew_point < FORECAST_DEW_SPREAD_WARN);
+  const rain = hourRuns(hours, h => num(h.precipitation_probability) &&
+                                    h.precipitation_probability >= FORECAST_RAIN_LIKELY)[0] || null;
+  const maxGust = hours.reduce((m, h) => num(h.wind_gusts_10m) && h.wind_gusts_10m > m ? h.wind_gusts_10m : m, 0);
+  return { night, nightHours, clear, dewHours, rain, maxGust };
+}
+
+// Colour of the jetstream speed (km/h) for the seeing label and the forecast
+function getSeeingColor(jetstream_kmh) {
+  if (jetstream_kmh <= 30) return "green";
+  if (jetstream_kmh <= 60) return "limegreen";
+  if (jetstream_kmh <= 90) return "orange";
+  if (jetstream_kmh <= 120) return "orangered";
+  return "red";
+}
+
 function getSeeingLabel(jetstream_kmh) {
-  let label = "";
-  let color = "";
-
-  if (jetstream_kmh <= 30) {
-    label = "excellent";
-    color = "green";
-  } else if (jetstream_kmh <= 60) {
-    label = "good";
-    color = "limegreen";
-  } else if (jetstream_kmh <= 90) {
-    label = "fair";
-    color = "orange";
-  } else if (jetstream_kmh <= 120) {
-    label = "poor";
-    color = "orangered";
-  } else {
-    label = "very poor";
-    color = "red";
-  }
-
-  return `<span style="color: ${color}">(${label})</span>`;
+  let label;
+  if (jetstream_kmh <= 30) label = "excellent";
+  else if (jetstream_kmh <= 60) label = "good";
+  else if (jetstream_kmh <= 90) label = "fair";
+  else if (jetstream_kmh <= 120) label = "poor";
+  else label = "very poor";
+  return `<span style="color: ${getSeeingColor(jetstream_kmh)}">(${label})</span>`;
 }
 
 function raDecToAzAlt(raDeg, decDeg, latDeg, lonDeg, unixTime) {
