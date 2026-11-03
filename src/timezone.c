@@ -7,6 +7,11 @@
  * (see LICENSE.md).
  *
  *****************************************************************************/
+/* tm_gmtoff is a glibc/BSD extension that a build with -D_XOPEN_SOURCE
+ * would hide: request it before any system header */
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE
+#endif
 #include "timezone.h"
 
 #include <limits.h>

@@ -1,6 +1,6 @@
 # Allsky360 Tools
 
-So, I've built a few command-line tools that work alongside the main `allsky360-camera` application. They're in the `tools/` directory and handle various tasks like fetching weather data, listing cameras, calculating location data, and creating timelapse videos. Each one is built separately and can be installed to `/opt/allsky360/bin/` or just run from wherever you built them.
+So, I've built a few command-line tools that work alongside the main `allsky360-camera` application. They're in the `tools/` directory and handle various tasks like fetching weather data, listing cameras, reading the mount position and the RS485 sensors, and creating timelapse videos. Each one is built separately and can be installed to `/opt/allsky360/bin/` or just run from wherever you built them.
 
 ---
 
@@ -9,8 +9,7 @@ So, I've built a few command-line tools that work alongside the main `allsky360-
 Here's what's in the `tools/` directory:
 
 * **allsky360-aurora** – Grabs aurora forecast and space weather data from NOAA/ESA
-* **indigo-list-cameras** – Lists all the INDIGO cameras you've got connected
-* **location** – Calculates location-specific astronomical data (magnetic declination, etc.)
+* **indigo-cameras** – Lists the INDIGO cameras or reads the sensor data of one camera
 * **allsky360-meteo** – Fetches weather data from Open-Meteo
 * **timelapse-cuda-nv** – Creates timelapse videos from image sequences, with GPU acceleration
 * **allsky360-sensors** – Reads the local RS485/Modbus sensors (weather sensor, anemometer, wind vane, control cabinet) into the daily database
@@ -127,72 +126,47 @@ Here's how I test it manually:
 
 ---
 
-## 2. indigo-list-cameras
+## 2. indigo-cameras
 
-**Location:** `tools/indigo-list-cameras/`  
-**Binary:** `bin/indigo-list-cameras`
+**Location:** `tools/indigo-cameras/`  
+**Binary:** `bin/indigo_cameras` (installed to `/opt/allsky360/bin/indigo_cameras`)
 
 ### What it does
 
-This is a simple utility that connects to your INDIGO server and lists all the CCD cameras it can find. I use this all the time when I'm setting up a new camera or troubleshooting connection issues. It's really handy to verify that INDIGO can see your camera before you try to configure the main application.
+Connects to an INDIGO server and either lists the cameras it offers or reads
+the sensor data of one camera (`CCD_INFO`: size, pixel size, binning, bit
+depth, plus the sensor temperature). Use the list to find the exact device
+name for `indigo_camera` in `config.ini`; `install.sh` uses it for the
+camera choice in the configuration assistant. Agents such as the "Imager
+Agent" are not listed. A camera that is not connected is connected for the
+query and disconnected again.
 
 ### Usage
 
 ```bash
-./bin/indigo-list-cameras [OPTIONS]
+./bin/indigo_cameras -h <server> [-p <port>] [-l] [-c <camera>] [-t <secs>] [-j]
 ```
 
-It connects to the local INDIGO server by default (127.0.0.1:7624). If you need to connect to a remote server or change other options, check the source code or run it with `--help`.
-
-### Example
-
-Just run it:
-```bash
-./bin/indigo-list-cameras
-```
-
-It'll print out all the cameras it finds.
-
----
-
-## 3. location (indigo-location)
-
-**Location:** `tools/location/`  
-**Binary:** `bin/indigo-location`
-
-### What it does
-
-This calculates location-specific astronomical data like magnetic declination and other geophysical parameters based on your geographic coordinates. I use this to get accurate magnetic declination for my location, which is useful for aurora forecasting and other calculations.
-
-### Usage
-
-```bash
-./bin/indigo-location --config <config_file> [OPTIONS]
-```
-
-### Parameters
-
-| Parameter | Short | Description |
-|-----------|-------|-------------|
-| `--config` | | **Required.** Path to your config file |
-| `--outfile` | `-o` | Write output to a file |
-| `--longitude` | | Longitude in decimal degrees |
-| `--latitude` | | Latitude in decimal degrees |
-| `--altitude` | | Altitude in meters |
-| `--debug` | `-v` | Enable debug output |
-| `--help` | `-h`, `-?` | Show help message |
+| Parameter | Description |
+|---|---|
+| `-h`, `--host` | INDIGO server (host name or IP) |
+| `-p`, `--port` | port, default 7624 |
+| `-l`, `--list-cameras` | list the cameras and exit (waits up to `-t`, stops 1 s after the last device answered) |
+| `-c`, `--camera` | device name as listed, e.g. `"Poseidon-C PRO @ indigo_server"` |
+| `-t`, `--timeout` | seconds to wait, default 10 |
+| `-j`, `--json` | JSON output |
 
 ### Example
 
 ```bash
-./bin/indigo-location --config /home/allskyuser/config.ini \
-  --longitude 7.0 --latitude 50.2 --altitude 200 \
-  --outfile location_data.json
+./bin/indigo_cameras -h localhost -l
+./bin/indigo_cameras -h localhost -l -j
+./bin/indigo_cameras -h localhost -c "Poseidon-C PRO @ indigo_server" -j
 ```
 
 ---
 
-## 4. allsky360-meteo
+## 3. allsky360-meteo
 
 **Location:** `tools/meteo/`  
 **Binary:** `bin/allsky360-meteo`
@@ -291,7 +265,7 @@ You can run it manually too:
 
 ---
 
-## 5. timelapse-cuda-nv (allsky360-timelapse)
+## 4. timelapse-cuda-nv (allsky360-timelapse)
 
 **Location:** `tools/timelapse/`  
 **Binary:** `bin/timelapse-cuda-nv` or `bin/allsky360-timelapse`
@@ -375,8 +349,7 @@ You can build each tool individually from its directory:
 cd tools/aurora && make
 cd tools/meteo && make
 cd tools/timelapse && make
-cd tools/location && make
-cd tools/indigo-list-cameras && make
+cd tools/indigo-cameras && make
 ```
 
 Or build all of them at once from the main directory:

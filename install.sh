@@ -31,7 +31,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_USER="allskyuser"
 CONFIG_FILE="/home/${SERVICE_USER}/config.ini"
 INDIGO_ROOT="${INDIGO_ROOT:-$(cd "$REPO_DIR/.." && pwd)/indigo}"
-START_UNITS="allsky360-camera.service allsky360-aurora.timer allsky360-meteo.timer allsky360-location.timer allsky360-mount-position.timer allsky360-sensors.timer"
+START_UNITS="allsky360-camera.service allsky360-aurora.timer allsky360-meteo.timer allsky360-mount-position.timer allsky360-sensors.timer"
 MIN_FREE_GB=5
 
 # Options
@@ -216,13 +216,13 @@ configure() {
 
     # Devices are reported as "<device> @ <server name>"; the listing tools
     # connect as "indigo_server", so swap the suffix if another name is used.
-    local lister="$REPO_DIR/tools/indigo-list-cameras/bin/indigo_list_cameras"
+    local lister="$REPO_DIR/tools/indigo-cameras/bin/indigo_cameras"
     local mountlister="$REPO_DIR/tools/indigo-mount-position/bin/indigo_mount_position"
     local -a cams=() mounts=()
     if [ -x "$lister" ]; then
         echo "  Asking $host:$port for cameras..."
-        mapfile -t cams < <(timeout 30 "$lister" --host "$host" --port "$port" --timeout 5000 --json 2>/dev/null \
-            | python3 -c 'import json,sys; [print(c["name"]) for c in json.load(sys.stdin).get("cameras", [])]' 2>/dev/null \
+        mapfile -t cams < <(timeout 30 "$lister" -h "$host" -p "$port" -t 10 -l -j 2>/dev/null \
+            | python3 -c 'import json,sys; [print(c if isinstance(c, str) else c["name"]) for c in json.load(sys.stdin).get("cameras", [])]' 2>/dev/null \
             | sed "s/ @ indigo_server\$/ @ $name/" || true)
     fi
     choose_device v "Camera" "$(cfg_get indigo_camera)" "${cams[@]+"${cams[@]}"}"
@@ -371,7 +371,7 @@ install_ai() {
 selftest() {
     step "Self-test"
     local bin=/opt/allsky360/bin
-    for b in allsky360-camera allsky360-timelapse allsky360-meteo allsky360-aurora allsky360-location allsky360-sensors indigo_mount_position; do
+    for b in allsky360-camera allsky360-timelapse allsky360-meteo allsky360-aurora allsky360-sensors indigo_mount_position indigo_cameras; do
         if [ -x "$bin/$b" ]; then ok "$b installed"; else fail "$b missing in $bin"; fi
     done
     if "$bin/allsky360-camera" --help >/dev/null 2>&1; then ok "allsky360-camera starts (all libraries found)"

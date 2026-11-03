@@ -414,7 +414,6 @@ which allows exactly these three actions on the units listed below.
 | `allsky360-camera.service`      | Main camera capture daemon        |
 | `allsky360-api.service`         | Node.js web API server            |
 | `allsky360-meteo.service`       | Meteorological data fetcher       |
-| `allsky360-location.service`    | Location/astronomical data tool   |
 | `allsky360-aurora.service`      | Aurora / space weather fetcher    |
 | `allsky360-mount-position.service` | Mount position service (timer-driven) |
 

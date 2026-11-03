@@ -288,7 +288,7 @@ sudo make install
 This installs allsky360 and its tools to `/opt/allsky360/bin/`.
 
 `make install` only enables and starts the web API. On a fresh install the
-camera service and the data timers (aurora, meteo, location, mount position)
+camera service and the data timers (aurora, meteo, mount position, sensors)
 are installed but **not** started: `config.ini` still contains the template
 values. Enter at least the location (`location_latitude`,
 `location_longitude`, `location_altitude`) and the INDIGO settings
@@ -299,7 +299,7 @@ everything manually:
 sudo -u allskyuser nano /home/allskyuser/config.ini
 sudo systemctl enable --now allsky360-camera.service \
     allsky360-aurora.timer allsky360-meteo.timer \
-    allsky360-location.timer allsky360-mount-position.timer
+    allsky360-mount-position.timer allsky360-sensors.timer
 tail -f /var/log/allsky360/camera.log
 ```
 

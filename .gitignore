@@ -12,12 +12,6 @@ obj/
 *.AppleDouble
 tools/aurora/bin
 tools/aurora/obj
-tools/indigo-list-cameras/bin
-tools/indigo-list-cameras/obj
-tools/indigo-mount-status/bin
-tools/indigo-mount-status/obj
-tools/location/bin
-tools/location/obj
 tools/meteo/bin
 tools/meteo/obj
 tools/panorama/bin
@@ -76,7 +70,6 @@ GPUJPEG/
 # Tool build output not covered above
 tools/indigo-cameras/bin
 tools/indigo-mount-position/bin
-tools/indigo-mount-status/bin/
 examples/*/bin/
 examples/*/obj/
 

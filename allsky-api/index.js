@@ -79,7 +79,6 @@ const ALLOWED_SERVICES = [
     'allsky360-camera.service',
     'allsky360-api.service',
     'allsky360-meteo.service',
-    'allsky360-location.service',
     'allsky360-aurora.service',
     'allsky360-mount-position.service',
     'allsky360-sensors.service'

@@ -10,13 +10,15 @@ Format je Befund: `- [ ] Datei:Zeile — Beschreibung. Fix: ...`
 
 ## A. Build-brechende Regressionen (zuerst fixen)
 
-- [ ] `tools/location/Makefile` + `tools/location/src/config.c` (Symlink auf `src/config.c`) —
+- [x] (entfällt: Tool entfernt) `tools/location/Makefile` + `tools/location/src/config.c` (Symlink auf `src/config.c`) —
       Build kaputt: `config.c` inkludiert `"atomic_file.h"` und ruft `write_text_file_atomic()`
       auf (REL-05-Refactoring), aber das Makefile hat weder `-I../../src` noch
       `../../src/atomic_file.c` in `OBJECTS`. Fix: `INCLUDE_ROOT = ../../src`, `-I$(INCLUDE_ROOT)`
       ergänzen, `atomic_file.c` als zusätzliches Objekt aufnehmen (Muster aus
       `tools/panorama/Makefile` übernehmen).
-- [ ] Root-`Makefile:285` (`tools:`) — `panorama`, `indigo-list-cameras`, `indigo-mount-status`
+- [x] (erledigt: panorama und mount-status sind in `make tools`; `indigo-list-cameras` wurde
+      entfernt, ersetzt durch `indigo-cameras -l`)
+      Root-`Makefile:285` (`tools:`) — `panorama`, `indigo-list-cameras`, `indigo-mount-status`
       fehlen komplett in `make tools` und in `binaries:` (Z. 452-465), obwohl CLAUDE.md sie als
       Build-Ziele dokumentiert (`make list-cameras` schlägt aktuell mit "No rule to make target"
       fehl). Fix: Targets ergänzen — oder CLAUDE.md korrigieren, falls Auslassung beabsichtigt
@@ -25,7 +27,7 @@ Format je Befund: `- [ ] Datei:Zeile — Beschreibung. Fix: ...`
       `| $(BINDIR)` (vgl. `tools/meteo/Makefile:43,46`, dort korrekt). Auf frischem Checkout
       (kein `obj/`/`bin/`, nicht versioniert) bricht der erste Compile mit "No such file or
       directory" ab. Fix: Order-only-Prerequisites analog meteo ergänzen.
-- [ ] `tools/indigo-mount-status/src/indigo_mount_status.c:197-213` — nutzt nicht-existente
+- [x] (entfällt: Tool entfernt) `tools/indigo-mount-status/src/indigo_mount_status.c:197-213` — nutzt nicht-existente
       INDIGO-API (`indigo_client_attach()`, `indigo_service_attach()`, `indigo_client_detach()`).
       Alle anderen INDIGO-Clients im Repo (`indigo_cameras.c`, `indigo_mount_position.c`,
       `indigo_list_cameras.c`, `src/main.c`) nutzen einheitlich `indigo_attach_client()` /
@@ -102,13 +104,13 @@ Format je Befund: `- [ ] Datei:Zeile — Beschreibung. Fix: ...`
       (Z. 357) nie ausgewertet, anders als bei `server`/`port`. Widerspricht dokumentierter
       Semantik "CLI arguments override values from -c/--config" (Z. 34). Fix: Mount-Namen
       analog Server/Port über Scratch-Buffer + `cli_mount`-Check behandeln.
-- [ ] `tools/location/src/magnetic_declination.c:244-247` — unbedingtes Debug-`printf` bei jedem
+- [x] (entfällt: Tool entfernt) `tools/location/src/magnetic_declination.c:244-247` — unbedingtes Debug-`printf` bei jedem
       Aufruf, unabhängig vom `--debug`-Flag in `main.c`. Verunreinigt reguläre Ausgabe.
       Fix: entfernen oder hinter globales `debug`-Flag stellen.
 
 ## D. Makefile-Probleme (Build-Robustheit)
 
-- [ ] `tools/indigo-list-cameras/Makefile:40-58`, identisch `tools/indigo-mount-status/Makefile:40-58`:
+- [x] (entfällt: Tool entfernt) `tools/indigo-mount-status/Makefile:40-58` (`tools/indigo-list-cameras` entfernt):
   - Z. 40: `-L$(INDIGO_LIBS)` — `INDIGO_LIBS` enthält bereits `-L.../lib -lindigo`, ergibt
     kaputtes `-L-L...` plus doppeltes `-lindigo` (Build funktioniert nur, weil Z. 46 den
     korrekten Flag separat liefert). Fix: Zeile 40 streichen.
@@ -135,7 +137,7 @@ Format je Befund: `- [ ] Datei:Zeile — Beschreibung. Fix: ...`
 
 ## E. Plausible Risiken (nicht abschließend verifiziert)
 
-- [ ] `tools/location/src/main.c:138-151` — Fehlschlag von `fopen(outfile, "w")` wird nur auf
+- [x] (entfällt: Tool entfernt) `tools/location/src/main.c:138-151` — Fehlschlag von `fopen(outfile, "w")` wird nur auf
       stderr gemeldet, Exitcode bleibt `EXIT_SUCCESS`. Fix: bei Fehler `EXIT_FAILURE`
       zurückgeben.
 - [ ] `tools/indigo-mount-position/indigo_mount_position.c:453-459` — bei Timeout mit aktivem
@@ -156,11 +158,11 @@ Format je Befund: `- [ ] Datei:Zeile — Beschreibung. Fix: ...`
 
 ## F. Offene Fragen (Entscheidung/Verifikation durch Betreiber nötig)
 
-- [ ] WMM-Implementierung (`tools/location/src/magnetic_declination.c:124-249`) numerisch gegen
+- [x] (entfällt: Tool entfernt) WMM-Implementierung (`tools/location/src/magnetic_declination.c:124-249`) numerisch gegen
       offizielle NOAA-WMM-Testvektoren verifizieren.
-- [ ] Fehlende Root-Integration von panorama/list-cameras/mount-status (siehe A) — Regression
+- [x] (entfällt: Tool entfernt) Fehlende Root-Integration von panorama/list-cameras/mount-status (siehe A) — Regression
       oder nie fertig integriert? Entscheidet, ob Root-Makefile oder CLAUDE.md korrigiert wird.
-- [ ] `tools/indigo-mount-status/src/indigo_mount_status.c:127-136` — verbindet den Mount beim
+- [x] (entfällt: Tool entfernt) `tools/indigo-mount-status/src/indigo_mount_status.c:127-136` — verbindet den Mount beim
       ersten Property-Update, trennt ihn aber nie wieder (anders als `indigo_cameras.c`).
       Beabsichtigt oder Versehen?
 - [ ] Uneinheitliche curl-Absicherung zwischen `aurora_fetch.c` (Connect-Timeout,
@@ -175,6 +177,8 @@ Keine Befunde — `tools/panorama/` ist in sich konsistent (main.c, Makefile, Fu
 zwischen Header und Aufrufern stimmen, `apply_mask()` geht korrekt von `CAIRO_FORMAT_RGB24` aus).
 
 ---
+
+**Hinweis:** `tools/location`, `tools/indigo-mount-status` und `tools/indigo-list-cameras` wurden entfernt.
 
 **Empfohlene Reihenfolge:** A1 (location baut nicht) → A4 (indigo-mount-status vermutlich nicht
 kompilierbar) → B1 (Double-Free aurora) → C4 (NVENC-Tool nutzt keine GPU-Kodierung) → Rest nach

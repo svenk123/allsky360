@@ -26,7 +26,7 @@ If you're not sure what port to use, check your INDIGO server configuration. Mos
 
 The exact name of the camera device as it appears in INDIGO. This needs to match exactly what INDIGO reports, including any network location information.
 
-The default is `"Uranus-C @ localhost"`, but your camera name will be different. To find the correct name, you can use the `indigo-list-cameras` tool that comes with allsky360, or check the INDIGO control panel.
+The default is `"Uranus-C @ localhost"`, but your camera name will be different. To find the correct name, run `/opt/allsky360/bin/indigo_cameras -h localhost -l` (tool `tools/indigo-cameras`), or check the INDIGO control panel.
 
 Camera names in INDIGO typically include the camera model and where it's connected. For example:
 - `"Uranus-C @ 192.168.3.61"` – a Player-One Uranus-C connected via network
@@ -49,7 +49,7 @@ On the other hand, if you're only doing short exposures (a few seconds), you can
 
 ## Practical Tips
 
-When setting up a new camera, start by finding the correct camera name. Run `indigo-list-cameras` or check your INDIGO control panel to see what cameras are available. Copy the exact name, including any network location information.
+When setting up a new camera, start by finding the correct camera name. Run `indigo_cameras -h <server> -l` or check your INDIGO control panel to see what cameras are available. Copy the exact name, including any network location information.
 
 If you're having connection issues, check:
 1. Is the INDIGO server running? You can test this by trying to connect with the INDIGO control panel.

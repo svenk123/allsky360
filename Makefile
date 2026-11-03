@@ -336,7 +336,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cu
 endif
 
 # Build for utils
-tools: timelapse meteo aurora location mount-position cameras panorama list-cameras mount-status sensors
+tools: timelapse meteo aurora mount-position cameras panorama sensors
 
 timelapse:
 	@echo "Building timelapse tool"
@@ -354,10 +354,6 @@ aurora:
 	@echo "Building aurora tool"
 	@$(MAKE) -C tools/aurora
 
-location:
-	@echo "Building location tool"
-	@$(MAKE) -C tools/location
-
 mount-position:
 	@echo "Building mount-position tool"
 	@$(MAKE) -C tools/indigo-mount-position
@@ -369,14 +365,6 @@ cameras:
 panorama:
 	@echo "Building panorama tool"
 	@$(MAKE) -C tools/panorama
-
-list-cameras:
-	@echo "Building list-cameras tool"
-	@$(MAKE) -C tools/indigo-list-cameras
-
-mount-status:
-	@echo "Building mount-status tool"
-	@$(MAKE) -C tools/indigo-mount-status
 
 sensors:
 	@echo "Building RS485/Modbus sensors tool"
@@ -432,8 +420,10 @@ GROUPNAME         := allskygroup
 INSTALL           := install
 SYSTEMCTL         := systemctl
 # Units that need a configured config.ini and are started by the user
+# Units and binaries of removed tools, deleted by 'make install'
+OBSOLETE_UNITS := allsky360-location
 START_MANUALLY_UNITS := allsky360-camera.service allsky360-aurora.timer \
-                        allsky360-meteo.timer allsky360-location.timer \
+                        allsky360-meteo.timer \
                         allsky360-mount-position.timer allsky360-sensors.timer
 
 APP_DIR           := /opt/allsky360/bin
@@ -558,7 +548,6 @@ binaries:
 	$(INSTALL) -o root -g root -m 755 tools/timelapse/bin/allsky360-timelapse $(APP_DIR)
 	$(INSTALL) -o root -g root -m 755 tools/meteo/bin/allsky360-meteo $(APP_DIR)
 	$(INSTALL) -o root -g root -m 755 tools/aurora/bin/allsky360-aurora $(APP_DIR)
-	$(INSTALL) -o root -g root -m 755 tools/location/bin/allsky360-location $(APP_DIR)
 	$(INSTALL) -o root -g root -m 755 tools/sensors/bin/allsky360-sensors $(APP_DIR)
 	$(INSTALL) -o root -g root -m 755 tools/indigo-mount-position/bin/indigo_mount_position $(APP_DIR)
 	$(INSTALL) -o root -g root -m 755 tools/indigo-cameras/bin/indigo_cameras $(APP_DIR)
@@ -588,7 +577,6 @@ POLKIT_RULE  = /etc/polkit-1/rules.d/50-allsky360.rules
 METEO_SERVICE   = allsky360-meteo.service
 CAMERA_SERVICE   = allsky360-camera.service
 API_SERVICE   = allsky360-api.service
-LOCATION_SERVICE   = allsky360-location.service
 MOUNT_POSITION_SERVICE = allsky360-mount-position.service
 END_OF_NIGHT_SERVICE   = allsky360-endofnight.service
 
@@ -612,19 +600,27 @@ polkit:
 	fi
 
 systemd:
+	@# Removed tools (allsky360-location): stop and delete what an earlier
+	@# version installed, so no orphaned timer keeps running
+	@for t in $(OBSOLETE_UNITS); do \
+	    if [ -e $(SYSTEMD_DIR)/$$t.timer ] || [ -e $(SYSTEMD_DIR)/$$t.service ]; then \
+	        echo "Removing obsolete $$t units"; \
+	        $(SYSTEMCTL) disable --now $$t.timer 2>/dev/null || true; \
+	        rm -f $(SYSTEMD_DIR)/$$t.service $(SYSTEMD_DIR)/$$t.timer; \
+	    fi; \
+	    rm -f $(APP_DIR)/$$t; \
+	done
 	@echo "Installing systemd service..."
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-camera.service $(SYSTEMD_DIR)/
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-api.service $(SYSTEMD_DIR)/
 	# Tools
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-aurora.service $(SYSTEMD_DIR)/
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-meteo.service $(SYSTEMD_DIR)/
-	$(INSTALL) -m 644 etc/systemd/system/allsky360-location.service $(SYSTEMD_DIR)/
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-sensors.service $(SYSTEMD_DIR)/
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-mount-position.service $(SYSTEMD_DIR)/
 	# Timer
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-aurora.timer $(SYSTEMD_DIR)/
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-meteo.timer $(SYSTEMD_DIR)/
-	$(INSTALL) -m 644 etc/systemd/system/allsky360-location.timer $(SYSTEMD_DIR)/
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-sensors.timer $(SYSTEMD_DIR)/
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-mount-position.timer $(SYSTEMD_DIR)/
 
@@ -788,7 +784,7 @@ uninstall:
 	rm -f $(APP_DIR)/allsky360-timelapse
 	rm -f $(APP_DIR)/allsky360-meteo
 	rm -f $(APP_DIR)/allsky360-aurora
-	rm -f $(APP_DIR)/allsky360-mount-position
+	rm -f $(APP_DIR)/allsky360-mount-position $(APP_DIR)/allsky360-location
 	rm -f $(APP_DIR)/allsky360-sensors $(APP_DIR)/indigo_mount_position $(APP_DIR)/indigo_cameras
 
 	@echo "Removing legacy cron files (replaced by systemd timers)..."
@@ -804,6 +800,7 @@ uninstall:
 	$(SYSTEMCTL) daemon-reexec
 	@# make runs /bin/sh (dash): no {service,timer} brace expansion, so list
 	@# the files; '-' because a unit may not be installed
+	@# allsky360-location: removed tool, cleaned up on old installations
 	@for t in aurora meteo location mount-position sensors; do \
 	    $(SYSTEMCTL) disable --now allsky360-$$t.timer 2>/dev/null || true; \
 	    rm -f $(SYSTEMD_DIR)/allsky360-$$t.service $(SYSTEMD_DIR)/allsky360-$$t.timer; \

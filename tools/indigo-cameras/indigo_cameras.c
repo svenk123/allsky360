@@ -75,6 +75,8 @@ static bool g_list_mode = false;
 #define MAX_FOUND_CAMERAS 64
 static char g_found_cameras[MAX_FOUND_CAMERAS][256];
 static int  g_found_count = 0;
+/* Number of INFO properties seen so far (list mode stops when it is quiet) */
+static volatile int g_info_seen = 0;
 
 static bool g_json_mode = false;
 
@@ -140,8 +142,12 @@ static indigo_result client_define_property(indigo_client *client, indigo_device
 	if (g_list_mode) {
 		if (strcmp(property->name, INFO_PROPERTY_NAME) == 0) {
 			indigo_item *iface = indigo_get_item(property, INFO_DEVICE_INTERFACE_ITEM_NAME);
-			if (iface && (atol(iface->text.value) & INDIGO_INTERFACE_CCD))
+			long flags = iface ? atol(iface->text.value) : 0;
+			/* Agents (e.g. "Imager Agent") also report the CCD interface,
+			 * but they are not cameras */
+			if ((flags & INDIGO_INTERFACE_CCD) && !(flags & INDIGO_INTERFACE_AGENT))
 				collect_camera(property->device);
+			g_info_seen++;
 		}
 
 		return INDIGO_OK;
@@ -313,9 +319,24 @@ int main(int argc, const char *argv[]) {
 	}
 
 	if (g_list_mode) {
-		/* Collect INFO properties from all devices for 3 seconds */
-		for (int i = 0; i < 30; i++)
+		/* Collect the INFO properties of all devices. The server sends them
+		 * in a burst after the connect, but a busy server can take a while:
+		 * wait up to the timeout, and stop once a camera was found and no
+		 * further device has shown up for 1 s (a fixed 3 s wait missed the
+		 * camera at times, BUG-15). */
+		int waited_ms = 0, quiet_ms = 0, last_seen = 0;
+		while (waited_ms < timeout * 1000) {
 			indigo_usleep(100000);
+			waited_ms += 100;
+			if (g_info_seen != last_seen) {
+				last_seen = g_info_seen;
+				quiet_ms = 0;
+			} else {
+				quiet_ms += 100;
+			}
+			if (g_found_count > 0 && quiet_ms >= 1000)
+				break;
+		}
 	} else {
 		/* Wait for CCD_INFO up to the configured timeout */
 		int timeout_ms = timeout * 1000;
@@ -339,6 +360,11 @@ int main(int argc, const char *argv[]) {
 	}
 
 	indigo_disconnect_server(server_entry);
+	/* The disconnect is asynchronous: wait (max. 2 s) until the server
+	 * device is gone, otherwise indigo_stop() complains that it is still
+	 * attached */
+	for (int i = 0; i < 20 && connection_state; i++)
+		indigo_usleep(100000);
 	indigo_detach_client(&g_client);
 	indigo_stop();
 
