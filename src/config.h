@@ -122,9 +122,6 @@ typedef struct {
     int clarity_filter_mask_mode;
 
     double auto_color_calibration_area;
-    int local_histogram_normalization;
-    double local_histogram_normalization_kernel_radius;
-    double local_histogram_normalization_contrast_limit;
 
     int scnr_filter;
     double scnr_filter_amount;

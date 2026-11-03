@@ -592,7 +592,7 @@
       if (key.startsWith('nighttime_'))        return 'nighttime';
       if (key.startsWith('hdr') || key.startsWith('autostretch')) return 'exposure';
       if (key.startsWith('acdnr_') || key.startsWith('clarity_') || key.startsWith('wavelet_') ||
-          key.startsWith('scnr_')  || key.startsWith('dehaze_')  || key.startsWith('local_histogram_')) return 'filters';
+          key.startsWith('scnr_')  || key.startsWith('dehaze_') ) return 'filters';
       if (key.startsWith('image_') || key.startsWith('focus_') || key.startsWith('crop_') ||
           key.startsWith('lens_')  || key.startsWith('png_')   || key.startsWith('jpeg_') ||
           key === 'rotate_image'   || key.startsWith('thumbnail')) return 'image';

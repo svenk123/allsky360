@@ -178,9 +178,6 @@ int load_config(const char *filename, config_t *config) {
 
   config->auto_color_calibration_area = 80.0;
 
-  config->local_histogram_normalization = 1;
-  config->local_histogram_normalization_kernel_radius = 64;
-  config->local_histogram_normalization_contrast_limit = 1.5;
 
   config->scnr_filter = 1;
   config->scnr_filter_amount = 1.0f;
@@ -524,12 +521,6 @@ int load_config(const char *filename, config_t *config) {
       else if (strcmp(key, "auto_color_calibration_area") == 0)
         config->auto_color_calibration_area = atof(value);
 
-      else if (strcmp(key, "local_histogram_normalization") == 0)
-        config->local_histogram_normalization = atoi(value);
-      else if (strcmp(key, "local_histogram_normalization_kernel_radius") == 0)
-        config->local_histogram_normalization_kernel_radius = atof(value);
-      else if (strcmp(key, "local_histogram_normalization_contrast_limit") == 0)
-        config->local_histogram_normalization_contrast_limit = atof(value);
 
       else if (strcmp(key, "scnr_filter") == 0)
         config->scnr_filter = atoi(value);
@@ -558,6 +549,14 @@ int load_config(const char *filename, config_t *config) {
         config->sqm_center_x = atoi(value);
       else if (strcmp(key, "sqm_center_y") == 0)
         config->sqm_center_y = atoi(value);
+      /* Never implemented (local histogram normalization / CLAHE) */
+      else if (strncmp(key, "local_histogram_normalization", 29) == 0) {
+        if (warn_unknown_keys)
+          fprintf(stderr,
+                  "NOTE: %s: '%s' is no longer used (local histogram "
+                  "normalization was never implemented), remove it\n",
+                  filename, key);
+      }
       /* Settings of the former template-matching detector */
       else if (strcmp(key, "sqm_threshold") == 0 ||
                strcmp(key, "sqm_min_brightness") == 0 ||
@@ -982,13 +981,6 @@ int show_config(config_t *config) {
          config->auto_color_calibration_area,
          config->auto_color_calibration_area == 0.0 ? " (off)" : " ");
 
-  printf("local_histogram_normalization: %d (%s)\n",
-         config->local_histogram_normalization,
-         config->local_histogram_normalization == 1 ? "yes" : "no");
-  printf("local_histogram_normalization_kernel_radius: %.1f\n",
-         config->local_histogram_normalization_kernel_radius);
-  printf("local_histogram_normalization_contrast_limit: %.1f\n",
-         config->local_histogram_normalization_contrast_limit);
 
   printf("scnr_filter: %d (%s)\n", config->scnr_filter,
          config->scnr_filter == 1 ? "yes" : "no");
@@ -1325,17 +1317,6 @@ int config_to_json(const char *filename, const config_t *config) {
   json_object_object_add(
       jroot, "auto_color_calibration_area",
       json_object_new_double(config->auto_color_calibration_area));
-  json_object_object_add(
-      jroot, "local_histogram_normalization",
-      json_object_new_int(config->local_histogram_normalization));
-  json_object_object_add(
-      jroot, "local_histogram_normalization_kernel_radius",
-      json_object_new_double(
-          config->local_histogram_normalization_kernel_radius));
-  json_object_object_add(
-      jroot, "local_histogram_normalization_contrast_limit",
-      json_object_new_double(
-          config->local_histogram_normalization_contrast_limit));
   json_object_object_add(jroot, "scnr_filter",
                          json_object_new_int(config->scnr_filter));
   json_object_object_add(jroot, "scnr_filter_amount",

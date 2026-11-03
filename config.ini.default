@@ -408,12 +408,6 @@ clarity_filter_mask_mode=1
 # Set auto_color_calibration_area=0.0 to disable
 auto_color_calibration_area=80.0
 
-# Local Contrast Enhancement (TBD)
-##################################
-local_histogram_normalization=0
-local_histogram_normalization_kernel_radius=64
-local_histogram_normalization_contrast_limit=1.5
-
 # Wavelet Sharpening
 ####################
 wavelet_sharpen=1

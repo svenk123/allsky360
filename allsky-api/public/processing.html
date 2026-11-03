@@ -174,18 +174,18 @@
       </div>
     </div>
 
-    <!-- Local histogram normalization -->
+    <!-- Autostretch (debug image 808) -->
     <div class="processing-row">
       <div class="processing-section">
-        <h2>Step 8: Local histogram normalization</h2>
+        <h2>Step 8: Autostretch</h2>
         <div class="image-wrapper">
-          <img id="pipeline-lhn" src="" alt="Local histogram normalization" style="width: 100%; height: auto; border-radius: 0.3rem;" />
-          <div class="loading-indicator" id="loading-lhn">Loading...</div>
+          <img id="pipeline-autostretch" src="" alt="Autostretch" style="width: 100%; height: auto; border-radius: 0.3rem;" />
+          <div class="loading-indicator" id="loading-autostretch">Loading...</div>
         </div>
       </div>
       <div class="metadata-section">
-        <h2>Local histogram normalization</h2>
-        <div class="config-params" id="config-lhn">
+        <h2>Autostretch</h2>
+        <div class="config-params" id="config-autostretch">
           <!-- Configuration parameters will be loaded here -->
         </div>
       </div>
@@ -378,12 +378,12 @@
         { name: 'clarity_filter_mask_mode', description: 'Clarity Mask Mode' }
       ]
     };
-    let pipeline_lhn = {
-      name: 'Local histogram normalization',
+    let pipeline_autostretch = {
+      name: 'Autostretch',
       params: [
-        { name: 'local_histogram_normalization', description: 'Local Histogram Normalization aktiviert' },
-        { name: 'local_histogram_normalization_strength', description: 'Local Histogram Normalization Stärke' },
-        { name: 'local_histogram_normalization_radius', description: 'Local Histogram Normalization Radius' }
+        { name: 'autostretch', description: 'Autostretch aktiviert' },
+        { name: 'autostretch_min_val', description: 'Autostretch Schwarzpunkt (Perzentil)' },
+        { name: 'autostretch_max_val', description: 'Autostretch Weißpunkt (Perzentil)' }
       ]
     };
     let pipeline_scnr = {
@@ -410,7 +410,7 @@
       { id: 'pipeline-saturation', path: '/images/pipeline_805.png', loadingId: 'loading-saturation', configId: 'config-saturation' },
       { id: 'pipeline-dehaze', path: '/images/pipeline_806.png', loadingId: 'loading-dehaze', configId: 'config-dehaze' },
       { id: 'pipeline-clarity', path: '/images/pipeline_807.png', loadingId: 'loading-clarity', configId: 'config-clarity' },
-      { id: 'pipeline-lhn', path: '/images/pipeline_808.png', loadingId: 'loading-lhn', configId: 'config-lhn' },
+      { id: 'pipeline-autostretch', path: '/images/pipeline_808.png', loadingId: 'loading-autostretch', configId: 'config-autostretch' },
       { id: 'pipeline-scnr', path: '/images/pipeline_809.png', loadingId: 'loading-scnr', configId: 'config-scnr' },
       { id: 'pipeline-99', path: '/images/pipeline_99.png', loadingId: 'loading-99', configId: 'config-99' }
     ];
@@ -418,7 +418,7 @@
     // Array with all pipeline configurations
     const pipelineConfigs = [
       pipeline01, pipeline_acdnr, pipeline_move_blackpoint, pipeline_gamma, pipeline_saturation, 
-      pipeline_dehaze, pipeline_clarity, pipeline_lhn, pipeline_scnr, pipeline99
+      pipeline_dehaze, pipeline_clarity, pipeline_autostretch, pipeline_scnr, pipeline99
     ];
 
     async function loadConfig() {
@@ -458,8 +458,8 @@
           configElementId = 'config-dehaze';
         } else if (index === 6) { // pipeline_clarity (Clarity filter)
           configElementId = 'config-clarity';
-        } else if (index === 7) { // pipeline_lhn (Local histogram normalization)
-          configElementId = 'config-lhn';
+        } else if (index === 7) { // pipeline_autostretch (Autostretch)
+          configElementId = 'config-autostretch';
         } else if (index === 8) { // pipeline_scnr (SCNR filter)
           configElementId = 'config-scnr';
         } else if (index === 9) { // pipeline99 (Final image)
