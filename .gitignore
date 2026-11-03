@@ -25,6 +25,12 @@ tools/panorama/obj
 tools/timelapse/bin
 tools/timelapse/obj
 
+# Notes for Claude Code: local only, not part of the repository
+CLAUDE.md
+review.md
+docs/superpowers
+examples/
+
 # AI artifacts
 runs/
 *.engine
@@ -45,7 +51,11 @@ CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
 
-# Local configs
+# Local configs. config.ini holds the api-token and the INDIGO server
+# address - never commit it (config.ini.default is the template)
+/config.ini
+/config.ini.new
+*.ini.local
 config.ini.saturn-c
 config.ini.uranus-c
 
