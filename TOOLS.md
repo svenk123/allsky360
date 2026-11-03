@@ -186,9 +186,17 @@ query and disconnected again.
 
 This fetches meteorological data (temperature, humidity, cloud cover, etc.) from the Open-Meteo API. I use it to correlate weather conditions with my sky observations – it's interesting to see how cloud cover affects what I can capture. The data gets stored in a SQLite database just like the aurora data.
 
+One request per run fetches the hourly values from the current hour on for the
+next 24 hours. The current hour goes into the database (table `meteo`) and
+`latest_meteo_data.json`; with `--forecastfile` the 24-hour forecast is written
+to `allsky-api/public/forecast_meteo.json` (overwritten on every run, not
+stored in the database). `meteo.html` shows it as a timeline: cloud cover per
+layer, precipitation, temperature/dew point and wind, night hours shaded, plus
+the longest clear stretch of the coming night.
+
 ### Running automatically
 
-This also runs via systemd by default, every 10 minutes. The service files are:
+This also runs via systemd by default, every 30 minutes (the weather models are recomputed every 1-3 hours, the current values come from the station sensors). The service files are:
 
 * **Timer file:** `/etc/systemd/system/allsky360-meteo.timer`
 * **Service file:** `/etc/systemd/system/allsky360-meteo.service`
@@ -229,11 +237,10 @@ Edit the timer file:
 sudo nano /etc/systemd/system/allsky360-meteo.timer
 ```
 
-Change line 6 (`OnUnitActiveSec=10min`) to your desired interval:
+Change `OnUnitActiveSec=30min` to your desired interval:
 
-* `OnUnitActiveSec=5min` – Every 5 minutes
 * `OnUnitActiveSec=15min` – Every 15 minutes
-* `OnUnitActiveSec=30min` – Every 30 minutes
+* `OnUnitActiveSec=60min` – Every hour
 
 Then reload and restart:
 ```bash
@@ -261,6 +268,7 @@ You can run it manually too:
 | `--timestamp` | `-t` | Optional UTC timestamp (format: `YYYYMMDDhhmmss`) |
 | `--outfile` | `-f` | Write output to a file instead of stdout |
 | `--databasedir` | `-d` | Where to put the database |
+| `--forecastfile` | `-F` | Write the hourly forecast of the next 24 hours as JSON to this file |
 | `--debug` | `-v` | Enable debug output |
 | `--help` | `-h` | Show help message |
 

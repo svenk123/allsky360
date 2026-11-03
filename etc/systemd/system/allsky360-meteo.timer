@@ -1,9 +1,11 @@
 [Unit]
-Description=Run allsky360-meteo every 10 minutes
+Description=Run allsky360-meteo every 30 minutes
 
 [Timer]
 OnBootSec=2min
-OnUnitActiveSec=10min
+# The models are recomputed every 1-3 hours, the current values come from
+# the station sensors (allsky360-sensors): 30 minutes are enough
+OnUnitActiveSec=30min
 AccuracySec=30s
 Persistent=true
 Unit=allsky360-meteo.service

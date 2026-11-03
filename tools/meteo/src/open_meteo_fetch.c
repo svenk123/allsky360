@@ -15,7 +15,10 @@
  * DEALINGS IN THE SOFTWARE.
  *
  *****************************************************************************/
+/* timegm() and strptime() are not declared with only _XOPEN_SOURCE */
+#define _DEFAULT_SOURCE
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <curl/curl.h>
 #include <math.h>
@@ -49,9 +52,17 @@ int fetch_open_meteo_weather(double latitude, double longitude, const int *eleva
     if (elevation)
         snprintf(elevation_param, sizeof(elevation_param), "&elevation=%d", *elevation);
 
-    struct tm *utc_time = gmtime(&timestamp);
-    char iso_time[32];
-    strftime(iso_time, sizeof(iso_time), "%Y-%m-%dT%H:00", utc_time);
+    /* One request for the current hour (database) and the forecast: the
+     * hourly values from the full hour of timestamp up to FORECAST_HOURS
+     * later (start_hour/end_hour are inclusive, FORECAST_HOURS + 1 values). */
+    time_t start = timestamp - timestamp % 3600;
+    time_t end = start + FORECAST_HOURS * 3600;
+    struct tm tm_start, tm_end;
+    char start_hour[32], end_hour[32];
+    gmtime_r(&start, &tm_start);
+    gmtime_r(&end, &tm_end);
+    strftime(start_hour, sizeof(start_hour), "%Y-%m-%dT%H:00", &tm_start);
+    strftime(end_hour, sizeof(end_hour), "%Y-%m-%dT%H:00", &tm_end);
 
     snprintf(url, MAX_URL_LEN,
         "https://api.open-meteo.com/v1/forecast?"
@@ -59,12 +70,11 @@ int fetch_open_meteo_weather(double latitude, double longitude, const int *eleva
         "&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,"
         "pressure_msl,surface_pressure,cloud_cover,cloud_cover_low,"
         "cloud_cover_mid,cloud_cover_high,visibility,"
-        "wind_speed_10m,wind_direction_10m,wind_speed_300hPa"
+        "wind_speed_10m,wind_direction_10m,wind_speed_300hPa,"
+        "wind_gusts_10m,precipitation,precipitation_probability,is_day"
         "&timezone=UTC"
-        "&start_date=%.4d-%.2d-%.2d&end_date=%.4d-%.2d-%.2d",
-        latitude, longitude, elevation_param,
-        utc_time->tm_year + 1900, utc_time->tm_mon + 1, utc_time->tm_mday,
-        utc_time->tm_year + 1900, utc_time->tm_mon + 1, utc_time->tm_mday
+        "&start_hour=%s&end_hour=%s",
+        latitude, longitude, elevation_param, start_hour, end_hour
     );
 
     CURL *curl = curl_easy_init();
@@ -165,4 +175,111 @@ int parse_open_meteo_weather(const char *json_raw, time_t target, open_meteo_wea
 
     json_object_put(root);
     return 0;
+}
+
+/* Value i of the hourly array name as a JSON number with the given decimals,
+ * NULL (JSON null) when the array, the entry or the value is missing. */
+static json_object *hourly_value(json_object *j_hourly, const char *name, int i, int decimals)
+{
+    json_object *arr = NULL, *val;
+    char buf[32];
+
+    if (!json_object_object_get_ex(j_hourly, name, &arr) ||
+        !json_object_is_type(arr, json_type_array) ||
+        i >= (int)json_object_array_length(arr))
+        return NULL;
+    val = json_object_array_get_idx(arr, i);
+    if (!json_object_is_type(val, json_type_double) &&
+        !json_object_is_type(val, json_type_int))
+        return NULL;
+    if (decimals == 0)
+        return json_object_new_int((int)lround(json_object_get_double(val)));
+    /* the string keeps the JSON short (no 4.2999999999999998) */
+    snprintf(buf, sizeof(buf), "%.*f", decimals, json_object_get_double(val));
+    return json_object_new_double_s(strtod(buf, NULL), buf);
+}
+
+int write_open_meteo_forecast(const char *json_raw, time_t from, const char *path)
+{
+    /* Open-Meteo name -> name in forecast JSON (as in the database), decimals */
+    static const struct { const char *src, *dst; int decimals; } fields[] = {
+        { "temperature_2m",            "temperature",               1 },
+        { "relative_humidity_2m",      "humidity",                  0 },
+        { "dew_point_2m",              "dew_point",                 1 },
+        { "pressure_msl",              "pressure_msl",              1 },
+        { "cloud_cover",               "cloud_cover",               0 },
+        { "cloud_cover_low",           "cloud_low",                 0 },
+        { "cloud_cover_mid",           "cloud_mid",                 0 },
+        { "cloud_cover_high",          "cloud_high",                0 },
+        { "precipitation_probability", "precipitation_probability", 0 },
+        { "precipitation",             "precipitation",             1 },
+        { "visibility",                "visibility",                0 },
+        { "wind_speed_10m",            "wind_speed_10m",            1 },
+        { "wind_gusts_10m",            "wind_gusts_10m",            1 },
+        { "wind_direction_10m",        "wind_dir_10m",              0 },
+        { "wind_speed_300hPa",         "wind_speed_300hPa",         1 },
+        { "is_day",                    "is_day",                    0 },
+    };
+    json_object *root, *j_hourly = NULL, *j_time = NULL, *j_elev = NULL;
+    time_t from_hour = from - from % 3600;
+
+    if (!json_raw || !path)
+        return 1;
+    root = json_tokener_parse(json_raw);
+    if (!root)
+        return 2;
+    if (!json_object_object_get_ex(root, "hourly", &j_hourly) ||
+        !json_object_object_get_ex(j_hourly, "time", &j_time) ||
+        !json_object_is_type(j_time, json_type_array)) {
+        json_object_put(root);
+        return 3;
+    }
+
+    json_object *jout = json_object_new_object();
+    json_object *hours = json_object_new_array();
+    json_object_object_add(jout, "source", json_object_new_string("Open-Meteo"));
+    json_object_object_add(jout, "generated", json_object_new_int64((int64_t)time(NULL)));
+    json_object_object_add(jout, "from", json_object_new_int64((int64_t)from_hour));
+    if (json_object_object_get_ex(root, "elevation", &j_elev))
+        json_object_object_add(jout, "elevation", json_object_get(j_elev));
+
+    int n = (int)json_object_array_length(j_time);
+    for (int i = 0; i < n && (int)json_object_array_length(hours) <= FORECAST_HOURS; i++) {
+        const char *t = json_object_get_string(json_object_array_get_idx(j_time, i));
+        struct tm tm = {0};
+        if (!t || !strptime(t, "%Y-%m-%dT%H:%M", &tm))
+            continue;
+        time_t ts = timegm(&tm);
+        if (ts < from_hour)
+            continue;
+
+        json_object *h = json_object_new_object();
+        json_object_object_add(h, "timestamp", json_object_new_int64((int64_t)ts));
+        for (size_t f = 0; f < sizeof(fields) / sizeof(fields[0]); f++)
+            json_object_object_add(h, fields[f].dst,
+                                   hourly_value(j_hourly, fields[f].src, i, fields[f].decimals));
+        json_object_array_add(hours, h);
+    }
+    json_object_object_add(jout, "hours", hours);
+    json_object_put(root);
+
+    /* Write to a temporary file and rename: the web page never reads a
+     * half-written file */
+    char tmp_path[1024];
+    int rc = 0;
+    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
+    FILE *fp = fopen(tmp_path, "w");
+    if (!fp ||
+        fprintf(fp, "%s\n", json_object_to_json_string_ext(jout, JSON_C_TO_STRING_PLAIN)) < 0) {
+        rc = 4;
+    }
+    if (fp && fclose(fp) != 0)
+        rc = 4;
+    if (rc == 0 && rename(tmp_path, path) != 0)
+        rc = 4;
+    if (rc != 0)
+        remove(tmp_path);
+
+    json_object_put(jout);
+    return rc;
 }

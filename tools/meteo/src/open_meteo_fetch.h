@@ -19,6 +19,10 @@
 #define OPEN_METEO_FETCH_H
 
 #include <stddef.h>
+#include <time.h>
+
+/* Hours of forecast after the current hour (forecast JSON, meteo.html) */
+#define FORECAST_HOURS 24
 
 typedef struct {
     double temperature;           // Temperature at 2 meters (°C)
@@ -49,5 +53,16 @@ int fetch_open_meteo_weather(double latitude, double longitude, const int *eleva
  * @return int       0 on success, >0 on failure.
  */
 int parse_open_meteo_weather(const char *json_raw, time_t target, open_meteo_weather_t *out);
+
+/**
+ * @brief Write the hourly forecast from the full hour of from on (at most
+ * FORECAST_HOURS + 1 hours) as JSON to path (replaced atomically).
+ *
+ * {"source", "generated", "from", "elevation", "hours": [{"timestamp", ...}]},
+ * timestamps are Unix time (UTC), missing values are null.
+ *
+ * @return 0 on success, >0 on failure.
+ */
+int write_open_meteo_forecast(const char *json_raw, time_t from, const char *path);
 
 #endif // OPEN_METEO_FETCH_H

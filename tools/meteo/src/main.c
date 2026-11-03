@@ -76,6 +76,8 @@ void print_help(const char *progname) {
       "  -t, --timestamp   Optional UTC timestamp (format: YYYYMMDDhhmmss)\n");
   printf("  -f, --outfile     Write output to file\n");
   printf("  -d, --databasedir Database directory\n");
+  printf("  -F, --forecastfile Write the hourly forecast of the next %d hours\n"
+         "                    as JSON to this file (for meteo.html)\n", FORECAST_HOURS);
   printf("  -v, --debug       Enable debug output\n");
   printf("  -h, --help        Show this help message\n");
 }
@@ -88,6 +90,7 @@ int main(int argc, char *argv[]) {
       {"help", no_argument, 0, 'h'},
       {"outfile", required_argument, 0, 'f'},
       {"databasedir", required_argument, 0, 'd'},
+      {"forecastfile", required_argument, 0, 'F'},
 
       {0, 0, 0, 0}};
 
@@ -96,10 +99,11 @@ int main(int argc, char *argv[]) {
   char *timestamp_str = NULL;
   char *outfile = NULL;
   char *database_dir = NULL;
+  char *forecast_file = NULL;
   const char *config_path = NULL;
 
   int opt;
-  while ((opt = getopt_long(argc, argv, "c:t:f:d:vh", long_options, NULL)) !=
+  while ((opt = getopt_long(argc, argv, "c:t:f:d:F:vh", long_options, NULL)) !=
          -1) {
     switch (opt) {
     case 'c':
@@ -113,6 +117,9 @@ int main(int argc, char *argv[]) {
       break;
     case 'd':
       database_dir = optarg;
+      break;
+    case 'F':
+      forecast_file = optarg;
       break;
     case 'v':
       debug = 1;
@@ -179,7 +186,18 @@ int main(int argc, char *argv[]) {
     printf("\nResponse:\n%s\n\n", json_raw);
   }
 
-  int ret = parse_open_meteo_weather(json_raw, time(NULL), &weather);
+  /* The forecast does not depend on the current values: write it first, a
+   * parse error of the current hour must not leave an old forecast behind */
+  if (forecast_file) {
+    int frc = write_open_meteo_forecast(json_raw, timestamp, forecast_file);
+    if (frc != 0)
+      fprintf(stderr, "Failed to write the forecast to %s (code %d)\n",
+              forecast_file, frc);
+    else if (debug)
+      printf("Forecast written to file: %s\n", forecast_file);
+  }
+
+  int ret = parse_open_meteo_weather(json_raw, timestamp, &weather);
   if (ret != 0) {
     printf("ret=%d\n", ret);
     fprintf(stderr, "Fehler beim Parsen der Wetterdaten\n");

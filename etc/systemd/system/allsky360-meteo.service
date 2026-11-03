@@ -8,7 +8,7 @@ Type=oneshot
 User=allskyuser
 Group=allskygroup
 WorkingDirectory=/home/allskyuser/database
-ExecStart=/opt/allsky360/bin/allsky360-meteo -c /home/allskyuser/config.ini -d /home/allskyuser/database -f /opt/allsky360/allsky-api/public/latest_meteo_data.json
+ExecStart=/opt/allsky360/bin/allsky360-meteo -c /home/allskyuser/config.ini -d /home/allskyuser/database -f /opt/allsky360/allsky-api/public/latest_meteo_data.json -F /opt/allsky360/allsky-api/public/forecast_meteo.json
 
 # --- Sandbox (review.md, SEC-09) ------------------------------------------
 # Fetch tool: needs network, reads config.ini, writes only the paths below.

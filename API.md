@@ -184,6 +184,27 @@ HTTP 200 — JSON array of meteorological records:
 GET /api/meteo?date=2025-07-22
 ```
 
+
+The forecast for the next 24 hours is not stored in the database but in the
+static file `forecast_meteo.json` (rewritten by every run of the meteo tool,
+every 30 minutes):
+
+```json
+{ "source": "Open-Meteo", "generated": 1793710031, "from": 1793707200,
+  "elevation": 114.0,
+  "hours": [ { "timestamp": 1793707200, "temperature": 8.7, "humidity": 59,
+               "dew_point": 1.1, "pressure_msl": 1030.3, "cloud_cover": 13,
+               "cloud_low": 13, "cloud_mid": 0, "cloud_high": 0,
+               "precipitation_probability": 0, "precipitation": 0.0,
+               "visibility": 23420, "wind_speed_10m": 12.2,
+               "wind_gusts_10m": 32.0, "wind_dir_10m": 63,
+               "wind_speed_300hPa": 78.7, "is_day": 1 }, ... ] }
+```
+
+`from` is the first full hour, `hours` holds up to 25 hourly entries, Unix
+timestamps (UTC). Units as above, `precipitation` in mm, `wind_gusts_10m` in
+km/h, `is_day` 1/0; missing values are `null`.
+
 ---
 
 ### Aurora Data
