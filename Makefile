@@ -789,19 +789,18 @@ uninstall:
 	$(SYSTEMCTL) disable allsky360-api.service || true
 	rm -f $(SYSTEMD_DIR)/allsky360-api.service
 	$(SYSTEMCTL) daemon-reexec
-	$(SYSTEMCTL) disable --now allsky360-aurora.timer
-	$(SYSTEMCTL) disable --now allsky360-meteo.timer
-	$(SYSTEMCTL) disable --now allsky360-location.timer
-	$(SYSTEMCTL) disable --now allsky360-mount-position.timer
-	rm -f $(UNIT_DIR)/allsky360-aurora.{service,timer}
-	rm -f $(UNIT_DIR)/allsky360-meteo.{service,timer}
-	rm -f $(UNIT_DIR)/allsky360-location.{service,timer}
-	rm -f $(UNIT_DIR)/allsky360-mount-position.{service,timer}
+	@# make runs /bin/sh (dash): no {service,timer} brace expansion, so list
+	@# the files; '-' because a unit may not be installed
+	@for t in aurora meteo location mount-position sensors; do \
+	    $(SYSTEMCTL) disable --now allsky360-$$t.timer 2>/dev/null || true; \
+	    rm -f $(SYSTEMD_DIR)/allsky360-$$t.service $(SYSTEMD_DIR)/allsky360-$$t.timer; \
+	done
 	$(SYSTEMCTL) daemon-reload
 
-	@echo "Removing configuration..."
-	rm -rf $(CONFIG_DIR)/*
-
+	@# Never delete $(CONFIG_DIR)/*: CONFIG_DIR is the home directory of
+	@# $(USERNAME) and holds the image archive, videos and databases.
+	@echo "Kept: $(CONFIG_DIR)/config.ini and all data in $(HOME_DIR)"
+	@echo "      (images, videos, databases). Remove them by hand if wanted."
 	@echo "Attention: User $(USERNAME) and home directory $(HOME_DIR) not deleted."
 	@echo "Uninstall complete"
 
@@ -812,9 +811,21 @@ node-run:
 	@echo "Starting Allsky API Server"
 	cd $(NODEDIR) && sudo -u $(USERNAME) node index.js
 
+# Run the freshly built camera binary in the foreground exactly like
+# allsky360-camera.service does (user, group, working directory, environment,
+# config, umask), but with the output on the terminal. Stops the service first:
+# two instances would fight over the camera. Extra options: ARGS="-vv -e 0.002"
+# No dependency on $(TARGET): "make camera-run" must not silently rebuild a
+# CUDA build as CPU build. Build first with "make USE_CUDA=1".
 camera-run:
-	@echo "Starting Allsky Camera"
-	sudo -u $(USERNAME) bin/allsky360-camera -c config.ini.uranus-c -vvv -e 0.002 -g 0.0
+	@test -x $(TARGET) || { echo "$(TARGET) missing, build it first (make USE_CUDA=1)"; exit 1; }
+	@echo "Running $(TARGET) ($$(cat $(VARIANT_STAMP) 2>/dev/null || echo unknown) build)"
+	@echo "Stopping allsky360-camera.service (restart it with: sudo systemctl start allsky360-camera.service)"
+	-sudo $(SYSTEMCTL) stop allsky360-camera.service
+	sudo $(INSTALL) -m 755 $(TARGET) $(APP_DIR)/allsky360-camera
+	cd / && sudo -u $(USERNAME) -g $(GROUPNAME) \
+	    env CONFIG_PATH=$(CONFIG_DIR)/config.ini USER_DIR=$(HOME_DIR) \
+	    sh -c 'umask 0022 && cd $(HOME_DIR) && exec $(APP_DIR)/allsky360-camera --config $(CONFIG_DIR)/config.ini $(if $(ARGS),$(ARGS),-v)'
 
 help:
 	@echo "Allsky360 Makefile - Available targets:"
@@ -839,7 +850,8 @@ help:
 	@echo "  node-build       - npm ci + build the browser bundle (development)"
 	@echo "  yolo             - Install Ultralytics YOLO26 venv for AI classification (root)"
 	@echo "  yolo-check       - Verify the YOLO venv (torch CUDA, TensorRT, onnxruntime)"
-	@echo "  camera-run       - Start Allsky Camera (development mode)"
+	@echo "  camera-run       - Stop the service, install bin/ and run the camera in the"
+	@echo "                     foreground as allskyuser like systemd (ARGS=\"-vv\")"
 	@echo "  log              - Show live logs from allsky360-api.service"
 	@echo ""
 	@echo "Maintenance targets:"

@@ -62,9 +62,9 @@ sudo make install
 
 The install targets create a dedicated `allskyuser`/`allskygroup`, copy binaries to `/opt/allsky360/bin/`, install systemd services and timers (aurora, meteo, location, mount-position). Configuration is installed to `/home/allskyuser/config.ini`.
 
-Run the camera in development mode (without installing):
+Run the built camera binary in the foreground exactly like `allsky360-camera.service` (stops the service, installs `bin/allsky360-camera` to `/opt/allsky360/bin/`, runs as `allskyuser:allskygroup` in `/home/allskyuser` with `/home/allskyuser/config.ini`; extra options via `ARGS`):
 ```bash
-make camera-run
+make USE_CUDA=1 && make camera-run ARGS="-vv"
 ```
 
 Run the API server in development mode:
