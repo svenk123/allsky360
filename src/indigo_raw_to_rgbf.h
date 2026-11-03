@@ -18,6 +18,8 @@
 #ifndef RAW_TO_RGB16_H
 #define RAW_TO_RGB16_H
 
+#include <stddef.h>
+
 #define CHANNELS 4
 
 /** Get the width of a Indigo raw array
@@ -35,6 +37,21 @@ int indigo_raw_get_width(const unsigned char *raw_data, int *width_out);
  * @return: 0 on success, 1 on error.
  */
 int indigo_raw_get_height(const unsigned char *raw_data, int *height_out);
+
+/** Bytes per pixel of an Indigo raw array, derived from the header signature
+ *
+ * @param raw_data: the raw data.
+ * @return: 1 (MONO8), 2 (MONO16), 3 (RGB24), 4 (RGBA32/ABGR32), 6 (RGB48)
+ *          or 0 for an unsupported format.
+ */
+int indigo_raw_bytes_per_pixel(const unsigned char *raw_data);
+
+/** Minimum size of a complete Indigo raw array (header + pixel data)
+ *
+ * @param raw_data: the raw data.
+ * @return: size in bytes, 0 for an unsupported format or invalid size.
+ */
+size_t indigo_raw_expected_size(const unsigned char *raw_data);
 
 /** Load a Indigo raw array as rgbf
  *

@@ -327,8 +327,10 @@ static indigo_result client_update_property(indigo_client *client,
       /* Check if target buffer size is large enough and reallocate if necessary
        */
       if (needed_raw_buffer_size > raw_buffer_size) {
+        /* +1: the FITS keywords after the pixel data are searched as a
+           string, keep the buffer NUL-terminated */
         unsigned char *temp_raw_buffer = (unsigned char *)allsky_safe_realloc(
-            raw_buffer, needed_raw_buffer_size);
+            raw_buffer, needed_raw_buffer_size + 1);
         if (!temp_raw_buffer) {
           fprintf(stderr,
                   "realloc() failed (raw_buffer_size=%ld bytes, new_size=%ld "
@@ -345,6 +347,7 @@ static indigo_result client_update_property(indigo_client *client,
 
       /* Copy image data to raw buffer */
       memcpy(raw_buffer, property->items[0].blob.value, raw_buffer_size);
+      raw_buffer[raw_buffer_size] = '\0';
 
       /* In case we have URL BLOB transfer we need to release the blob ourselves
        */
@@ -1295,7 +1298,7 @@ int main(int argc, const char *argv[]) {
           if (needed_raw_buffer_size > raw_buffer_size) {
             unsigned char *temp_raw_buffer =
                 (unsigned char *)allsky_safe_realloc(raw_buffer,
-                                                     needed_raw_buffer_size);
+                                                     needed_raw_buffer_size + 1);
             if (!temp_raw_buffer) {
               fprintf(stderr,
                       "ERROR: realloc() failed (raw_buffer_size=%ld bytes, "
@@ -1326,6 +1329,7 @@ int main(int argc, const char *argv[]) {
             failed_no++;
             continue;
           }
+          raw_buffer[raw_buffer_size] = '\0';
 
           printf("Loaded image file %s (%ld bytes) into raw_buffer\n", img_file,
                  raw_buffer_size);
@@ -1395,33 +1399,67 @@ int main(int argc, const char *argv[]) {
           continue;
         }
 
-        /* Crop image */
-        width = config.crop_image ? config.crop_width : raw_width;
-        height = config.crop_image ? config.crop_height : raw_height;
-        printf("Indigo raw image (header data): %dx%d px (%ld bytes)\n",
-               raw_width, raw_height,
-               raw_width * raw_height * sizeof(unsigned short));
-        printf("Processing image buffer (float, RGBA): %dx%d px (%ld bytes)\n",
-               width, height, width * height * CHANNELS * sizeof(float));
-
-        /* Check if target buffer size is large enough */
-        size_t est_buffer_size = width * height * sizeof(unsigned short);
-        if (est_buffer_size > raw_buffer_size) {
+        /* Check that the frame is complete. The size depends on the raw
+           format: 8 bit (MONO8/Bayer 8), 16 bit, RGB24, RGBA32 or RGB48. */
+        int raw_bpp = indigo_raw_bytes_per_pixel(raw_buffer);
+        size_t raw_expected_size = indigo_raw_expected_size(raw_buffer);
+        if (raw_bpp == 0 || raw_expected_size == 0) {
           fprintf(stderr,
-                  "ERROR: taking HDR frame (image header size: %dx%d > target "
-                  "buffer size %dx%d)\nPlease decrease crop.width and "
-                  "crop.height in your config.ini\n",
-                  raw_width, raw_height, width, height);
-
+                  "ERROR: taking HDR frame (unsupported INDIGO raw format "
+                  "0x%08X or invalid size %dx%d)\n",
+                  *(const unsigned int *)raw_buffer, raw_width, raw_height);
+          abort_captures = 1;
+          exposure_sec = frames[0].exposure;
+          failed_no++;
+          continue;
+        }
+        if (raw_buffer_size < raw_expected_size) {
+          fprintf(stderr,
+                  "ERROR: taking HDR frame (incomplete raw image: %zu bytes "
+                  "received, %zu bytes expected for %dx%d px at %d byte(s) "
+                  "per pixel)\n",
+                  raw_buffer_size, raw_expected_size, raw_width, raw_height,
+                  raw_bpp);
           abort_captures = 1;
           exposure_sec = frames[0].exposure;
           failed_no++;
           continue;
         }
 
+        /* Crop image */
+        int crop_x = 0, crop_y = 0;
+        if (config.crop_image) {
+          width = config.crop_width;
+          height = config.crop_height;
+          crop_x = config.crop_x_offset;
+          crop_y = config.crop_y_offset;
+          if (width <= 0 || height <= 0 || crop_x < 0 || crop_y < 0 ||
+              crop_x + width > raw_width || crop_y + height > raw_height) {
+            fprintf(stderr,
+                    "ERROR: taking HDR frame (crop region %dx%d at offset "
+                    "%d,%d does not fit into the camera image %dx%d)\n"
+                    "Please check crop_width, crop_height, crop_x_offset and "
+                    "crop_y_offset in your config.ini or set crop_image=0\n",
+                    width, height, crop_x, crop_y, raw_width, raw_height);
+            abort_captures = 1;
+            exposure_sec = frames[0].exposure;
+            failed_no++;
+            continue;
+          }
+        } else {
+          width = raw_width;
+          height = raw_height;
+        }
+        printf("Indigo raw image (header data): %dx%d px, %d byte(s) per "
+               "pixel (%zu bytes)\n",
+               raw_width, raw_height, raw_bpp, raw_expected_size);
+        printf("Processing image buffer (float, RGBA): %dx%d px (%zu bytes)\n",
+               width, height,
+               (size_t)width * height * CHANNELS * sizeof(float));
+
         /* Load raw image data into memory */
         size_t processing_image_size =
-            (size_t)(width * height * CHANNELS * sizeof(float));
+            (size_t)width * height * CHANNELS * sizeof(float);
         if (processing_image_size > frames[i].image_size) {
           float *temp_image = (float *)allsky_safe_realloc(
               frames[i].image, processing_image_size);
@@ -1446,8 +1484,7 @@ int main(int argc, const char *argv[]) {
           if (indigo_raw_to_rgbf1(
                   frames[i].image, raw_width, raw_height, raw_buffer,
                   config.camera_monochrome, debayer_alg, width, height,
-                  config.crop_image ? config.crop_x_offset : 0,
-                  config.crop_image ? config.crop_y_offset : 0)) {
+                  crop_x, crop_y)) {
             fprintf(stderr, "ERROR: Loading raw data to rgbf array.\n");
 
             abort_captures = 1;

@@ -115,6 +115,8 @@ ifeq ($(USE_CUDA), 1)
     CUDA_LIBS += -lcudart -lnvjpeg -lstdc++
     CFLAGS += -DUSE_CUDA -pthread 
     INCLUDE += -I$(CUDA_PATH)/include -I/usr/include/cairo -I./include
+    # JPEG_CFLAGS comes first in the nvcc rule: the .cu files must see the
+    # jpeglib.h of the linked INDIGO libjpeg (v9), not the system one (v8)
     CUDA_INCLUDE = -I$(CUDA_PATH)/include -I./include
     LDFLAGS += $(CUDA_LIBS)
     CUDAFLAGS += -DCUDA_FORCE_CXX03 -L$(CUDA_PATH)/lib64 -lcudart -lfreetype
@@ -326,7 +328,7 @@ endif
 ifeq ($(USE_CUDA), 1)
 $(OBJDIR)/%.o: $(SRCDIR)/%.cu
 	@mkdir -p $(OBJDIR)
-	$(NVCC) $(NVCCFLAGS) $(CUDA_INCLUDE) -c $< -o $@
+	$(NVCC) $(NVCCFLAGS) $(JPEG_CFLAGS) $(CUDA_INCLUDE) -c $< -o $@
 endif
 
 # Build for utils

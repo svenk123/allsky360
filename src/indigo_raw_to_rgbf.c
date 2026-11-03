@@ -53,6 +53,41 @@ int indigo_raw_get_height(const unsigned char *raw_data, int *height_out) {
   return 0;
 }
 
+int indigo_raw_bytes_per_pixel(const unsigned char *raw_data) {
+  if (!raw_data)
+    return 0;
+
+  const indigo_raw_header *header = (const indigo_raw_header *)raw_data;
+  switch (header->signature) {
+  case INDIGO_RAW_MONO8:
+    return 1;
+  case INDIGO_RAW_MONO16:
+    return 2;
+  case INDIGO_RAW_RGB24:
+    return 3;
+  case INDIGO_RAW_RGBA32:
+  case INDIGO_RAW_ABGR32:
+    return 4;
+  case INDIGO_RAW_RGB48:
+    return 6;
+  default:
+    return 0;
+  }
+}
+
+size_t indigo_raw_expected_size(const unsigned char *raw_data) {
+  int bpp = indigo_raw_bytes_per_pixel(raw_data);
+  if (bpp == 0)
+    return 0;
+
+  const indigo_raw_header *header = (const indigo_raw_header *)raw_data;
+  if (header->width <= 0 || header->height <= 0)
+    return 0;
+
+  return sizeof(indigo_raw_header) +
+         (size_t)header->width * (size_t)header->height * (size_t)bpp;
+}
+
 #define MAX_U16 65535.0f
 
 static void normalize_rgbf(float *rgba, int pixel_count) {
@@ -254,6 +289,7 @@ int indigo_raw_to_rgbf1(float *rgba, int width, int height,
       for (int i = 0; i < crop_pixel_count; i++)
         temp_image_data[i] = image_u8[i] << 8;
       allsky_safe_free(image_u8);
+      image_u8 = NULL; /* freed again at the end of the function */
       image_data = temp_image_data;
     }
 
