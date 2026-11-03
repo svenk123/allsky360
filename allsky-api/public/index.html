@@ -422,16 +422,16 @@
 
       // ── Aurora card ────────────────────────────────────────────
       if (aurora) {
-        const bzColor = aurora.bz < 0 ? '#22c55e' : '#9ca3af';
+        const bzColor = (typeof aurora.bz === 'number' && aurora.bz < 0) ? '#22c55e' : '#9ca3af';
         const auroraRows =
-            row('Kp Index',          aurora.kp_index.toFixed(1))
-          + row('Probability (%)',   aurora.probability_percent.toFixed(1))
-          + row('Max prob. (%)',     aurora.probability_max.toFixed(1))
-          + row('Bt (nT)',           aurora.bt.toFixed(1))
-          + `<div>Bz (nT)<span style="color:${bzColor}">${aurora.bz.toFixed(1)}</span></div>`
-          + row('SW Speed (km/s)',   aurora.speed)
-          + row('SW Density',        aurora.density)
-          + row('SW Temp (K)',        aurora.temperature);
+            row('Kp Index',          fmtNum(aurora.kp_index, 1))
+          + row('Probability (%)',   fmtNum(aurora.probability_percent, 1))
+          + row('Max prob. (%)',     fmtNum(aurora.probability_max, 1))
+          + row('Bt (nT)',           fmtNum(aurora.bt, 1))
+          + `<div>Bz (nT)<span style="color:${bzColor}">${fmtNum(aurora.bz, 1)}</span></div>`
+          + row('SW Speed (km/s)',   fmtNum(aurora.speed, 0))
+          + row('SW Density',        fmtNum(aurora.density, 1))
+          + row('SW Temp (K)',        fmtNum(aurora.temperature, 0));
         cardAurora.innerHTML = section('Aurora & Space Weather', auroraRows);
         cardAurora.style.display = '';
       } else {

@@ -1609,15 +1609,15 @@
         if (auroraMeta) {
           auroraHtml = `<div class="metadata-section">
             <h2>Aurora</h2>
-            <div>Probability (%)     <span>${auroraMeta.probability_percent.toFixed(1)}</span></div>
-            <div>Max probability (%) <span>${auroraMeta.probability_max.toFixed(1)}</span></div>
-            <div>Avg probability (%) <span>${auroraMeta.probability_avg.toFixed(1)}</span></div>
-            <div>Kp Index            <span>${auroraMeta.kp_index.toFixed(1)}</span></div>
-            <div>Bt (nT)             <span>${auroraMeta.bt.toFixed(1)}</span></div>
-            <div>Bz (nT)             <span>${auroraMeta.bz.toFixed(1)}</span></div>
-            <div>SW Density          <span>${auroraMeta.density}</span></div>
-            <div>SW Speed            <span>${auroraMeta.speed}</span></div>
-            <div>SW Temp             <span>${auroraMeta.temperature} K</span></div>
+            <div>Probability (%)     <span>${fmtNum(auroraMeta.probability_percent, 1)}</span></div>
+            <div>Max probability (%) <span>${fmtNum(auroraMeta.probability_max, 1)}</span></div>
+            <div>Avg probability (%) <span>${fmtNum(auroraMeta.probability_avg, 1)}</span></div>
+            <div>Kp Index            <span>${fmtNum(auroraMeta.kp_index, 1)}</span></div>
+            <div>Bt (nT)             <span>${fmtNum(auroraMeta.bt, 1)}</span></div>
+            <div>Bz (nT)             <span>${fmtNum(auroraMeta.bz, 1)}</span></div>
+            <div>SW Density          <span>${fmtNum(auroraMeta.density, 1)}</span></div>
+            <div>SW Speed            <span>${fmtNum(auroraMeta.speed, 0)}</span></div>
+            <div>SW Temp             <span>${fmtNum(auroraMeta.temperature, 0)} K</span></div>
           </div>`;
         }
         if (auroraEl) auroraEl.innerHTML = auroraHtml;

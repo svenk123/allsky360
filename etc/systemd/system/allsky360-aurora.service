@@ -9,7 +9,7 @@ User=allskyuser
 Group=allskygroup
 WorkingDirectory=/home/allskyuser/database
 # verhindert parallele L.ufe:
-ExecStart=/opt/allsky360/bin/allsky360-aurora -c /home/allskyuser/config.ini -d /home/allskyuser/database  -f /opt/allsky360/allsky-api/public/latest_aurora_data.json --kp --mag
+ExecStart=/opt/allsky360/bin/allsky360-aurora -c /home/allskyuser/config.ini -d /home/allskyuser/database  -f /opt/allsky360/allsky-api/public/latest_aurora_data.json --kp --mag --plasma
 # Sandbox (optional, anpassbar):
 
 # --- Sandbox (review.md, SEC-09) ------------------------------------------

@@ -276,6 +276,12 @@ function cloudCoverToRGB(percent) {
   return "rgb(240,240,200)";
 }
 
+// Number with fixed digits, or a dash for missing values (null/undefined/NaN):
+// the aurora tool writes null when NOAA has no current value.
+function fmtNum(value, digits = 1, fallback = '–') {
+  return (typeof value === 'number' && Number.isFinite(value)) ? value.toFixed(digits) : fallback;
+}
+
 function getSeeingLabel(jetstream_kmh) {
   let label = "";
   let color = "";

@@ -15,6 +15,7 @@
  * DEALINGS IN THE SOFTWARE.
  *
  *****************************************************************************/
+#include <math.h>
 #include <sqlite3.h>
 #include <sys/stat.h>
 #include <stdio.h>
@@ -108,16 +109,21 @@ int insert_measurement(
         return 2;
     }
 
+    /* Missing values (NAN) become NULL */
+#define BIND_REAL(i, v) ((isnan(v)) ? sqlite3_bind_null(stmt, (i)) : sqlite3_bind_double(stmt, (i), (v)))
+
     sqlite3_bind_int64(stmt, 1, timestamp);
-    sqlite3_bind_double(stmt, 2, probability_percent);
-    sqlite3_bind_double(stmt, 3, probability_max);
-    sqlite3_bind_double(stmt, 4, probability_avg);
-    sqlite3_bind_double(stmt, 5, kp_index);
-    sqlite3_bind_double(stmt, 6, bt);
-    sqlite3_bind_double(stmt, 7, bz);
-    sqlite3_bind_double(stmt, 8, density);
-    sqlite3_bind_double(stmt, 9, speed);
-    sqlite3_bind_double(stmt, 10, temperature);
+    BIND_REAL(2, probability_percent);
+    BIND_REAL(3, probability_max);
+    BIND_REAL(4, probability_avg);
+    BIND_REAL(5, kp_index);
+    BIND_REAL(6, bt);
+    BIND_REAL(7, bz);
+    BIND_REAL(8, density);
+    BIND_REAL(9, speed);
+    BIND_REAL(10, temperature);
+
+#undef BIND_REAL
 
     /* Retry a few times: busy_timeout already waits, but a writer that gives up
      * the lock late can still surface as SQLITE_BUSY here. */

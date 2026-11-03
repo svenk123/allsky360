@@ -16,6 +16,7 @@
  *
  *****************************************************************************/
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <curl/curl.h>
 #include <math.h>
@@ -67,6 +68,9 @@ int fetch_aurora_json(const char *url, char **out_json) {
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
     curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    /* Accept gzip/deflate: the RTSW solar wind files are ~1.5-2.5 MB of JSON,
+     * compressed ~100-150 kB (the timer runs every 5 minutes). */
+    curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, "");
 
     if(curl_easy_perform(curl) != CURLE_OK) {
         curl_easy_cleanup(curl);
@@ -89,12 +93,108 @@ int fetch_aurora_json(const char *url, char **out_json) {
 
 
 
+/**
+ * Parse an SWPC time tag: "2026-11-03T11:29:00", "2026-11-03T11:22:00Z",
+ * "2026-11-03 11:29:00.000" - always UTC.
+ */
+static int parse_time_tag(const char *str, time_t *out) {
+    struct tm tm = {0};
+    const char *end;
+
+    if (!str)
+        return -1;
+    end = strptime(str, "%Y-%m-%dT%H:%M:%S", &tm);
+    if (!end) {
+        memset(&tm, 0, sizeof(tm));
+        end = strptime(str, "%Y-%m-%d %H:%M:%S", &tm);
+    }
+    if (!end)
+        return -1;
+    *out = timegm(&tm);
+    return 0;
+}
+
+/* Number member of a JSON object; json null, strings and missing keys fail */
+static int get_number(json_object *obj, const char *key, double *out) {
+    json_object *val;
+
+    if (!json_object_object_get_ex(obj, key, &val))
+        return -1;
+    if (!json_object_is_type(val, json_type_double) &&
+        !json_object_is_type(val, json_type_int))
+        return -1;
+    *out = json_object_get_double(val);
+    return 0;
+}
+
+/**
+ * Find the entry of an SWPC array of objects ([{"time_tag": ..., ...}, ...])
+ * closest to timestamp that has all keys as numbers.
+ *
+ * @param only_active  RTSW files hold one row per minute and spacecraft
+ *                     (DSCOVR/SOLAR1, ACE, IMAP); "active": true marks the one
+ *                     SWPC uses operationally, the others are skipped.
+ * @param max_diff     Maximum distance in seconds, farther entries are stale.
+ * @return Borrowed entry or NULL.
+ */
+static json_object *find_nearest_entry(json_object *root, time_t timestamp,
+                                       double max_diff, int only_active,
+                                       const char *const *keys, int nkeys) {
+    json_object *best = NULL;
+    double best_diff = max_diff;
+    size_t n = json_object_array_length(root);
+
+    for (size_t i = 0; i < n; i++) {
+        json_object *entry = json_object_array_get_idx(root, i);
+        json_object *val;
+        time_t t;
+        double dummy;
+        int ok = 1;
+
+        if (!json_object_is_type(entry, json_type_object))
+            continue;
+        if (!json_object_object_get_ex(entry, "time_tag", &val) ||
+            parse_time_tag(json_object_get_string(val), &t) != 0)
+            continue;
+        if (only_active &&
+            (!json_object_object_get_ex(entry, "active", &val) ||
+             !json_object_get_boolean(val)))
+            continue;
+        for (int k = 0; k < nkeys && ok; k++)
+            ok = get_number(entry, keys[k], &dummy) == 0;
+        if (!ok)
+            continue;
+
+        double diff = fabs(difftime(timestamp, t));
+        if (diff <= best_diff) {
+            best_diff = diff;
+            best = entry;
+        }
+    }
+    return best;
+}
+
+/* Parse raw_json and make sure it is a JSON array */
+static json_object *parse_array(const char *raw_json) {
+    json_object *root = json_tokener_parse(raw_json);
+
+    if (root && !json_object_is_type(root, json_type_array)) {
+        json_object_put(root);
+        root = NULL;
+    }
+    return root;
+}
+
+/* Smallest distance between two longitudes in degrees (0..180) */
+static double lon_distance(double a, double b) {
+    double d = fmod(fabs(a - b), 360.0);
+    return d > 180.0 ? 360.0 - d : d;
+}
+
 int parse_noaa_json(const char *raw_json, double latitude, double longitude, time_t timestamp,
                     int *out_best_val, int *out_max_val, double *out_avg_val,
                     time_t *out_obs_time, time_t *out_fore_time)
 {
-    int debug = 0;
-
     json_object *root = json_tokener_parse(raw_json);
     if (!root)
         return PARSE_ERROR_JSON;
@@ -102,43 +202,26 @@ int parse_noaa_json(const char *raw_json, double latitude, double longitude, tim
     json_object *j_obs, *j_fore, *j_coords;
     if (!json_object_object_get_ex(root, "Observation Time", &j_obs) ||
         !json_object_object_get_ex(root, "Forecast Time", &j_fore) ||
-        !json_object_object_get_ex(root, "coordinates", &j_coords)) {
+        !json_object_object_get_ex(root, "coordinates", &j_coords) ||
+        !json_object_is_type(j_coords, json_type_array)) {
         json_object_put(root);
         return PARSE_ERROR_DATA;
     }
 
-    const char *obs = json_object_get_string(j_obs);
-    const char *fore = json_object_get_string(j_fore);
+    time_t obs_time = 0, forecast_time = 0;
+    parse_time_tag(json_object_get_string(j_obs), &obs_time);
+    parse_time_tag(json_object_get_string(j_fore), &forecast_time);
 
-    // Parse observation time
-    struct tm tm_obs = {0};
-    time_t obs_time = 0;
-    if (strptime(obs, "%Y-%m-%dT%H:%M:%SZ", &tm_obs)) {
-        obs_time = timegm(&tm_obs);
-    }
-
-    // Parse forecast time
-    struct tm tm_fore = {0};
-    time_t forecast_time = 0;
-    if (strptime(fore, "%Y-%m-%dT%H:%M:%SZ", &tm_fore)) {
-        forecast_time = timegm(&tm_fore);
-    }
-
-    if (debug) {
-        printf("NOAA observation time: %s", ctime(&obs_time));
-        printf("Requested timestamp:   %s", ctime(&timestamp));
-    }
-
-    if (fabs(difftime(obs_time, timestamp)) > 3600) {
-        if (debug)
-            fprintf(stderr, "Warning: NOAA data is older/newer than 1 hour.\n");
-    }
+    if (fabs(difftime(obs_time, timestamp)) > 3600)
+        fprintf(stderr, "Warning: OVATION data is more than 1 hour away from the requested time.\n");
 
     double best_diff = 1e9;
     int best_val = -1, max_val = -1;
     double avg_sum = 0.0;
     int avg_count = 0;
 
+    /* The OVATION grid uses longitudes 0..359 (east), the site -180..180:
+     * compare across the 0/360 seam, otherwise western sites never match. */
     size_t n = json_object_array_length(j_coords);
     for (size_t i = 0; i < n; i++) {
         json_object *entry = json_object_array_get_idx(j_coords, i);
@@ -148,16 +231,17 @@ int parse_noaa_json(const char *raw_json, double latitude, double longitude, tim
         double lon = json_object_get_double(json_object_array_get_idx(entry, 0));
         double lat = json_object_get_double(json_object_array_get_idx(entry, 1));
         int val = json_object_get_int(json_object_array_get_idx(entry, 2));
+        double dlon = lon_distance(lon, longitude);
 
         // Find nearest point
-        double dist = hypot(lat - latitude, lon - longitude);
+        double dist = hypot(lat - latitude, dlon);
         if (dist < best_diff) {
             best_diff = dist;
             best_val = val;
         }
 
-        // Average within 5x5 degree box
-        if (fabs(lat - latitude) <= 2.5 && fabs(lon - longitude) <= 2.5) {
+        // Maximum and average within a 5x5 degree box
+        if (fabs(lat - latitude) <= 2.5 && dlon <= 2.5) {
             if (val > max_val)
                 max_val = val;
             avg_sum += val;
@@ -184,116 +268,65 @@ int parse_noaa_json(const char *raw_json, double latitude, double longitude, tim
     return 0;
 }
 
-
 int parse_kp_json(const char *raw_json, time_t timestamp, double *out_kp) {
-    json_object *root = json_tokener_parse(raw_json);
-    if (!root || !json_object_is_type(root, json_type_array)) 
-	return PARSE_ERROR_JSON;
+    /* planetary_k_index_1m.json: estimated Kp per minute ("estimated_kp");
+     * noaa-planetary-k-index.json: 3-hourly Kp ("Kp"). The 3-hour value is
+     * valid for its interval, so allow up to 3 hours distance. */
+    static const char *const key_1m[] = { "estimated_kp" };
+    static const char *const key_3h[] = { "Kp" };
+    json_object *root = parse_array(raw_json);
+    json_object *entry;
+    double kp;
 
-    size_t n = json_object_array_length(root);
-    double best_kp = -1.0;
-    double best_diff = 1e9;
+    if (!root)
+        return PARSE_ERROR_JSON;
 
-    for (size_t i = 1; i < n; i++) {  // skip header
-        json_object *entry = json_object_array_get_idx(root, i);
-        if (!json_object_is_type(entry, json_type_array) || json_object_array_length(entry) < 2) 
-	    continue;
-
-        const char *time_str = json_object_get_string(json_object_array_get_idx(entry, 0));
-        double kp_val = json_object_get_double(json_object_array_get_idx(entry, 1));
-
-        struct tm tm = {0};
-        if (strptime(time_str, "%Y-%m-%d %H:%M:%S", &tm)) {
-            time_t t = timegm(&tm);
-            double diff = fabs(difftime(timestamp, t));
-            if (diff < best_diff) {
-                best_diff = diff;
-                best_kp = kp_val;
-            }
-        }
-    }
+    entry = find_nearest_entry(root, timestamp, 3 * 3600, 0, key_1m, 1);
+    if (entry)
+        get_number(entry, key_1m[0], &kp);
+    else if ((entry = find_nearest_entry(root, timestamp, 3 * 3600, 0, key_3h, 1)))
+        get_number(entry, key_3h[0], &kp);
 
     json_object_put(root);
-    if (best_kp < 0) 
-	return PARSE_ERROR_DATA;
-    *out_kp = best_kp;
+    if (!entry)
+        return PARSE_ERROR_DATA;
+    *out_kp = kp;
     return 0;
 }
 
 int parse_mag_json(const char *raw_json, time_t timestamp, double *out_bt, double *out_bz) {
-    json_object *root = json_tokener_parse(raw_json);
-    if (!root || !json_object_is_type(root, json_type_array)) 
-	return PARSE_ERROR_JSON;
+    /* rtsw_mag_1m.json; Bz in GSM coordinates is the one relevant for aurora */
+    static const char *const keys[] = { "bt", "bz_gsm" };
+    json_object *root = parse_array(raw_json);
+    json_object *entry;
 
-    size_t n = json_object_array_length(root);
-    double best_bt = -1, best_bz = -1, best_diff = 1e9;
+    if (!root)
+        return PARSE_ERROR_JSON;
 
-    for (size_t i = 1; i < n; i++) {
-        json_object *entry = json_object_array_get_idx(root, i);
-        if (!json_object_is_type(entry, json_type_array) || json_object_array_length(entry) < 6) 
-	    continue;
-
-        const char *time_str = json_object_get_string(json_object_array_get_idx(entry, 0));
-        double bt = json_object_get_double(json_object_array_get_idx(entry, 2));
-        double bz = json_object_get_double(json_object_array_get_idx(entry, 4));
-
-        struct tm tm = {0};
-        if (strptime(time_str, "%Y-%m-%d %H:%M:%S", &tm)) {
-            time_t t = timegm(&tm);
-            double diff = fabs(difftime(timestamp, t));
-            if (diff < best_diff) {
-                best_diff = diff;
-                best_bt = bt;
-                best_bz = bz;
-            }
-        }
+    entry = find_nearest_entry(root, timestamp, SOLAR_WIND_MAX_AGE, 1, keys, 2);
+    if (entry) {
+        get_number(entry, "bt", out_bt);
+        get_number(entry, "bz_gsm", out_bz);
     }
-
     json_object_put(root);
-    if (best_bt < 0 || best_bz < -1e5) 
-	return PARSE_ERROR_DATA;
-    *out_bt = best_bt;
-    *out_bz = best_bz;
-    return 0;
+    return entry ? 0 : PARSE_ERROR_DATA;
 }
 
 int parse_plasma_json(const char *raw_json, time_t timestamp, double *out_density, double *out_speed, double *out_temp) {
-    json_object *root = json_tokener_parse(raw_json);
-    if (!root || !json_object_is_type(root, json_type_array)) 
-	return PARSE_ERROR_JSON;
+    /* rtsw_wind_1m.json */
+    static const char *const keys[] = { "proton_density", "proton_speed", "proton_temperature" };
+    json_object *root = parse_array(raw_json);
+    json_object *entry;
 
-    size_t n = json_object_array_length(root);
-    double best_diff = 1e9;
-    double best_density = -1, best_speed = -1, best_temp = -1;
+    if (!root)
+        return PARSE_ERROR_JSON;
 
-    for (size_t i = 1; i < n; i++) {
-        json_object *entry = json_object_array_get_idx(root, i);
-        if (!json_object_is_type(entry, json_type_array) || json_object_array_length(entry) < 5) 
-	    continue;
-
-        const char *time_str = json_object_get_string(json_object_array_get_idx(entry, 0));
-        double density = json_object_get_double(json_object_array_get_idx(entry, 1));
-        double speed = json_object_get_double(json_object_array_get_idx(entry, 2));
-        double temp = json_object_get_double(json_object_array_get_idx(entry, 3));
-
-        struct tm tm = {0};
-        if (strptime(time_str, "%Y-%m-%d %H:%M:%S", &tm)) {
-            time_t t = timegm(&tm);
-            double diff = fabs(difftime(timestamp, t));
-            if (diff < best_diff) {
-                best_diff = diff;
-                best_density = density;
-                best_speed = speed;
-                best_temp = temp;
-            }
-        }
+    entry = find_nearest_entry(root, timestamp, SOLAR_WIND_MAX_AGE, 1, keys, 3);
+    if (entry) {
+        get_number(entry, "proton_density", out_density);
+        get_number(entry, "proton_speed", out_speed);
+        get_number(entry, "proton_temperature", out_temp);
     }
-
     json_object_put(root);
-    if (best_density < 0 || best_speed < 0 || best_temp < 0) 
-	return PARSE_ERROR_DATA;
-    *out_density = best_density;
-    *out_speed = best_speed;
-    *out_temp = best_temp;
-    return 0;
+    return entry ? 0 : PARSE_ERROR_DATA;
 }

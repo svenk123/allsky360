@@ -105,11 +105,22 @@ Even though it runs automatically, you can also run it manually from the command
 | `--timestamp` | `-t` | Optional UTC timestamp (format: `YYYYMMDDhhmmss`) |
 | `--outfile` | `-f` | Write output to a file instead of stdout |
 | `--databasedir` | `-d` | Where to put the database |
-| `--kp` | | Include planetary Kp index data |
-| `--mag` | | Include solar wind magnetic field data |
-| `--plasma` | | Include solar wind plasma data |
+| `--kp` | | Include the planetary Kp index (1-minute estimate, falls back to the 3-hourly value) |
+| `--mag` | | Include the solar wind magnetic field (Bt, Bz in GSM) |
+| `--plasma` | | Include solar wind plasma data (density, speed, temperature) |
 | `--debug` | `-v` | Enable debug output (useful when things go wrong) |
 | `--help` | `-h` | Show the help message |
+
+### Data sources (NOAA SWPC)
+
+| Value | Endpoint |
+|-------|----------|
+| Aurora probability | `json/ovation_aurora_latest.json` (OVATION model) |
+| Kp | `json/planetary_k_index_1m.json`, fallback `products/noaa-planetary-k-index.json` |
+| Bt, Bz | `json/rtsw/rtsw_mag_1m.json` |
+| Density, speed, temperature | `json/rtsw/rtsw_wind_1m.json` |
+
+The real-time solar wind files contain one row per minute and spacecraft; only the spacecraft marked `active` (the one SWPC uses operationally) is used, and only values at most 30 minutes from the requested time. Values that are not requested or not available are `null` in the JSON and `NULL` in the database.
 
 ### Example
 

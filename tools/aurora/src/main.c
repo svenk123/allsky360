@@ -20,6 +20,7 @@
 #include "config.h"
 #include "coordinates.h"
 #include <getopt.h>
+#include <math.h>
 #include <json-c/json.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,6 +46,29 @@ time_t timegm(struct tm *tm) {
   return t;
 }
 #endif
+
+static double round_to_precision(double value, int precision);
+
+/* Missing values (fetch failed, no current data) are NAN and written as JSON
+ * null / SQL NULL, never as 0 (a valid Bz) or -1. */
+static json_object *json_number_or_null(double value, int precision) {
+  return isnan(value) ? NULL : json_object_new_double(round_to_precision(value, precision));
+}
+
+/* Fetch url and print a size and a short excerpt with --debug: the RTSW
+ * files are megabytes of JSON. */
+static int fetch_json(const char *url, char **out_json) {
+  int rc = fetch_aurora_json(url, out_json);
+
+  if (rc != 0) {
+    fprintf(stderr, "Failed to fetch %s (code %d)\n", url, rc);
+    return rc;
+  }
+  if (debug)
+    printf("\n%s: %zu bytes\n%.300s%s\n", url, strlen(*out_json), *out_json,
+           strlen(*out_json) > 300 ? " ..." : "");
+  return 0;
+}
 
 static double round_to_precision(double value, int precision) {
   char buffer[64];
@@ -84,8 +108,9 @@ void print_help(const char *progname) {
       "  -t, --timestamp   Optional UTC timestamp (format: YYYYMMDDhhmmss)\n");
   printf("  -f, --outfile     Write output to file\n");
   printf("      --kp            Include planetary Kp index\n");
-  printf("      --mag           Include solar wind magnetic field\n");
-  printf("      --plasma        Include solar wind plasma data\n");
+  printf("      --mag           Include solar wind magnetic field (Bt, Bz)\n");
+  printf("      --plasma        Include solar wind plasma data (density, speed, temperature)\n");
+  printf("  Values that are not requested or not available are null.\n");
   printf("  -d, --databasedir Database directory\n");
   printf("  -v, --debug       Enable debug output\n");
   printf("  -h, --help        Show this help message\n");
@@ -189,88 +214,71 @@ int main(int argc, char *argv[]) {
     printf("Timestamp: %ld (%s)\n", timestamp, ctime(&timestamp));
   }
 
-  // Updated every 5 secs. globally
-  const char *url_noaa =
-      "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json";
-  // Updated every 3 hours
-  const char *url_kp =
-      "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
-
-  // Updated every minute but delayed about some minutes
-  const char *url_mag =
-      "https://services.swpc.noaa.gov/products/solar-wind/mag-2-hour.json";
-  const char *url_plasma =
-      "https://services.swpc.noaa.gov/products/solar-wind/plasma-2-hour.json";
-
   char *json_raw = NULL;
   int best_val = -1, max_val = -1;
   double avg_val = -1.0;
   time_t obs_time = 0, fore_time = 0;
-  double kp_val = -1.0, bt_val = 0.0, bz_val = 0.0, density = 0.0, speed = 0.0,
-         temp = 0.0;
+  double kp_val = NAN, bt_val = NAN, bz_val = NAN, density = NAN, speed = NAN,
+         temp = NAN;
 
-  if (fetch_aurora_json(url_noaa, &json_raw) != 0) {
-    fprintf(stderr, "Failed to fetch NOAA data.\n");
+  /* OVATION aurora probability (required) */
+  if (fetch_json(URL_OVATION, &json_raw) != 0)
     return 2;
-  }
 
   if (parse_noaa_json(json_raw, latitude, longitude, timestamp, &best_val, &max_val,
                       &avg_val, &obs_time, &fore_time) != 0) {
-    fprintf(stderr, "Failed to parse NOAA data.\n");
+    fprintf(stderr, "Failed to parse NOAA OVATION data.\n");
     free(json_raw);
     return 3;
   }
-
-  if (debug) {
-    printf("\nResponse:\n%s\n\n", json_raw);
-  }
-
   free(json_raw);
   json_raw = NULL;
 
+  /* Optional values: a failure only leaves the value missing */
   if (fetch_kp) {
-    if (fetch_aurora_json(url_kp, &json_raw) == 0 &&
-        parse_kp_json(json_raw, timestamp, &kp_val) == 0 && debug)
-      printf("Kp index: %.1f\n", kp_val);
-
-    if (debug) {
-      printf("\nResponse:\n%s\n\n", json_raw);
-    }
-
+    /* 1-minute estimate covers ~6 hours, the 3-hourly product 7 days */
+    if (fetch_json(URL_KP_1M, &json_raw) == 0 &&
+        parse_kp_json(json_raw, timestamp, &kp_val) != 0)
+      kp_val = NAN;
     free(json_raw);
-    /* Reset: a failed fetch below leaves json_raw untouched, freeing the
-     * stale pointer again was a double free (abort when NOAA lacks data). */
     json_raw = NULL;
+
+    if (isnan(kp_val)) {
+      if (fetch_json(URL_KP_3H, &json_raw) == 0 &&
+          parse_kp_json(json_raw, timestamp, &kp_val) != 0)
+        kp_val = NAN;
+      free(json_raw);
+      json_raw = NULL;
+    }
+    if (isnan(kp_val))
+      fprintf(stderr, "No Kp index available for the requested time.\n");
+    else if (debug)
+      printf("Kp index: %.2f\n", kp_val);
   }
+
   if (fetch_mag) {
-    if (fetch_aurora_json(url_mag, &json_raw) == 0 &&
-        parse_mag_json(json_raw, timestamp, &bt_val, &bz_val) == 0 && debug)
-      printf("Bt: %.1f nT, Bz: %.1f nT\n", bt_val, bz_val);
-
-    if (debug) {
-      printf("\nResponse:\n%s\n\n", json_raw);
+    if (fetch_json(URL_RTSW_MAG, &json_raw) == 0 &&
+        parse_mag_json(json_raw, timestamp, &bt_val, &bz_val) != 0) {
+      bt_val = bz_val = NAN;
+      fprintf(stderr, "No current solar wind magnetic field data.\n");
     }
-
     free(json_raw);
-    /* Reset: a failed fetch below leaves json_raw untouched, freeing the
-     * stale pointer again was a double free (abort when NOAA lacks data). */
     json_raw = NULL;
+    if (debug && !isnan(bt_val))
+      printf("Bt: %.1f nT, Bz: %.1f nT\n", bt_val, bz_val);
   }
+
   if (fetch_plasma) {
-    if (fetch_aurora_json(url_plasma, &json_raw) == 0 &&
-        parse_plasma_json(json_raw, timestamp, &density, &speed, &temp) == 0 &&
-        debug)
+    if (fetch_json(URL_RTSW_WIND, &json_raw) == 0 &&
+        parse_plasma_json(json_raw, timestamp, &density, &speed, &temp) != 0) {
+      density = speed = temp = NAN;
+      fprintf(stderr, "No current solar wind plasma data.\n");
+    }
+    free(json_raw);
+    json_raw = NULL;
+    if (debug && !isnan(speed))
       printf("Density: %.1f cm^-3, Speed: %.1f km/s, Temp: %.0f K\n", density,
              speed, temp);
-
-    if (debug) {
-      printf("\nResponse:\n%s\n\n", json_raw);
-    }
-
-    free(json_raw);
-    /* Reset: a failed fetch below leaves json_raw untouched, freeing the
-     * stale pointer again was a double free (abort when NOAA lacks data). */
-    json_raw = NULL;
   }
 
   json_object *jout = json_object_new_object();
@@ -288,27 +296,12 @@ int main(int argc, char *argv[]) {
       jout, "probability_avg",
       json_object_new_double(round_to_precision(avg_val, 1)));
 
-  if (fetch_kp)
-    json_object_object_add(
-        jout, "kp_index",
-        json_object_new_double(round_to_precision(kp_val, 1)));
-
-  if (fetch_mag) {
-    json_object_object_add(
-        jout, "bt", json_object_new_double(round_to_precision(bt_val, 1)));
-    json_object_object_add(
-        jout, "bz", json_object_new_double(round_to_precision(bz_val, 1)));
-  }
-
-  if (fetch_plasma) {
-    json_object_object_add(
-        jout, "density",
-        json_object_new_double(round_to_precision(density, 1)));
-    json_object_object_add(
-        jout, "speed", json_object_new_double(round_to_precision(speed, 0)));
-    json_object_object_add(jout, "temperature",
-                           json_object_new_double(round_to_precision(temp, 0)));
-  }
+  json_object_object_add(jout, "kp_index", json_number_or_null(kp_val, 1));
+  json_object_object_add(jout, "bt", json_number_or_null(bt_val, 1));
+  json_object_object_add(jout, "bz", json_number_or_null(bz_val, 1));
+  json_object_object_add(jout, "density", json_number_or_null(density, 1));
+  json_object_object_add(jout, "speed", json_number_or_null(speed, 0));
+  json_object_object_add(jout, "temperature", json_number_or_null(temp, 0));
 
   const char *json_str =
       json_object_to_json_string_ext(jout, JSON_C_TO_STRING_PRETTY);
