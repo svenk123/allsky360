@@ -42,7 +42,6 @@ C_SRC = $(SRC_DIR)/main.c $(SRC_DIR)/video_encoder.c $(SRC_DIR)/image_check.c $(
 C_OBJS = $(C_SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
 ifeq ($(USE_CUDA),1)
-	USE_NVJPEG = 1
 
 # Intelligent CUDA-path detection
 	CUDA_PATH ?= $(shell \
@@ -77,7 +76,7 @@ ifeq ($(USE_CUDA),1)
 
 	CFLAGS +=  -I/usr/include/aarch64-linux-gnu -I$(CUDA_PATH)/include
 	LDFLAGS += -L/usr/lib/aarch64-linux-gnu -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib
-	LDFLAGS += -lnppig -lcuda -lcudart -lnvjpeg -lstdc++
+	LDFLAGS += -lnppig -lcudart -lnvjpeg -lstdc++
 	CUDA_INCLUDE = -I$(CUDA_PATH)/include -I./src -I../../include
 
     CU_SRC = $(SRC_DIR)/image_loader_nvjpeg.cu $(SRC_DIR)/stacker_cuda.cu
@@ -85,7 +84,7 @@ ifeq ($(USE_CUDA),1)
 	CFLAGS += -DUSE_CUDA
 else
 	C_SRC += $(SRC_DIR)/image_loader_libjpeg.c
-    CU_SRCS =
+    CU_SRC =
     CU_OBJS =
 endif
 

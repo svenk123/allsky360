@@ -20,6 +20,23 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Reads only the JPEG header. 0 on success, -1 if the file is missing or
+ * not a readable JPEG (never exits, unlike libjpeg's default handler). */
 int get_jpeg_dimensions(const char *filename, int *width, int *height);
+
+/**
+ * Letterbox: the largest rectangle with the aspect ratio of src_w x src_h
+ * that fits into dst_w x dst_h, centred. The rest of the frame stays black.
+ */
+void fit_rect(int src_w, int src_h, int dst_w, int dst_h,
+              int *out_x, int *out_y, int *out_w, int *out_h);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

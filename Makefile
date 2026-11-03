@@ -341,7 +341,7 @@ tools: timelapse meteo aurora mount-position cameras panorama sensors
 timelapse:
 	@echo "Building timelapse tool"
 ifeq ($(USE_CUDA), 1)
-	@$(MAKE) -C tools/timelapse USE_CUDA=1 USE_NVJPEG=1
+	@$(MAKE) -C tools/timelapse USE_CUDA=1
 else
 	@$(MAKE) -C tools/timelapse
 endif

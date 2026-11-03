@@ -1,20 +1,19 @@
-# Timelapse Creator with CUDA Acceleration (nvJPEG + NVENC)
+# Timelapse Creator with CUDA Acceleration (nvJPEG + libx264)
 
-This project is a high-performance C/CUDA-based program that converts a series of JPEG images into a timelapse video (MP4 format). The implementation uses GPU acceleration through NVIDIA technologies for both JPEG decoding and video encoding:
+This project is a high-performance C/CUDA-based program that converts a series of JPEG images into a timelapse video (MP4 format). JPEG decoding and resizing run on the GPU through NVIDIA libraries, the H.264 encoding runs on the CPU:
 
 - **nvJPEG** for GPU-accelerated JPEG decoding
 - **NPP** (NVIDIA Performance Primitives) for image resizing on the GPU
-- **NVENC** for fast H.264 video encoding on the GPU
+- **libx264** (via FFmpeg) for H.264 encoding on the CPU. The Jetson Orin Nano has no hardware video encoder (NVENC)
 - Optional **progress bar** for real-time feedback
 
 ## Features
 
 - Input: List of `.jpg` images
-- Output: MP4 video using H.264 compression (via NVENC)
+- Output: MP4 video using H.264 compression (libx264, CRF 23, peak rate ~4 Mbps)
 - Configurable output resolution via `-w` and `-h`
 - Configurable frame rate via `-p`
 - GPU-accelerated JPEG decoding and scaling
-- GPU-accelerated video encoding
 - Optional progress display via `-v`
 
 ## Requirements
@@ -22,7 +21,8 @@ This project is a high-performance C/CUDA-based program that converts a series o
 - Linux system with NVIDIA GPU
 - CUDA Toolkit (e.g. 11.x or 12.x)
 - FFmpeg with development headers (`libavcodec`, `libavformat`, `libavutil`, `libswscale`)
-- NVIDIA libraries: `nvJPEG`, `NPP`, `NVENC`
+- NVIDIA libraries: `nvJPEG`, `NPP`
+- FFmpeg built with `libx264`
 - Compiler: `gcc` and `nvcc`
 
 ## Build Instructions
@@ -30,11 +30,11 @@ This project is a high-performance C/CUDA-based program that converts a series o
 ```bash
 make
 
-This will create the binary timelapse_cuda_nvenc.
+This will create the binary bin/allsky360-timelapse.
 
 ## Example Usage
 ```
-./timelapse_cuda_nvenc -o output.mp4 -w 1920 -h 1080 -p 25 -v img001.jpg img002.jpg img003.jpg ...
+./bin/allsky360-timelapse -o output.mp4 -w 1920 -h 1080 -p 25 -v img001.jpg img002.jpg img003.jpg ...
 
 ### Parameters:
 - -o output.mp4: Output filename
@@ -47,13 +47,20 @@ This will create the binary timelapse_cuda_nvenc.
 ## Performance Benefits
 	•	Faster JPEG Decoding: nvJPEG uses GPU memory and pipelines to decode images much faster than traditional libjpeg.
 	•	Zero-Copy Resizing: Images are resized directly on the GPU using NPP, avoiding costly memory transfers.
-	•	Real-time Encoding: NVENC allows high-quality H.264 encoding with low CPU load and high throughput.
 	•	Scalable: Can process hundreds or thousands of frames efficiently on CUDA-capable GPUs.
 
 
+## Mixed image sizes
+
+A config change during the night can change the image size. All JPEG headers are read first:
+
+- **Normal timelapse:** every image is used. Each one is scaled with its aspect ratio kept and centred in the video frame, black bars fill the rest (letterbox).
+- **Stacking modes** (`-m avg|max|min|sigma|diff|motion`): pixels must line up, so only the size with the most images is used (tie: the size of the newest image). The other images are skipped with one summary warning.
+- Unreadable or broken JPEGs are skipped instead of aborting the run.
+
 ## Notes
 	•	For optimal performance, use images of similar dimensions and consistent formatting.
-	•	Output bitrate is currently fixed to ~4 Mbps; this can be modified in video_encoder.c.
+	•	Encoder settings (CRF 23, peak rate ~4 Mbps, preset slow) are set in video_encoder.c.
 	•	Designed for use in scientific imaging, astronomy, and observatory camera projects (e.g., allsky).
 
 ## License

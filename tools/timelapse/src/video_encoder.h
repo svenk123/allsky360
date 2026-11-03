@@ -21,18 +21,19 @@
 #include <stdint.h>
 
 /**
- * Initializes the NVENC-based video encoder.
+ * Initializes the H.264 video encoder (libx264 via FFmpeg, on the CPU: the
+ * Jetson Orin Nano has no hardware video encoder).
  *
  * @param filename  Output filename for the encoded video (e.g., .mp4).
  * @param width     Width of the video frames in pixels.
  * @param height    Height of the video frames in pixels.
  * @param fps       Frame rate (frames per second).
- * @return          0 on success, 1 on failure.
+ * @return          0 on success, -1 on failure.
  */
-int init_encoder_nvenc(const char *filename, int width, int height, int fps);
+int init_encoder(const char *filename, int width, int height, int fps);
 
 /**
- * Encodes a single video frame using the initialized NVENC encoder.
+ * Encodes a single video frame using the initialized encoder.
  * The input must be an RGB image matching the encoder's resolution.
  *
  * @param rgb_data  Pointer to the RGB frame data (width × height × 3 bytes).

@@ -29,10 +29,11 @@ static AVCodecContext *codec_ctx;
 static AVStream *video_stream;
 static AVFrame *frame = NULL;
 static struct SwsContext *sws_ctx;
-static int frame_counter = 0;
+static int frame_counter = 0; /* packets written */
+static int64_t next_pts = 0;   /* one tick per submitted frame */
 static int width, height;
 
-int init_encoder_nvenc(const char *filename, int w, int h, int fps) {
+int init_encoder(const char *filename, int w, int h, int fps) {
   av_log_set_level(AV_LOG_WARNING);
 #if DEBUG
   av_log_set_level(AV_LOG_DEBUG);
@@ -188,7 +189,9 @@ void encode_frame(uint8_t *rgb_data) {
          video_stream->avg_frame_rate.num, video_stream->avg_frame_rate.den);
 #endif
 
-  frame->pts = frame_counter;
+  /* PTS must advance per submitted frame: packets come out delayed and
+   * reordered because of B-frames, so the packet counter cannot be used. */
+  frame->pts = next_pts++;
 
   int ret = av_frame_make_writable(frame);
   if (ret < 0) {
@@ -265,6 +268,8 @@ void finalize_encoder(void) {
   avformat_free_context(fmt_ctx);
 
   av_frame_free(&frame);
+  sws_freeContext(sws_ctx);
+  sws_ctx = NULL;
 
   printf("[FINAL] Encoded %d frames\n", frame_counter);
 }

@@ -25,7 +25,9 @@ extern "C" {
 #endif
 
 /**
- * Loads a JPEG image, optionally verifies the original dimensions, and resizes it to the target dimensions.
+ * Loads a JPEG image, optionally verifies the original dimensions, and fits it
+ * into a target_width x target_height frame: scaled with its aspect ratio kept,
+ * centred, black bars where the aspect ratios differ (letterbox).
  *
  * @param filename            Path to the JPEG file.
  * @param target_width        Desired output width in pixels.
@@ -35,7 +37,7 @@ extern "C" {
  * @return                    Pointer to resized RGB image buffer (3 bytes per pixel), or NULL on error.
  */
 uint8_t* load_and_resize_jpeg(const char *filename,
-                               int width, int height,
+                               int target_width, int target_height,
                                int expected_src_width, int expected_src_height);
 
 #ifdef __cplusplus

@@ -31,13 +31,14 @@ extern "C" {
 #endif
 
 int init_stack_context(stack_context_t *ctx, int width, int height, stacking_mode_t mode, float sigma_clip_threshold) {
-    size_t size = width * height * 3;
+    size_t size = (size_t)width * height * 3;
     ctx->width = width;
     ctx->height = height;
     ctx->count = 0;
     ctx->mode = mode;
     ctx->sigma_clip_threshold = sigma_clip_threshold;
-    ctx->motion_threshold = sigma_clip_threshold; //10.0f;
+    /* main.c passes the mode-specific threshold (-t or its default) */
+    ctx->motion_threshold = sigma_clip_threshold;
     ctx->accum = (float *)calloc(size, sizeof(float));
     ctx->accum2 = (float *)calloc(size, sizeof(float));
     ctx->background = (float *)calloc(size, sizeof(float));
@@ -51,7 +52,7 @@ int init_stack_context(stack_context_t *ctx, int width, int height, stacking_mod
 	    return 1;
     }
 
-    if (mode == STACK_DIFFERENCE) {
+    if (mode == STACK_SIGMA_CLIP || mode == STACK_DIFFERENCE) {
         if (!ctx->background) 
 	    return 1;
     }

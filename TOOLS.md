@@ -283,7 +283,7 @@ You can run it manually too:
 
 ### What it does
 
-This is probably my favorite tool. It creates timelapse videos from a sequence of JPEG images, and it uses GPU acceleration for everything – JPEG decoding, image resizing, and video encoding. If you've got hundreds or thousands of images, this makes a huge difference. I've processed sequences with thousands of images in minutes instead of hours.
+This is probably my favorite tool. It creates timelapse videos from a sequence of JPEG images, and it uses GPU acceleration for JPEG decoding and image resizing (the H.264 encoding runs on the CPU with libx264, the Jetson Orin Nano has no hardware video encoder). If you've got hundreds or thousands of images, this makes a huge difference. I've processed sequences with thousands of images in minutes instead of hours.
 
 It also supports different stacking modes, which is really useful if you want to combine multiple images in interesting ways.
 
@@ -291,7 +291,7 @@ It also supports different stacking modes, which is really useful if you want to
 
 * GPU-accelerated JPEG decoding (using nvJPEG)
 * GPU-accelerated image resizing (using NPP)
-* GPU-accelerated video encoding (using NVENC)
+* H.264 video encoding with libx264 (CPU)
 * Multiple stacking modes (average, max, min, sum, sigma-clip, difference, motion)
 * Progress bar so you know it's actually working
 
@@ -348,7 +348,8 @@ You'll need:
 * An NVIDIA GPU with CUDA support
 * CUDA Toolkit (11.x or 12.x should work)
 * FFmpeg development libraries
-* NVIDIA libraries: nvJPEG, NPP, NVENC
+* NVIDIA libraries: nvJPEG, NPP
+* FFmpeg with libx264
 
 ---
 
