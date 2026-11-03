@@ -423,22 +423,31 @@ wavelet_sharpen_gain_large=0.0
 
 # SQM estimation
 ################
+# Stars are detected on the raw frame of HDR frame 0 (the longest exposure),
+# before debayering and any processing, inside the circle sqm_center_x/y,
+# sqm_radius (processing-image pixels, i.e. after the crop; 0 = image_zenith).
+# Only at exposures > 1 s; the star list goes to images/YYYYMMDD/stars-*.json
+# (position, flux, SNR, FWHM) and the count into the database.
 sqm=1
-# Correlation threshold (0.0-1.0): only template matches above this score are accepted.
-# Higher values reduce false positives; 0.65-0.75 is a good starting range.
-sqm_threshold=0.65
-# Minimum peak brightness (0.0-1.0) a candidate pixel must have.
-# Pixels dimmer than this are rejected before the correlation step, suppressing
-# noise-induced false positives in dark sky regions.
-sqm_min_brightness=0.05
 sqm_max_stars=1000
 sqm_radius=100
 sqm_center_x=989
 sqm_center_y=1238
-# Star template size in pixels (should roughly match the star FWHM in the image).
-# Typical allsky stars are 3-5 px across; a 7x7 template works well.
-sqm_star_size=7
-sqm_star_sigma=2.0
+# Gaussian sigma of a star in image pixels (FWHM / 2.355). The mean "fwhm"
+# in the stars-*.json files shows the real value; typical 1.0-1.5.
+sqm_star_sigma=1.0
+# Detection threshold in noise sigma of the filtered image. 5 gives about 1 %
+# false detections on real night frames; lower finds fainter stars and more
+# noise, higher only bright stars.
+sqm_detect_sigma=5.0
+# Rejected as not a star: wider than sqm_max_fwhm image pixels (lights, lit
+# clouds) or more elongated than sqm_max_elongation (0 = round, 1 = line:
+# edges, wires, trails).
+sqm_max_fwhm=8.0
+sqm_max_elongation=0.5
+# The star count depends on the detector: after changing the parameters
+# above, recalibrate sqm_intercept against a known value (SQM-L meter or
+# lightpollutionmap.info) on a clear moonless night.
 # the intercept representing the maximum sky darkness
 # You can get the value from lightpollutionmap.info for your location
 sqm_intercept=21.2

@@ -974,6 +974,13 @@ int main(int argc, const char *argv[]) {
    * on the main loop has to ping the watchdog regularly (WatchdogSec=). */
   allsky_sd_notify("READY=1\nSTATUS=Capturing");
 
+  /* Stars of HDR frame 0, detected on the raw frame (see the capture loop).
+   * Declared here so that a skipped cycle cannot leak them. */
+  star_t *sqm_stars = NULL;
+  int sqm_num_stars = -1; /* -1: no detection in this cycle */
+  star_detect_stats_t sqm_star_stats;
+  memset(&sqm_star_stats, 0, sizeof(sqm_star_stats));
+
   /* Loop forever and taking pictures */
   while (keep_running) {
     allsky_watchdog_ping();
@@ -1175,6 +1182,10 @@ int main(int argc, const char *argv[]) {
 
       /* Capture frames */
       int abort_captures = 0;
+
+      allsky_safe_free(sqm_stars);
+      sqm_stars = NULL;
+      sqm_num_stars = -1;
 
       for (i = 0; i < MAX_IMAGES; i++) {
         if (abort_captures)
@@ -1456,6 +1467,39 @@ int main(int argc, const char *argv[]) {
         printf("Processing image buffer (float, RGBA): %dx%d px (%zu bytes)\n",
                width, height,
                (size_t)width * height * CHANNELS * sizeof(float));
+
+        /* Star detection for the SQM estimate: on the raw frame of HDR frame
+         * 0 (the longest exposure), before debayering, white balance, SCNR
+         * and the night median filter, which remove faint 1-2 px stars.
+         * Only at long exposures (night); SQM is decided after the frame
+         * statistics are known (see "SQM estimation" below). */
+        if (i == 0 && config.sqm && frames[0].exposure > 1.0) {
+          int sqm_cx = (config.sqm_center_x > 0) ? config.sqm_center_x
+                                                 : config.image_zenith_x;
+          int sqm_cy = (config.sqm_center_y > 0) ? config.sqm_center_y
+                                                 : config.image_zenith_y;
+          if (config.sqm_radius <= 0) {
+            fprintf(stderr, "WARNING: sqm_radius is 0, no star detection\n");
+          } else {
+            star_detect_params_t sp = {
+                .psf_sigma = config.sqm_star_sigma,
+                .detect_sigma = config.sqm_detect_sigma,
+                .max_fwhm = config.sqm_max_fwhm,
+                .max_elongation = config.sqm_max_elongation,
+                .max_stars = config.sqm_max_stars,
+            };
+            TIMED_BLOCK("find_stars_raw", {
+              if (find_stars_raw(raw_buffer, raw_buffer_size,
+                                 config.camera_monochrome, crop_x, crop_y,
+                                 sqm_cx, sqm_cy, config.sqm_radius, &sp,
+                                 &sqm_stars, &sqm_num_stars,
+                                 &sqm_star_stats) != 0) {
+                fprintf(stderr, "WARNING: star detection failed\n");
+                sqm_num_stars = -1;
+              }
+            });
+          }
+        }
 
         /* Load raw image data into memory */
         size_t processing_image_size =
@@ -2067,55 +2111,27 @@ int main(int argc, const char *argv[]) {
       /* SQM estimation */
       int num_stars = 0;
       float estimated_sqm = 0.0;
-      if (config.sqm && (frames[0].exposure > 1.0) &&
-          (frames[0].median_g <= 0.21)) {
-        /* Only reliable at astronomical night and long exposures */
-        /* Generate star model (gaussian) */
-        int tpl_size = config.sqm_star_size;
-        float sigma = config.sqm_star_sigma;
-        float *template_data = generate_gaussian_template(tpl_size, sigma);
+      if (config.sqm && sqm_num_stars >= 0 && frames[0].median_g <= 0.21) {
+        /* Only reliable at astronomical night and long exposures; the stars
+         * were detected on the raw frame 0 in the capture loop. */
+        num_stars = sqm_num_stars;
 
-        star_position_t *stars = NULL;
-
-        int sqm_cx = (config.sqm_center_x > 0) ? config.sqm_center_x : config.image_zenith_x;
-        int sqm_cy = (config.sqm_center_y > 0) ? config.sqm_center_y : config.image_zenith_y;
-
-        TIMED_BLOCK("find_stars_template_rgbf1", {
-          int result = find_stars_template(
-              frames[0].image, width, height, template_data, tpl_size, tpl_size,
-              sqm_cx, sqm_cy, config.sqm_radius,
-              config.sqm_threshold, config.sqm_min_brightness,
-              config.sqm_max_stars, &stars, &num_stars);
-
-          if (result == 0) {
-#if 0
-            // Debug output of stars
-            for (int i = 0; i < num_stars; i++) {
-              printf("Star %d: (%d, %d)\n", i + 1, stars[i].x, stars[i].y);
-            }
-#endif
-            char stars_file[PATH_MAX + 1];
-            if (allsky_safe_snprintf(stars_file, sizeof(stars_file),
-                                     "%s/stars-%s%s.json", today_directory,
-                                     today_str, now_str))
-              fprintf(stderr, "WARNING: String %s truncated\n", stars_file);
-
-            stars_to_json(stars, num_stars, stars_file);
-          } else
-            fprintf(stderr, "Star detection failed with code %d\n", result);
-        });
-
-        allsky_safe_free(stars);
-        allsky_safe_free(template_data);
+        char stars_file[PATH_MAX + 1];
+        if (allsky_safe_snprintf(stars_file, sizeof(stars_file),
+                                 "%s/stars-%s%s.json", today_directory,
+                                 today_str, now_str))
+          fprintf(stderr, "WARNING: String %s truncated\n", stars_file);
+        stars_to_json(sqm_stars, sqm_num_stars, &sqm_star_stats, stars_file);
 
         if (num_stars > 0) {
-          /* Estimate SQM */
           estimate_sqm_corrected(num_stars, frames[0].exposure,
                                  frames[0].gain * 0.1f, config.sqm_intercept,
                                  config.sqm_slope, &estimated_sqm);
           printf("Estimated SQM: %.2f mag/arcsec²\n", estimated_sqm);
         }
       }
+      allsky_safe_free(sqm_stars);
+      sqm_stars = NULL;
 
       /* Measure focus */
       float sharpness = 0.0f;

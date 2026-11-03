@@ -44,7 +44,12 @@ Run tests:
 ```bash
 make tests
 ```
-Test sources are in `test/`; the built test binary goes to `bin/test_sun_calc`.
+Test sources are in `test/`; the test binaries go to `bin/` (`test_sun_calc`, `test_coordinates`, `test_raw_dump`, `test_star_detector`).
+
+The star detector (`src/star_detector.c`, used for SQM on the raw HDR frame 0) can be run on a real INDIGO raw frame; `STAR_TEST_INVERT=1` runs it on the negative image, where every detection is a false one:
+```bash
+bin/test_star_detector test_images/Night_Light_RAW_16_3856x2180_35_150_60s_001.raw 1925 1185 500 [STAR_SIGMA DETECT_SIGMA] [out.json]
+```
 
 Clean build artifacts:
 ```bash

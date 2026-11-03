@@ -191,7 +191,8 @@ TESTDIR = test
 TEST_SUN_CALC_BIN = $(BINDIR)/test_sun_calc
 TEST_RAW_DUMP_BIN = $(BINDIR)/test_raw_dump
 TEST_COORDINATES_BIN = $(BINDIR)/test_coordinates
-TESTBINS = $(TEST_SUN_CALC_BIN) $(TEST_RAW_DUMP_BIN) $(TEST_COORDINATES_BIN)
+TEST_STAR_DETECTOR_BIN = $(BINDIR)/test_star_detector
+TESTBINS = $(TEST_SUN_CALC_BIN) $(TEST_RAW_DUMP_BIN) $(TEST_COORDINATES_BIN) $(TEST_STAR_DETECTOR_BIN)
 UTILSDIR = utils
 UTILSBIN = $(UTILSDIR)/keogram
 NODEDIR = allsky-api
@@ -394,6 +395,13 @@ $(TEST_RAW_DUMP_BIN): $(TESTDIR)/test_raw_dump.c $(SRCDIR)/raw_dump.c
 $(TEST_COORDINATES_BIN): $(TESTDIR)/test_coordinates.c $(SRCDIR)/coordinates.h
 	@mkdir -p $(BINDIR)
 	$(CC) $(CFLAGS) -o $(TEST_COORDINATES_BIN) $(TESTDIR)/test_coordinates.c -lm
+
+STAR_DETECTOR_TEST_SRCS = $(SRCDIR)/star_detector.c $(SRCDIR)/indigo_raw_to_rgbf.c \
+	$(SRCDIR)/atomic_file.c $(SRCDIR)/debayer_nni.c $(SRCDIR)/debayer_bilinear.c \
+	$(SRCDIR)/debayer_vng.c
+$(TEST_STAR_DETECTOR_BIN): $(TESTDIR)/test_star_detector.c $(STAR_DETECTOR_TEST_SRCS) $(SRCDIR)/star_detector.h
+	@mkdir -p $(BINDIR)
+	$(CC) $(CFLAGS) $(INCLUDE) -I$(SRCDIR) -o $@ $(TESTDIR)/test_star_detector.c $(STAR_DETECTOR_TEST_SRCS) -L$(INDIGO_ROOT)/build/lib -ljson-c -lm -fopenmp
 
 ##################### Clean Build
 

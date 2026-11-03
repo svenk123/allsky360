@@ -136,15 +136,14 @@ typedef struct {
     double wavelet_sharpen_gain_large;
 
     int sqm;
-    double sqm_threshold;
-    double sqm_min_brightness;
     int sqm_max_stars;
     int sqm_radius;
     int sqm_center_x;
     int sqm_center_y;
-    char sqm_template[500];
-    int sqm_star_size;
-    double sqm_star_sigma;
+    double sqm_star_sigma;       /* Gaussian sigma of a star [image px] */
+    double sqm_detect_sigma;     /* detection threshold [noise sigma] */
+    double sqm_max_fwhm;         /* reject wider sources [image px] */
+    double sqm_max_elongation;   /* reject more elongated sources (0..1) */
     double sqm_intercept;
     double sqm_slope;
 

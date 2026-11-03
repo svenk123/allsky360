@@ -194,14 +194,13 @@ int load_config(const char *filename, config_t *config) {
 
   config->sqm = 0;
   config->sqm_max_stars = 1000;
-  config->sqm_threshold = 0.7f;
-  config->sqm_min_brightness = 0.05f;
   config->sqm_radius = 0;
   config->sqm_center_x = 0;
   config->sqm_center_y = 0;
-  config->sqm_template[0] = '\0';
-  config->sqm_star_size = 7;
-  config->sqm_star_sigma = 2.0f;
+  config->sqm_star_sigma = 1.0;
+  config->sqm_detect_sigma = 5.0;
+  config->sqm_max_fwhm = 8.0;
+  config->sqm_max_elongation = 0.5;
   config->sqm_intercept = 18.0f;
   config->sqm_slope = 1.5f;
 
@@ -553,23 +552,32 @@ int load_config(const char *filename, config_t *config) {
         config->sqm = atoi(value);
       else if (strcmp(key, "sqm_max_stars") == 0)
         config->sqm_max_stars = atoi(value);
-      else if (strcmp(key, "sqm_threshold") == 0)
-        config->sqm_threshold = atof(value);
-      else if (strcmp(key, "sqm_min_brightness") == 0)
-        config->sqm_min_brightness = atof(value);
       else if (strcmp(key, "sqm_radius") == 0)
         config->sqm_radius = atoi(value);
       else if (strcmp(key, "sqm_center_x") == 0)
         config->sqm_center_x = atoi(value);
       else if (strcmp(key, "sqm_center_y") == 0)
         config->sqm_center_y = atoi(value);
-      else if (strcmp(key, "sqm_template") == 0)
-        config_copy_string(config->sqm_template, sizeof(config->sqm_template), key,
-                           value);
-      else if (strcmp(key, "sqm_star_size") == 0)
-        config->sqm_star_size = atoi(value);
+      /* Settings of the former template-matching detector */
+      else if (strcmp(key, "sqm_threshold") == 0 ||
+               strcmp(key, "sqm_min_brightness") == 0 ||
+               strcmp(key, "sqm_star_size") == 0 ||
+               strcmp(key, "sqm_template") == 0) {
+        if (warn_unknown_keys)
+          fprintf(stderr,
+                  "NOTE: %s: '%s' is no longer used (the star detector works "
+                  "on the raw frame now, see sqm_detect_sigma in "
+                  "config.ini.default)\n",
+                  filename, key);
+      }
       else if (strcmp(key, "sqm_star_sigma") == 0)
         config->sqm_star_sigma = atof(value);
+      else if (strcmp(key, "sqm_detect_sigma") == 0)
+        config->sqm_detect_sigma = atof(value);
+      else if (strcmp(key, "sqm_max_fwhm") == 0)
+        config->sqm_max_fwhm = atof(value);
+      else if (strcmp(key, "sqm_max_elongation") == 0)
+        config->sqm_max_elongation = atof(value);
       else if (strcmp(key, "sqm_intercept") == 0)
         config->sqm_intercept = atof(value);
       else if (strcmp(key, "sqm_slope") == 0)
@@ -997,15 +1005,14 @@ int show_config(config_t *config) {
          config->wavelet_sharpen_gain_large);
 
   printf("sqm: %d (%s)\n", config->sqm, config->sqm == 1 ? "yes" : "no");
-  printf("sqm_threshold: %.2f\n", config->sqm_threshold);
-  printf("sqm_min_brightness: %.2f\n", config->sqm_min_brightness);
   printf("sqm_max_stars: %d\n", config->sqm_max_stars);
   printf("sqm_radius: %dpx\n", config->sqm_radius);
   printf("sqm_center_x: %d\n", config->sqm_center_x);
   printf("sqm_center_y: %d\n", config->sqm_center_y);
-  printf("sqm_template: %s\n", config->sqm_template);
-  printf("sqm_star_size: %d px\n", config->sqm_star_size);
-  printf("sqm_star_sigma: %.1f\n", config->sqm_star_sigma);
+  printf("sqm_star_sigma: %.2f px\n", config->sqm_star_sigma);
+  printf("sqm_detect_sigma: %.1f\n", config->sqm_detect_sigma);
+  printf("sqm_max_fwhm: %.1f px\n", config->sqm_max_fwhm);
+  printf("sqm_max_elongation: %.2f\n", config->sqm_max_elongation);
   printf("sqm_intercept: %.1f\n", config->sqm_intercept);
   printf("sqm_slope: %.1f\n", config->sqm_slope);
 
@@ -1348,10 +1355,6 @@ int config_to_json(const char *filename, const config_t *config) {
       jroot, "wavelet_sharpen_gain_large",
       json_object_new_double(config->wavelet_sharpen_gain_large));
   json_object_object_add(jroot, "sqm", json_object_new_int(config->sqm));
-  json_object_object_add(jroot, "sqm_threshold",
-                         json_object_new_double(config->sqm_threshold));
-  json_object_object_add(jroot, "sqm_min_brightness",
-                         json_object_new_double(config->sqm_min_brightness));
   json_object_object_add(jroot, "sqm_max_stars",
                          json_object_new_int(config->sqm_max_stars));
   json_object_object_add(jroot, "sqm_radius",
@@ -1360,12 +1363,14 @@ int config_to_json(const char *filename, const config_t *config) {
                          json_object_new_int(config->sqm_center_x));
   json_object_object_add(jroot, "sqm_center_y",
                          json_object_new_int(config->sqm_center_y));
-  json_object_object_add(jroot, "sqm_template",
-                         json_object_new_string(config->sqm_template));
-  json_object_object_add(jroot, "sqm_star_size",
-                         json_object_new_int(config->sqm_star_size));
   json_object_object_add(jroot, "sqm_star_sigma",
                          json_object_new_double(config->sqm_star_sigma));
+  json_object_object_add(jroot, "sqm_detect_sigma",
+                         json_object_new_double(config->sqm_detect_sigma));
+  json_object_object_add(jroot, "sqm_max_fwhm",
+                         json_object_new_double(config->sqm_max_fwhm));
+  json_object_object_add(jroot, "sqm_max_elongation",
+                         json_object_new_double(config->sqm_max_elongation));
   json_object_object_add(jroot, "sqm_intercept",
                          json_object_new_double(config->sqm_intercept));
   json_object_object_add(jroot, "sqm_slope",
