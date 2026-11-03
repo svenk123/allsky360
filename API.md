@@ -9,6 +9,16 @@ controls to local network clients.  The server is started by the
 All API responses use `Content-Type: application/json` unless stated otherwise.
 Dates are always expressed in **ISO 8601** format (`YYYY-MM-DD`).
 
+**Time:** every `timestamp` is Unix time (UTC). The `date` parameter of the
+day-based endpoints (`/api/image`, `/api/meteo`, `/api/aurora`,
+`/api/sensors`, `/api/thumbnails`) is the **UTC day**: the daily databases
+`database_YYYYMMDD.db` and the folders `images/YYYYMMDD` are named after it.
+A calendar day in local time spans two UTC days; the web pages fetch both
+and filter by timestamp (`fetchDayRows()` in `public/js/allsky-common.js`).
+For display, `/api/config` returns `timezone` (the IANA zone of the station,
+from `location_timezone`); summer/winter time comes from the time zone
+database for each moment, not from a fixed offset.
+
 ---
 
 ## Base URL
@@ -34,7 +44,7 @@ timestamp ascending.  Each row corresponds to one captured and processed frame.
 
 | Parameter | Type   | Required | Description                        |
 |-----------|--------|----------|------------------------------------|
-| `date`    | string | yes      | Observation date in `YYYY-MM-DD` format |
+| `date`    | string | yes      | UTC day in `YYYY-MM-DD` format |
 
 **Response**
 
@@ -43,7 +53,7 @@ HTTP 200 — JSON array of image records:
 | Field             | Type    | Description                                              |
 |-------------------|---------|----------------------------------------------------------|
 | `timestamp`       | integer | Unix timestamp (UTC) of image capture                    |
-| `timezone_offset` | integer | Local UTC offset in seconds at the time of capture       |
+| `timezone_offset` | integer | UTC offset of the station time zone at capture, seconds (DST included; informational) |
 | `exposure`        | number  | Exposure time in seconds                                 |
 | `gain`            | integer | Camera sensor gain                                       |
 | `brightness`      | number  | Mean image brightness (0.0 – 1.0)                        |
@@ -137,7 +147,7 @@ Open-Meteo data fetched by the `allsky360-meteo.service`.
 
 | Parameter | Type   | Required | Description                        |
 |-----------|--------|----------|------------------------------------|
-| `date`    | string | yes      | Observation date in `YYYY-MM-DD` format |
+| `date`    | string | yes      | UTC day in `YYYY-MM-DD` format |
 
 **Response**
 
@@ -187,7 +197,7 @@ from NOAA/ESA data fetched by the `allsky360-aurora.service`.
 
 | Parameter | Type   | Required | Description                        |
 |-----------|--------|----------|------------------------------------|
-| `date`    | string | yes      | Observation date in `YYYY-MM-DD` format |
+| `date`    | string | yes      | UTC day in `YYYY-MM-DD` format |
 
 **Response**
 

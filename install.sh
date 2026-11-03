@@ -192,6 +192,20 @@ configure() {
     cfg_set location_altitude "$v"
     ask v "City (shown in the overlay)" "$(cfg_get location_city)"; cfg_set location_city "$v"
     ask v "Owner (shown in the overlay)" "$(cfg_get location_owner)"; cfg_set location_owner "$v"
+    # Display time zone; storage is always UTC. Default: configured value,
+    # else the system zone (if it is not plain UTC), else Europe/Berlin.
+    local tz_def tz_sys
+    tz_def="$(cfg_get location_timezone)"
+    tz_sys="$(timedatectl show -p Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null)"
+    if [ -z "$tz_def" ]; then
+        case "$tz_sys" in ""|UTC|Etc/UTC|Etc/Universal|Universal) tz_def="Europe/Berlin" ;; *) tz_def="$tz_sys" ;; esac
+    fi
+    while :; do
+        ask v "Time zone for local time display (IANA, e.g. Europe/Berlin)" "$tz_def"
+        [ -f "/usr/share/zoneinfo/$v" ] && [[ "$v" != /* && "$v" != *..* ]] && break
+        echo "  ${C_R}unknown time zone${C_0} - see: timedatectl list-timezones"
+    done
+    cfg_set location_timezone "$v"
 
     echo; echo "  ${C_B}INDIGO server${C_0}"
     local host port name

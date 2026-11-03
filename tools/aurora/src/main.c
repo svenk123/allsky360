@@ -336,10 +336,14 @@ int main(int argc, char *argv[]) {
 
   if (database_dir) {
     /* Today string */
-    struct tm *tm_info = localtime(&timestamp);
+    /* The daily database is named after the UTC day, like the one of the
+     * camera and the sensors: a local day would put rows into another
+     * file than the camera's, and move them on a time zone change. */
+    struct tm tm_utc;
+    gmtime_r(&timestamp, &tm_utc);
     char today_str[40];
     snprintf(today_str, sizeof(today_str), "%04d%02d%02d",
-             tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday);
+             tm_utc.tm_year + 1900, tm_utc.tm_mon + 1, tm_utc.tm_mday);
 
     /* Add data to database */
     char db_path[512];

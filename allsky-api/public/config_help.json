@@ -132,6 +132,7 @@
   "location_longitude": {"description": "Geographic longitude in degrees", "unit": "degrees", "range": "-180 to 180", "default": "0"},
   "location_altitude": {"description": "Altitude above sea level in meters", "unit": "meters", "range": "0-8848", "default": "0"},
   "location_city": {"description": "City/location name", "unit": "string", "range": "text", "default": ""},
+  "location_timezone": {"description": "Time zone of the station for display (IANA name, e.g. Europe/Berlin; empty = system time zone). Summer/winter time follows automatically; stored data is always UTC", "unit": "string", "range": "IANA time zone", "default": ""},
   "location_owner": {"description": "Owner name for metadata", "unit": "string", "range": "text", "default": ""},
   "working_directory": {"description": "Working directory", "unit": "string", "range": "file path", "default": "/opt/allsky360"},
   "image_directory": {"description": "Directory path for storing images", "unit": "string", "range": "file path", "default": "/home/allskyuser/images"},

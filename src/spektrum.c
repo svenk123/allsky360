@@ -330,7 +330,8 @@ int spektrum_analyze(
   /* Build ISO-8601 UTC timestamp */
   char ts_buf[32];
   time_t now = time(NULL);
-  struct tm *utc = gmtime(&now);
+  struct tm utc_tm;
+  struct tm *utc = gmtime_r(&now, &utc_tm);
   if (utc)
     strftime(ts_buf, sizeof(ts_buf), "%Y-%m-%dT%H:%M:%SZ", utc);
   else

@@ -585,8 +585,8 @@
 
     function formatNow(unixTs) {
       if (!unixTs) return '—';
-      const d = new Date(unixTs * 1000);
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      // Display time zone (station time or UTC), with zone label
+      return formatClock(unixTs, { seconds: true, zone: true });
     }
 
     // ══════════════════════════════════════════════════════════════

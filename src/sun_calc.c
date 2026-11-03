@@ -31,8 +31,9 @@ int is_sun_below_18_degrees(time_t timestamp, double longitude, double latitude)
     struct ln_lnlat_posn observer; // Correct structure for the observer position
 
     /* Convert time_t to julian date */
-    struct tm *utc_time = gmtime(&timestamp);
-    ln_get_date_from_tm(utc_time, &date);
+    struct tm utc_time;
+    gmtime_r(&timestamp, &utc_time);
+    ln_get_date_from_tm(&utc_time, &date);
     double jd = ln_get_julian_day(&date);
     printf("Julian date: %.5f\n", jd);
 
@@ -78,8 +79,9 @@ double sun_altitude(time_t timestamp, double longitude, double latitude) {
     struct ln_lnlat_posn observer;
 
     /* Convert time_t to julian date */
-    struct tm *utc_time = gmtime(&timestamp);
-    ln_get_date_from_tm(utc_time, &date);
+    struct tm utc_time;
+    gmtime_r(&timestamp, &utc_time);
+    ln_get_date_from_tm(&utc_time, &date);
     double jd = ln_get_julian_day(&date);
 
     /* Sun position */

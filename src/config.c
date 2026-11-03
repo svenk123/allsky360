@@ -26,6 +26,7 @@
 #include "atomic_file.h"
 #include "config.h"
 #include "coordinates.h"
+#include "timezone.h"
 
 /* Unknown keys are reported only on the first load (see load_config()). */
 static int warn_unknown_keys = 1;
@@ -244,6 +245,7 @@ int load_config(const char *filename, config_t *config) {
   config->location_longitude = 7.4479;
   config->location_altitude = 114;
   snprintf(config->location_city, sizeof(config->location_city), "Musterstadt/Germany");
+  config->location_timezone[0] = '\0';
   snprintf(config->location_owner, sizeof(config->location_owner), "Max Mustermann");
 
   config->capture_interval = 120;
@@ -699,6 +701,9 @@ int load_config(const char *filename, config_t *config) {
       else if (strcmp(key, "location_owner") == 0)
         config_copy_string(config->location_owner, sizeof(config->location_owner), key,
                            value);
+      else if (strcmp(key, "location_timezone") == 0)
+        config_copy_string(config->location_timezone,
+                           sizeof(config->location_timezone), key, value);
       else if (strcmp(key, "working_directory") == 0)
         config_copy_string(config->working_directory, sizeof(config->working_directory), key,
                            value);
@@ -1070,6 +1075,9 @@ int show_config(config_t *config) {
   printf("location_altitude: %dm\n", config->location_altitude);
   printf("location_city: %s\n", config->location_city);
   printf("location_owner: %s\n", config->location_owner);
+  printf("location_timezone: %s (in use: %s)\n",
+         config->location_timezone[0] ? config->location_timezone : "system",
+         tz_name());
   printf("working_directory: %s\n", config->working_directory);
   printf("image_directory: %s\n", config->image_directory);
   printf("raw_dump_directory: %s\n", config->raw_dump_directory);
@@ -1460,6 +1468,11 @@ int config_to_json(const char *filename, const config_t *config) {
   json_object_object_add(jroot, "location_city",
                          json_object_new_string(config->location_city));
   /* location_owner is a person's name - deliberately not published (SEC-04) */
+  json_object_object_add(jroot, "location_timezone",
+                         json_object_new_string(config->location_timezone));
+  /* Time zone in use for display (location_timezone or the system zone);
+   * the web pages format all times with it. Timestamps are UTC. */
+  json_object_object_add(jroot, "timezone", json_object_new_string(tz_name()));
   json_object_object_add(jroot, "working_directory",
                          json_object_new_string(config->working_directory));
   json_object_object_add(jroot, "image_directory",

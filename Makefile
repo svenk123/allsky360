@@ -192,7 +192,8 @@ TEST_SUN_CALC_BIN = $(BINDIR)/test_sun_calc
 TEST_RAW_DUMP_BIN = $(BINDIR)/test_raw_dump
 TEST_COORDINATES_BIN = $(BINDIR)/test_coordinates
 TEST_STAR_DETECTOR_BIN = $(BINDIR)/test_star_detector
-TESTBINS = $(TEST_SUN_CALC_BIN) $(TEST_RAW_DUMP_BIN) $(TEST_COORDINATES_BIN) $(TEST_STAR_DETECTOR_BIN)
+TEST_TIMEZONE_BIN = $(BINDIR)/test_timezone
+TESTBINS = $(TEST_SUN_CALC_BIN) $(TEST_RAW_DUMP_BIN) $(TEST_COORDINATES_BIN) $(TEST_STAR_DETECTOR_BIN) $(TEST_TIMEZONE_BIN)
 UTILSDIR = utils
 UTILSBIN = $(UTILSDIR)/keogram
 NODEDIR = allsky-api
@@ -395,6 +396,10 @@ $(TEST_RAW_DUMP_BIN): $(TESTDIR)/test_raw_dump.c $(SRCDIR)/raw_dump.c
 $(TEST_COORDINATES_BIN): $(TESTDIR)/test_coordinates.c $(SRCDIR)/coordinates.h
 	@mkdir -p $(BINDIR)
 	$(CC) $(CFLAGS) -o $(TEST_COORDINATES_BIN) $(TESTDIR)/test_coordinates.c -lm
+
+$(TEST_TIMEZONE_BIN): $(TESTDIR)/test_timezone.c $(SRCDIR)/timezone.c $(SRCDIR)/timezone.h
+	@mkdir -p $(BINDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR) -o $@ $(TESTDIR)/test_timezone.c $(SRCDIR)/timezone.c
 
 STAR_DETECTOR_TEST_SRCS = $(SRCDIR)/star_detector.c $(SRCDIR)/indigo_raw_to_rgbf.c \
 	$(SRCDIR)/atomic_file.c $(SRCDIR)/debayer_nni.c $(SRCDIR)/debayer_bilinear.c \

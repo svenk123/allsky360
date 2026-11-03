@@ -17,23 +17,195 @@ function localSiderealTimeDeg(unixTime, lonDeg) {
   return LST;
 }
 
-function formatTimestamp(unixTime, timezoneOffsetSeconds = null) {
-  if (timezoneOffsetSeconds !== null) {
-    // Use server timezone offset
-    const date = new Date((unixTime + timezoneOffsetSeconds) * 1000);
-    // UTC methods to format without browser timezone interference
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const hours = String(date.getUTCHours()).padStart(2, '0');
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-  } else {
-    // Use browser's local timezone
-    const date = new Date(unixTime * 1000);
-    return date.toLocaleString();
+// ══════════════════════════════════════════════════════════════════════
+//  TIME ZONES
+//  Stored: Unix time (UTC) everywhere - databases, images/YYYYMMDD, files.
+//  Shown: the station time zone (config.json "timezone", from
+//  location_timezone in config.ini) or UTC, as chosen by the viewer
+//  (setTimeMode, remembered in the browser). Intl converts every moment
+//  with the time zone database, so summer/winter time is always right; a
+//  fixed offset (timezone_offset) is never used for display.
+// ══════════════════════════════════════════════════════════════════════
+const TIME_MODE_KEY = 'allsky360.timeMode';
+const STATION_TZ_KEY = 'allsky360.stationTimeZone';
+
+function __lsGet(key) { try { return localStorage.getItem(key); } catch (_) { return null; } }
+function __lsSet(key, value) { try { localStorage.setItem(key, value); } catch (_) {} }
+
+function isValidTimeZone(tz) {
+  if (!tz || typeof tz !== 'string') return false;
+  try { new Intl.DateTimeFormat('en-GB', { timeZone: tz }); return true; } catch (_) { return false; }
+}
+
+// Last known station zone: available at once on the next page load
+let __stationTimeZone = isValidTimeZone(__lsGet(STATION_TZ_KEY)) ? __lsGet(STATION_TZ_KEY) : null;
+
+function getStationTimeZone() {
+  return __stationTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+}
+
+function setStationTimeZone(tz) {
+  if (!isValidTimeZone(tz) || tz === __stationTimeZone) return;
+  __stationTimeZone = tz;
+  __lsSet(STATION_TZ_KEY, tz);
+  window.dispatchEvent(new CustomEvent('allsky-timezone-change'));
+}
+
+// 'local' (station time zone, default) or 'utc'
+function getTimeMode() { return __lsGet(TIME_MODE_KEY) === 'utc' ? 'utc' : 'local'; }
+
+function setTimeMode(mode) {
+  __lsSet(TIME_MODE_KEY, mode === 'utc' ? 'utc' : 'local');
+  window.dispatchEvent(new CustomEvent('allsky-timezone-change'));
+}
+
+function getDisplayTimeZone() { return getTimeMode() === 'utc' ? 'UTC' : getStationTimeZone(); }
+
+const __dtfCache = new Map();
+function __dtf(tz) {
+  let f = __dtfCache.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+      timeZoneName: 'short'
+    });
+    __dtfCache.set(tz, f);
   }
+  return f;
+}
+
+// Calendar fields of a moment in a time zone, plus the zone abbreviation
+// (CET, CEST, UTC, ...)
+function zonedParts(unixSec, tz = getDisplayTimeZone()) {
+  const out = {};
+  for (const p of __dtf(tz).formatToParts(new Date(unixSec * 1000)))
+    out[p.type] = p.value;
+  return {
+    year: +out.year, month: +out.month, day: +out.day,
+    hour: +out.hour % 24, minute: +out.minute, second: +out.second,
+    zone: out.timeZoneName || tz
+  };
+}
+
+const __pad2 = (n) => String(n).padStart(2, '0');
+
+// "2026-11-03 11:29:41 CET"
+function formatDateTime(unixSec, { tz = getDisplayTimeZone(), seconds = true, zone = true } = {}) {
+  const p = zonedParts(unixSec, tz);
+  let s = `${p.year}-${__pad2(p.month)}-${__pad2(p.day)} ${__pad2(p.hour)}:${__pad2(p.minute)}`;
+  if (seconds) s += `:${__pad2(p.second)}`;
+  return zone ? `${s} ${p.zone}` : s;
+}
+
+// "11:29" (optionally with seconds and zone)
+function formatClock(unixSec, { tz = getDisplayTimeZone(), seconds = false, zone = false } = {}) {
+  const p = zonedParts(unixSec, tz);
+  let s = `${__pad2(p.hour)}:${__pad2(p.minute)}`;
+  if (seconds) s += `:${__pad2(p.second)}`;
+  return zone ? `${s} ${p.zone}` : s;
+}
+
+// Zone abbreviation valid at a moment (CET in winter, CEST in summer)
+function timeZoneLabel(unixSec = Date.now() / 1000, tz = getDisplayTimeZone()) {
+  return zonedParts(unixSec, tz).zone;
+}
+
+// UTC offset of a time zone at a moment, in seconds
+function zoneOffsetSeconds(unixSec, tz = getDisplayTimeZone()) {
+  const t = Math.floor(unixSec);
+  const p = zonedParts(t, tz);
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) / 1000 - t;
+}
+
+// Unix time of 00:00 local time on a calendar day (DST-safe: the offset is
+// taken at the result, not at the guess)
+function localMidnight(year, month, day, tz = getDisplayTimeZone()) {
+  const asUtc = Date.UTC(year, month - 1, day) / 1000;
+  let t = asUtc - zoneOffsetSeconds(asUtc, tz);
+  t = asUtc - zoneOffsetSeconds(t, tz);
+  return t;
+}
+
+function startOfDayInZone(unixSec, tz = getDisplayTimeZone()) {
+  const p = zonedParts(unixSec, tz);
+  return localMidnight(p.year, p.month, p.day, tz);
+}
+
+// "YYYY-MM-DD" of a moment in a time zone
+function dayStringInZone(unixSec = Date.now() / 1000, tz = getDisplayTimeZone()) {
+  const p = zonedParts(unixSec, tz);
+  return `${p.year}-${__pad2(p.month)}-${__pad2(p.day)}`;
+}
+
+// [start, end) of a calendar day in a time zone, Unix seconds (23 or 25 h
+// on the days of the summer/winter time change)
+function dayRangeInZone(dayStr, tz = getDisplayTimeZone()) {
+  const [y, m, d] = dayStr.split('-').map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + 1));
+  return {
+    start: localMidnight(y, m, d, tz),
+    end: localMidnight(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate(), tz)
+  };
+}
+
+// UTC days ("YYYY-MM-DD") touched by [start, end): the daily databases and
+// image folders are UTC days, a local day can span two of them
+function utcDaysForRange(start, end) {
+  const days = [];
+  for (let t = Math.floor(start / 86400) * 86400; t < end; t += 86400)
+    days.push(new Date(t * 1000).toISOString().slice(0, 10));
+  return days;
+}
+
+// Rows of a day-based API endpoint (e.g. /api/meteo) for a calendar day in
+// the display time zone: fetches the UTC days it spans, keeps its range.
+async function fetchDayRows(endpoint, dayStr, tz = getDisplayTimeZone()) {
+  const { start, end } = dayRangeInZone(dayStr, tz);
+  const parts = await Promise.all(utcDaysForRange(start, end).map(async day => {
+    try {
+      const res = await fetch(`${endpoint}?date=${day}`);
+      if (!res.ok) return [];
+      const json = await res.json();
+      return Array.isArray(json) ? json : [];
+    } catch (err) {
+      console.error(`Failed to load ${endpoint} for ${day}:`, err);
+      return [];
+    }
+  }));
+  return parts.flat()
+    .filter(r => r.timestamp >= start && r.timestamp < end)
+    .sort((a, b) => a.timestamp - b.timestamp);
+}
+
+// Chart.js time axes: tick labels and tooltip titles in the display time
+// zone (the date adapter would use the browser's zone)
+function chartTimeTicks(extra = {}) {
+  return { ...extra, callback: (value) => formatClock(value / 1000) };
+}
+function chartTooltipTitle(items) {
+  return items.length ? formatDateTime(items[0].parsed.x / 1000, { seconds: false }) : '';
+}
+
+// Button that switches between station time and UTC; label "Local · CET"
+function initTimeModeToggle(el) {
+  if (!el) return;
+  const render = () => {
+    const utc = getTimeMode() === 'utc';
+    el.textContent = utc ? '🕐 UTC' : `🕐 Local · ${timeZoneLabel(Date.now() / 1000, getStationTimeZone())}`;
+    el.title = utc
+      ? 'Times are shown in UTC. Click for the local time of the station.'
+      : `Times are shown in the station time zone ${getStationTimeZone()}. Click for UTC.`;
+  };
+  el.addEventListener('click', () => setTimeMode(getTimeMode() === 'utc' ? 'local' : 'utc'));
+  window.addEventListener('allsky-timezone-change', render);
+  render();
+}
+
+// Kept for the pages: the offset argument is ignored, the zone comes from
+// the station configuration and the viewer's choice.
+function formatTimestamp(unixTime, _timezoneOffsetSeconds = null) {
+  return formatDateTime(unixTime);
 }
 
 // IAU 1976/2006 mean obliquity (arcsec poly), good enough for RA/Dec conversion
@@ -289,18 +461,14 @@ function getMoonRaDec(unixTime) {
 }
 
 // Calculate moon rise and set times
-function getMoonRiseAndSet(unixTime, latDeg, lonDeg, timezoneOffsetSeconds = 0) {
-  // Convert UTC unix time to local time
-  const localTime = unixTime + timezoneOffsetSeconds;
-  
-  // Get start of day in local time
-  const localDate = new Date(localTime * 1000);
-  const startOfDay = new Date(localDate.getFullYear(), localDate.getMonth(), localDate.getDate());
-  const startOfDayUnix = Math.floor(startOfDay.getTime() / 1000) - timezoneOffsetSeconds;
-  
+// Returns Unix times (UTC); the day searched is the calendar day of unixTime
+// in the display time zone. The offset argument is ignored (kept for callers).
+function getMoonRiseAndSet(unixTime, latDeg, lonDeg, _timezoneOffsetSeconds = 0) {
+  const startOfDayUnix = startOfDayInZone(unixTime);
+
   // Search for moon rise and set during this day
-  const moonRise = findMoonRiseOrSet(startOfDayUnix, latDeg, lonDeg, timezoneOffsetSeconds, true);
-  const moonSet = findMoonRiseOrSet(startOfDayUnix, latDeg, lonDeg, timezoneOffsetSeconds, false);
+  const moonRise = findMoonRiseOrSet(startOfDayUnix, latDeg, lonDeg, 0, true);
+  const moonSet = findMoonRiseOrSet(startOfDayUnix, latDeg, lonDeg, 0, false);
   
   return {
     moonRise: moonRise,
@@ -309,7 +477,8 @@ function getMoonRiseAndSet(unixTime, latDeg, lonDeg, timezoneOffsetSeconds = 0) 
 }
 
 function findMoonRiseOrSet(dayStartUnix, latDeg, lonDeg, timezoneOffsetSeconds, isRise) {
-  const searchWindow = 24 * 3600; // 24 hours in seconds
+  // Length of this local day: 23 or 25 hours on the days of the DST change
+  const searchWindow = startOfDayInZone(dayStartUnix + 30 * 3600) - dayStartUnix;
   const stepSize = 300; // 5 minutes in seconds
   let lastAltitude = null;
   
@@ -359,17 +528,13 @@ function findExactTime(startUnix, endUnix, latDeg, lonDeg, timezoneOffsetSeconds
     }
   }
   
-  const resultTime = (left + right) / 2 + timezoneOffsetSeconds;
-  return resultTime;
+  // Unix time (UTC); formatting adds the zone
+  return (left + right) / 2;
 }
 
-// Format time as HH:MM in local time
-function formatTimeString(unixTime, timezoneOffsetSeconds = 0) {
-  const localTime = unixTime + timezoneOffsetSeconds;
-  const date = new Date(localTime * 1000);
-  const hours = String(date.getUTCHours()).padStart(2, '0');
-  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-  return `${hours}:${minutes}`;
+// HH:MM in the display time zone (the offset argument is ignored)
+function formatTimeString(unixTime, _timezoneOffsetSeconds = 0) {
+  return formatClock(unixTime);
 }
 
 // Calculate time until moon rise or set
@@ -415,18 +580,14 @@ function formatTimeDuration(seconds) {
 }
 
 // Calculate sun rise and set times
-function getSunRiseAndSet(unixTime, latDeg, lonDeg, timezoneOffsetSeconds = 0) {
-  // Convert UTC unix time to local time
-  const localTime = unixTime + timezoneOffsetSeconds;
-  
-  // Get start of day in local time
-  const localDate = new Date(localTime * 1000);
-  const startOfDay = new Date(localDate.getFullYear(), localDate.getMonth(), localDate.getDate());
-  const startOfDayUnix = Math.floor(startOfDay.getTime() / 1000) - timezoneOffsetSeconds;
-  
+// Returns Unix times (UTC); the day searched is the calendar day of unixTime
+// in the display time zone. The offset argument is ignored (kept for callers).
+function getSunRiseAndSet(unixTime, latDeg, lonDeg, _timezoneOffsetSeconds = 0) {
+  const startOfDayUnix = startOfDayInZone(unixTime);
+
   // Search for sun rise and set during this day
-  const sunRise = findSunRiseOrSet(startOfDayUnix, latDeg, lonDeg, timezoneOffsetSeconds, true);
-  const sunSet = findSunRiseOrSet(startOfDayUnix, latDeg, lonDeg, timezoneOffsetSeconds, false);
+  const sunRise = findSunRiseOrSet(startOfDayUnix, latDeg, lonDeg, 0, true);
+  const sunSet = findSunRiseOrSet(startOfDayUnix, latDeg, lonDeg, 0, false);
   
   return {
     sunRise: sunRise,
@@ -435,7 +596,8 @@ function getSunRiseAndSet(unixTime, latDeg, lonDeg, timezoneOffsetSeconds = 0) {
 }
 
 function findSunRiseOrSet(dayStartUnix, latDeg, lonDeg, timezoneOffsetSeconds, isRise) {
-  const searchWindow = 24 * 3600; // 24 hours in seconds
+  // Length of this local day: 23 or 25 hours on the days of the DST change
+  const searchWindow = startOfDayInZone(dayStartUnix + 30 * 3600) - dayStartUnix;
   const stepSize = 300; // 5 minutes in seconds
   let lastAltitude = null;
   
@@ -485,8 +647,8 @@ function findExactSunTime(startUnix, endUnix, latDeg, lonDeg, timezoneOffsetSeco
     }
   }
   
-  const resultTime = (left + right) / 2 + timezoneOffsetSeconds;
-  return resultTime;
+  // Unix time (UTC); formatting adds the zone
+  return (left + right) / 2;
 }
 
 // Calculate time until sun rise or set
@@ -715,6 +877,7 @@ async function fetchConfig(force = false) {
       if (!resp.ok) throw new Error(`config fetch failed: ${resp.status}`);
       const data = await resp.json();
       __configCache = data;
+      setStationTimeZone(data.timezone || data.location_timezone);
       return data;
     })();
 
@@ -727,3 +890,7 @@ async function fetchConfig(force = false) {
   }
 }
 
+
+// Learn the station time zone on every page (cached by fetchConfig)
+if (typeof window !== 'undefined' && typeof fetch === 'function')
+  fetchConfig();

@@ -257,6 +257,7 @@
     </a>
 
 <div class="hdr-badges">
+      <button class="badge badge-gray" id="time-mode-btn" type="button"></button>
       <span class="badge badge-green">
         <span class="badge-dot live-pulse"></span>LIVE
       </span>
@@ -569,7 +570,8 @@
             x: {
               type: 'time',
               time: { unit: 'minute', tooltipFormat: 'HH:mm', displayFormats: { hour: 'HH:mm', minute: 'HH:mm' } },
-              ticks: { color: '#6b7280', maxTicksLimit: 5 },
+              // Labels in the display time zone (station or UTC), not the browser's
+              ticks: chartTimeTicks({ color: '#6b7280', maxTicksLimit: 5 }),
               grid: { color: 'rgba(255,255,255,0.06)' }
             },
             y: {
@@ -587,6 +589,7 @@
           plugins: {
             title: { display: true, text: label, color: '#9ca3af', font: { size: 11 }, padding: { bottom: 4 } },
             legend: { display: showLegend, labels: { color: '#9ca3af', boxWidth: 2, boxHeight: 2, font: { size: 10 } } },
+            tooltip: { callbacks: { title: chartTooltipTitle } },
             backgroundSun: {
               periods: [
                 { start: sunTimes.startOfDay,   end: sunTimes.dawnStart,    color: 'rgba(0,0,100,0.3)' },
@@ -646,41 +649,31 @@
       Object.values(charts).forEach(c => { if (c) { c.data.labels = []; c.data.datasets.forEach(ds => ds.data = []); c.update(); } });
     }
 
+    // "Today" is the calendar day in the display time zone (station or UTC);
+    // the daily databases are UTC days, fetchDayRows() joins the one or two
+    // that the day spans.
     async function loadMeasurements() {
       try {
-        const today = new Date().toISOString().slice(0, 10);
-        const res = await fetch(`/api/image?date=${today}`);
-        if (res.status === 404) { clearAllCharts(); return; }
-        if (!res.ok) throw new Error("Fetch error");
-        const json = await res.json();
-        if (Array.isArray(json)) updateCharts(json); else clearAllCharts();
+        const rows = await fetchDayRows('/api/image', dayStringInZone());
+        if (rows.length) updateCharts(rows); else clearAllCharts();
       } catch (err) { console.error("Failed to load measurement data:", err); clearAllCharts(); }
     }
 
     async function loadMeteoData() {
       try {
-        const today = new Date().toISOString().slice(0, 10);
-        const res = await fetch(`/api/meteo?date=${today}`);
-        if (!res.ok) return;
-        const json = await res.json();
-        if (Array.isArray(json)) updateMeteoCharts(json);
+        updateMeteoCharts(await fetchDayRows('/api/meteo', dayStringInZone()));
       } catch (err) { console.error("Failed to load meteo data:", err); }
     }
 
     async function loadAuroraData() {
       try {
-        const today = new Date().toISOString().slice(0, 10);
-        const res = await fetch(`/api/aurora?date=${today}`);
-        if (!res.ok) return;
-        const json = await res.json();
-        if (Array.isArray(json)) updateAuroraCharts(json);
+        updateAuroraCharts(await fetchDayRows('/api/aurora', dayStringInZone()));
       } catch (err) { console.error("Failed to load aurora data:", err); }
     }
 
     function updateSunTimes(date, lat, lon) {
       if (!lat || !lon) return;
-      const d = new Date(date);
-      sunTimes.startOfDay   = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      sunTimes.startOfDay   = new Date(startOfDayInZone(new Date(date).getTime() / 1000) * 1000);
       sunTimes.dawnStart    = new Date(sunTimes.startOfDay.getTime() + 6  * 3600000);
       sunTimes.dawnEnd      = new Date(sunTimes.startOfDay.getTime() + 8  * 3600000);
       sunTimes.duskStart    = new Date(sunTimes.startOfDay.getTime() + 18 * 3600000);
@@ -825,6 +818,19 @@
       loadMeasurements();
       loadMeteoData();
       loadAuroraData();
+      // Station time zone learnt or UTC/local switched: show everything anew
+      // loadLatestImage() returns at once while a load is running: retry
+      // until it is free, so the switch is never lost
+      const reloadImagePanel = () => {
+        if (loading) { setTimeout(reloadImagePanel, 300); return; }
+        loadLatestImage();
+      };
+      window.addEventListener('allsky-timezone-change', () => {
+        loadMeasurements();
+        loadMeteoData();
+        loadAuroraData();
+        reloadImagePanel();
+      });
       setInterval(loadMeasurements, 60000);
       setInterval(loadMeteoData,    60000);
       setInterval(loadAuroraData,   60000);
@@ -1493,7 +1499,8 @@
         // Build image data HTML
         let imageDataHtml = `<div class="metadata-section">
           <h2>Image Data</h2>
-          <div>Timestamp <span>${formatTimestamp(imageMeta.timestamp, imageMeta.timezone_offset)}</span></div>
+          <div>Timestamp <span>${formatDateTime(imageMeta.timestamp)}</span></div>
+          <div>${getTimeMode() === 'utc' ? 'Local' : 'UTC'} <span>${formatDateTime(imageMeta.timestamp, { tz: getTimeMode() === 'utc' ? getStationTimeZone() : 'UTC' })}</span></div>
           <div>Exposure t0 (s) <span>${imageMeta.exposure_t0.toFixed(5)}</span></div>`;
         if (imageMeta.hdr > 1) imageDataHtml += `<div>Exposure t1 (s) <span>${imageMeta.exposure_t1.toFixed(5)}</span></div>`;
         if (imageMeta.hdr > 2) imageDataHtml += `<div>Exposure t2 (s) <span>${imageMeta.exposure_t2.toFixed(5)}</span></div>`;
@@ -1550,7 +1557,7 @@
           const sunTimeUntil  = getTimeUntilSunRiseSet(sunTimesObj.sunRise, sunTimesObj.sunSet, imageTimestamp, timezoneOffset);
 
           const sunandmoonHtml = `<div class="metadata-section">
-            <h2>Sun &amp; Moon</h2>
+            <h2>Sun &amp; Moon <span style="font-weight:400;color:#6b7280">· times ${timeZoneLabel(imageTimestamp)}</span></h2>
             <div>Sun altitude (°) <span>${imageMeta.sun_altitude != null ? imageMeta.sun_altitude.toFixed(1) : "N/A"}</span></div>
             <div>Sun rise <span>${sunRiseStr}</span></div>
             <div>Sun set  <span>${sunSetStr}</span></div>
@@ -2087,6 +2094,7 @@
     // ══════════════════════════════════════════════════════════════
     //  INIT
     // ══════════════════════════════════════════════════════════════
+    initTimeModeToggle(document.getElementById('time-mode-btn'));
     loadConfig();
     loadLatestImage();
     loadMountData();

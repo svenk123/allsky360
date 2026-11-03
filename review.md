@@ -49,7 +49,8 @@
 | INST-02 | Installation vereinfacht: `install.sh` (Preflight, Build als Benutzer, Assistent, Selbsttest), CUDA-Arch/Version automatisch, einheitliche INDIGO-Gerätenamen | Medium | **erledigt** |
 | FEAT-01 | RS485/Modbus-Sensoren (Wetter, Wind, Schaltschrank) → `allsky360-sensors`, Tabelle `sensors`, `/api/sensors` | – | **erledigt** |
 | REL-15 | `make uninstall` löschte mit `rm -rf $(CONFIG_DIR)/*` das ganze Home von allskyuser (Bilder, Videos, DBs); `UNIT_DIR` undefiniert, `{service,timer}` ohne Brace-Expansion in sh | High | **erledigt** |
-| DATA-02 | Tagesdatenbank: Kamera/Sensoren benennen nach UTC-Tag, Meteo/Aurora nach lokalem Tag (fällt nur bei Zeitzone ≠ UTC auf) | Low | offen |
+| DATA-02 | Tagesdatenbank: Kamera/Sensoren benennen nach UTC-Tag, Meteo/Aurora nach lokalem Tag (fällt nur bei Zeitzone ≠ UTC auf) → alle nach UTC-Tag, `endofnight.sh` mit `date -u` | Low | **erledigt** |
+| TIME-01 | Zeitzonen: Speicherung durchgängig UTC; Anzeige in Stationszeit (`location_timezone`, IANA, Sommer-/Winterzeit je Zeitpunkt) oder UTC umschaltbar; Bildbeschriftung in Ortszeit mit Zonenkürzel; Sonnen-/Mondzeiten im Dashboard rechneten den Offset doppelt (fiel bei Systemzeit UTC nicht auf); `gmtime()`-Puffer der Bildbeschriftung wurde von `spektrum_analyze()` überschrieben | Medium | **erledigt** |
 | HW-01 | Windmesser (Adresse 11) liefert in Register 0-3 stets 0, Ultraschall-Wettersensor gleichzeitig 3-5 m/s: blockiert, windgeschützt oder andere Register/Skalierung | – | offen (vor Ort prüfen) |
 | DATA-01 | NOAA hat `solar-wind/mag-2-hour.json` und `plasma-2-hour.json` abgeschaltet (404), Kp-Index wird nicht mehr gelesen (-1) | Medium | offen |
 | BUG-15 | `indigo_cameras -l` listet die Kamera nicht (zeitweise), `indigo_list_cameras` schon | Low | offen |

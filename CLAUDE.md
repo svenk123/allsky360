@@ -133,6 +133,10 @@ Each tool has its own Makefile and produces a binary in its `bin/` subdirectory:
 
 Node.js REST API (`allsky-api/index.js`, plain `http` module, Node.js >= 24) serving images, database data, and the panorama viewer. The astronomia library is bundled for browser use via esbuild (`npm run build`, entry `astro_bundle.js`) into `public/js/astronomia.bundle.min.js`; esbuild and astronomia are devDependencies and are pruned after `make install`. npm 11 only runs install scripts listed in `allowScripts` in `package.json` (sqlite3, esbuild) - bump those entries when upgrading these packages. Runs as systemd service `allsky360-api.service` on port 3000 (configurable via `api-port` in `config.ini`).
 
+### Time handling
+
+Everything stored is UTC: Unix timestamps in the databases, `images/YYYYMMDD`, `database_YYYYMMDD.db` and file names use the UTC day (`gmtime_r`, never `localtime`), in the camera, all tools and `scripts/endofnight.sh` (`date -u`). Summer/winter time and the system time zone therefore never affect stored data. The station time zone `location_timezone` (IANA name, `src/timezone.c`) is only for display: the time printed into the image (local time with zone abbreviation) and `timezone` in `config.json`/image JSON. The web pages format all times with `formatDateTime()`/`formatClock()` from `public/js/allsky-common.js` (Intl, per-moment DST) in the station zone or UTC (header toggle, `setTimeMode`), and load a local calendar day with `fetchDayRows()`, which joins the UTC days it spans. `test/test_timezone.c` checks the DST changes.
+
 ### Configuration
 
 The main config file (`config.ini`) uses simple `key=value` INI format. `config.ini.default` is the reference template. Example hardware-specific configs are `config.ini.saturn-c` and `config.ini.uranus-c`. Key sections:

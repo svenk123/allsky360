@@ -73,6 +73,7 @@
 #include "rotate_image.h"
 #include "scnr_filter.h"
 #include "star_detector.h"
+#include "timezone.h"
 #include "sun_calc.h"
 #include "thumbnail.h"
 #include "spektrum.h"
@@ -673,32 +674,6 @@ int run_postprocessing(const char *script, const char *today_str,
   return spawn_hook(script, image_path);
 }
 
-/**
- *  Get timezone offset seconds
- * @param utc_timestamp: UTC timestamp
- * Positive values mean east of UTC (e.g. +3600 for CET, +7200 for CEST).
- * Negative values mean west of UTC (e.g. -18000 for US Eastern Standard Time).
- * Works on glibc / Linux.
- * @return: timezone offset in seconds
- */
-long get_timezone_offset_seconds(time_t utc_timestamp) {
-  struct tm local_tm;
-
-  if (localtime_r(&utc_timestamp, &local_tm) == NULL)
-    return 0; // fallback: assume UTC if conversion fails
-
-#if defined(__GLIBC__)
-  return (long)local_tm.tm_gmtoff;
-#else
-  // Portable fallback if tm_gmtoff not available
-  struct tm gm_tm;
-  gmtime_r(&utc_timestamp, &gm_tm);
-  time_t local_epoch = mktime(&local_tm);
-  time_t gm_epoch = mktime(&gm_tm);
-  return (long)difftime(local_epoch, gm_epoch);
-#endif
-}
-
 /***** Main function **********/
 
 int main(int argc, const char *argv[]) {
@@ -848,6 +823,8 @@ int main(int argc, const char *argv[]) {
             config_path);
     return EXIT_FAILURE;
   }
+  /* Display time zone (image text, web pages); storage stays UTC */
+  tz_apply(config.location_timezone);
   printf("-----------------------\n\n");
 
   setup_signal_handlers();
@@ -1003,6 +980,7 @@ int main(int argc, const char *argv[]) {
         cleanup_resources();
         return EXIT_FAILURE;
       }
+      tz_apply(config.location_timezone); /* no-op if unchanged */
 
       if (allsky_debug >= 2) {
         show_config(&config);
@@ -1092,21 +1070,27 @@ int main(int argc, const char *argv[]) {
              capture_no, failed_no);
       capture_no++;
 
-      /* Capture timestamp (UTC) */
+      /* Capture timestamp. Everything stored is UTC (directories, file
+       * names, databases); the offset of the station time zone at this
+       * moment (summer/winter time) is only recorded for display. */
       time_t now = time(NULL);
-      int timezone_offset = get_timezone_offset_seconds(now);
+      int timezone_offset = (int)tz_offset_seconds(now);
+
+      /* Own copy: gmtime() returns a static buffer that later calls in the
+       * cycle (spektrum, sun/moon calculation) would overwrite */
+      struct tm tm_utc;
+      gmtime_r(&now, &tm_utc);
 
       /* Today string YYYYMMDD (UTC) */
-      struct tm *tm_info = gmtime(&now);
       char today_str[9];
       allsky_safe_snprintf(today_str, sizeof(today_str), "%04d%02d%02d",
-                           tm_info->tm_year + 1900, tm_info->tm_mon + 1,
-                           tm_info->tm_mday);
+                           tm_utc.tm_year + 1900, tm_utc.tm_mon + 1,
+                           tm_utc.tm_mday);
 
       /* Now string hhmmss (UTC) */
       char now_str[7];
-      snprintf(now_str, sizeof(now_str), "%02d%02d%02d", tm_info->tm_hour,
-               tm_info->tm_min, tm_info->tm_sec);
+      snprintf(now_str, sizeof(now_str), "%02d%02d%02d", tm_utc.tm_hour,
+               tm_utc.tm_min, tm_utc.tm_sec);
 
       int dump_this_raw_series = dump_next_raw_series ? 1 : 0;
       if (dump_this_raw_series) {
@@ -2157,11 +2141,10 @@ int main(int argc, const char *argv[]) {
         printf("Exposure: %.6f, Gain: %.1f\n", exposure_sec, gain);
       }
 
-      // Format timestamp into datetime string
-      char datetime[50];
-      snprintf(datetime, sizeof(datetime), "%04d.%02d.%02d  %02d:%02d:%02d",
-               tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday,
-               tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec);
+      /* Capture time printed into the image: local time of the station with
+       * the zone abbreviation (CET/CEST/UTC), so it is never ambiguous */
+      char datetime[64];
+      tz_format_local(now, "%Y.%m.%d  %H:%M:%S %Z", datetime, sizeof(datetime));
 
       /* Draw text on image */
       draw_text_red_freetype_rgbf1(hdr_image_device, width, height, datetime,
@@ -2353,6 +2336,8 @@ int main(int argc, const char *argv[]) {
                              json_object_new_int(now));
       json_object_object_add(jroot, "timezone_offset",
                              json_object_new_int(timezone_offset));
+      json_object_object_add(jroot, "timezone",
+                             json_object_new_string(tz_name()));
       if (config.panorama)
         json_object_object_add(jroot, "panorama",
                                json_object_new_string(now_str));

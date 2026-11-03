@@ -30,8 +30,9 @@ double moon_altitude(time_t timestamp, double longitude, double latitude) {
     struct ln_lnlat_posn observer;
 
     // Convert time_t to julian date
-    struct tm *utc_time = gmtime(&timestamp);
-    ln_get_date_from_tm(utc_time, &date);
+    struct tm utc_time;
+    gmtime_r(&timestamp, &utc_time);
+    ln_get_date_from_tm(&utc_time, &date);
     double jd = ln_get_julian_day(&date);
 
     // Calculate moon position
@@ -49,8 +50,9 @@ double moon_altitude(time_t timestamp, double longitude, double latitude) {
 const char* moon_phase(time_t timestamp) {
     struct ln_date date;
 
-    struct tm *utc_time = gmtime(&timestamp);
-    ln_get_date_from_tm(utc_time, &date);
+    struct tm utc_time;
+    gmtime_r(&timestamp, &utc_time);
+    ln_get_date_from_tm(&utc_time, &date);
     double jd = ln_get_julian_day(&date);
 
     // Calculate moon phase
@@ -76,8 +78,9 @@ const char* moon_phase(time_t timestamp) {
 
 double moon_phase_percentage(time_t timestamp) {
     struct ln_date date;
-    struct tm *utc_time = gmtime(&timestamp);
-    ln_get_date_from_tm(utc_time, &date);
+    struct tm utc_time;
+    gmtime_r(&timestamp, &utc_time);
+    ln_get_date_from_tm(&utc_time, &date);
     double jd = ln_get_julian_day(&date);
 
     double illumination = ln_get_lunar_disk(jd);

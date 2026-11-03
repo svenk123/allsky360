@@ -16,6 +16,7 @@
  *
  *****************************************************************************/
 #include "image_overlay.h"
+#include "timezone.h"
 #include "allsky.h"
 #include "jpeg_to_cairo.h"
 #include <cairo/cairo.h>
@@ -110,10 +111,9 @@ int overlay_datetime_on_image(cairo_surface_t **surface, time_t timestamp) {
 
   // Format timestamp into datetime string
   char datetime[50];
-  struct tm *tm_info = localtime(&timestamp);
-  snprintf(datetime, sizeof(datetime), "%04d-%02d-%02d %02d:%02d:%02d",
-           tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday,
-           tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec);
+  /* Station local time with zone abbreviation (see timezone.h) */
+  tz_format_local(timestamp, "%Y-%m-%d %H:%M:%S %Z", datetime,
+                  sizeof(datetime));
   draw_text(cr, datetime, 10, 30);
 
   cairo_destroy(cr);

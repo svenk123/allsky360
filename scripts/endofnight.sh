@@ -72,10 +72,13 @@ if [ ! -x "$BINDIR/allsky360-timelapse" ]; then
   exit 1
 fi
 
-# Get the current date and time
-DATE=$(date +%Y%m%d)
-TIME=$(date +%H%M%S)
-YESTERDAY=$(date -d "yesterday" +%Y%m%d 2>/dev/null || date -v-1d +%Y%m%d 2>/dev/null || echo "")
+# Current date and time in UTC: images/YYYYMMDD and database_YYYYMMDD.db are
+# named after the UTC day (independent of the system time zone and of
+# summer/winter time). The night is found via the timestamps in today's and
+# yesterday's database, so it may span midnight.
+DATE=$(date -u +%Y%m%d)
+TIME=$(date -u +%H%M%S)
+YESTERDAY=$(date -u -d "yesterday" +%Y%m%d 2>/dev/null || date -u -v-1d +%Y%m%d 2>/dev/null || echo "")
 
 # Get the latest image
 LATEST_IMAGE=$(ls -t ${IMAGEDIR}/*.jpg 2>/dev/null | head -n 1)
@@ -197,7 +200,7 @@ get_night_images() {
 
 generate_timelapse() {
   local MODES="max motion"
-  local DATESTAMP=$(date +%Y%m%d)
+  local DATESTAMP=$(date -u +%Y%m%d)
   
   # Get night images from database
   FILES=$(get_night_images)

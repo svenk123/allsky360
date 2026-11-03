@@ -22,6 +22,7 @@
 #include <math.h>
 #include "atomic_file.h"
 #include "image_metadata.h"
+#include "timezone.h"
 
 static double round_to_precision(double value, int precision) {
     char buffer[64];
@@ -43,6 +44,8 @@ int save_image_metadata_json(const char *image_filename, const image_metadata_t 
     // Fill json data
     json_object_object_add(root, "timestamp", json_object_new_int(metadata->timestamp));
     json_object_object_add(root, "timezone_offset", json_object_new_int(metadata->timezone_offset));
+    /* Display time zone (IANA); the timestamp itself is UTC */
+    json_object_object_add(root, "timezone", json_object_new_string(tz_name()));
     json_object_object_add(root, "width", json_object_new_int(metadata->width));
     json_object_object_add(root, "height", json_object_new_int(metadata->height));
     json_object_object_add(root, "exposure_t0", json_object_new_double(round_to_precision(metadata->exposure_t0, 6)));

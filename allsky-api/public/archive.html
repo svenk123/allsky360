@@ -154,6 +154,7 @@
     </a>
 
     <div class="hdr-badges">
+      <button class="badge badge-gray" id="time-mode-btn" type="button"></button>
       <span class="badge badge-gray"  id="hdr-date">–</span>
       <span class="badge badge-blue"  id="hdr-count">0 images</span>
     </div>
@@ -360,19 +361,19 @@
     // ══════════════════════════════════════════════════════════════
     //  HELPERS
     // ══════════════════════════════════════════════════════════════
+    // ts = "yyyymmddHHMMSS", the UTC capture time of the file name
+    function tsToUnix(ts) {
+      return Date.UTC(+ts.slice(0, 4), +ts.slice(4, 6) - 1, +ts.slice(6, 8),
+                      +ts.slice(8, 10), +ts.slice(10, 12), +(ts.slice(12, 14) || 0)) / 1000;
+    }
+
+    // Shown in the display time zone (station time or UTC)
     function formatThumbTime(ts) {
-      // ts = "yyyymmddHHMMSS" (14 chars)
-      const h = ts.slice(8, 10)  || '??';
-      const m = ts.slice(10, 12) || '??';
-      const s = ts.slice(12, 14);
-      return s ? `${h}:${m}:${s}` : `${h}:${m}`;
+      return formatClock(tsToUnix(ts), { seconds: ts.length >= 14 });
     }
 
     function formatThumbDate(ts) {
-      const y = ts.slice(0, 4);
-      const mo = ts.slice(4, 6);
-      const d  = ts.slice(6, 8);
-      return `${y}-${mo}-${d} ${formatThumbTime(ts)}`;
+      return formatDateTime(tsToUnix(ts));
     }
 
     function safeFixed(v, digits) {
@@ -427,19 +428,19 @@
     function thumbPath(ts) {
       return currentType === 'video'
         ? `videos/${currentDateStr}/thumbnails/video-${ts}.jpg`
-        : `images/${currentDateStr}/thumbnails/image-${ts}.jpg`;
+        : `images/${ts.slice(0, 8)}/thumbnails/image-${ts}.jpg`;
     }
 
     function fullPath(ts) {
       return currentType === 'video'
         ? `videos/${currentDateStr}/video-${ts}.mp4`
-        : `images/${currentDateStr}/image-${ts}.jpg`;
+        : `images/${ts.slice(0, 8)}/image-${ts}.jpg`;
     }
 
     function metaPath(ts) {
       return currentType === 'video'
         ? `videos/${currentDateStr}/video-${ts}.json`
-        : `images/${currentDateStr}/image-${ts}.json`;
+        : `images/${ts.slice(0, 8)}/image-${ts}.json`;
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -467,13 +468,26 @@
       currentLbIdx  = -1;
       activeThumb   = null;
 
-      const jsonUrl = `/api/thumbnails?date=${dateInput}&type=${currentType}`;
+      // Images: the selected day is a calendar day in the display time zone;
+      // the image folders are UTC days, so join the one or two it spans and
+      // keep the images of the day. Videos keep their (UTC) date.
+      const listPromise = currentType === 'video'
+        ? fetch(`/api/thumbnails?date=${dateInput}&type=video`).then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+          })
+        : (async () => {
+            const { start, end } = dayRangeInZone(dateInput);
+            const parts = await Promise.all(utcDaysForRange(start, end).map(day =>
+              fetch(`/api/thumbnails?date=${day}&type=image`)
+                .then(r => (r.ok ? r.json() : []))
+                .catch(() => [])));
+            return parts.flat()
+              .filter(ts => { const t = tsToUnix(ts); return t >= start && t < end; })
+              .sort();
+          })();
 
-      fetch(jsonUrl)
-        .then(r => {
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.json();
-        })
+      listPromise
         .then(list => {
           gallery.innerHTML = '';
 
@@ -491,12 +505,15 @@
           let currentHour = null;
 
           list.forEach((ts, idx) => {
-            const hour = ts.slice(8, 10);
+            // Hour in the display time zone; the zone label also tells the
+            // two 02:00 hours apart on the night of the autumn DST change
+            const zp = zonedParts(tsToUnix(ts));
+            const hour = `${String(zp.hour).padStart(2, '0')}:00 ${zp.zone}`;
             if (hour !== currentHour) {
               currentHour = hour;
               const sep = document.createElement('div');
               sep.className = 'hour-sep';
-              sep.textContent = `${hour}:00`;
+              sep.textContent = hour;
               gallery.appendChild(sep);
             }
 
@@ -656,8 +673,16 @@
       orderSelect.addEventListener('change', loadThumbnails);
       imageType.addEventListener('change',   loadThumbnails);
 
-      // Default: today
-      datePicker.value = new Date().toISOString().slice(0, 10);
+      // Default: today in the display time zone
+      datePicker.value = dayStringInZone();
+      initTimeModeToggle(document.getElementById('time-mode-btn'));
+      let shownToday = datePicker.value;
+      window.addEventListener('allsky-timezone-change', () => {
+        const t = dayStringInZone();
+        if (datePicker.value === shownToday) datePicker.value = t;
+        shownToday = t;
+        loadThumbnails();
+      });
 
       loadConfig();
       loadThumbnails();

@@ -601,7 +601,8 @@
       datePicker.addEventListener('change',  loadThumbnails);
       orderSelect.addEventListener('change', loadThumbnails);
 
-      datePicker.value = new Date().toISOString().slice(0, 10);
+      // Night videos are named after the UTC day of the end-of-night run
+      datePicker.value = dayStringInZone(Date.now() / 1000, 'UTC');
 
       loadThumbnails();
     });

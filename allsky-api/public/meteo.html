@@ -100,6 +100,7 @@
     </a>
 
     <div class="hdr-badges">
+      <button class="badge badge-gray" id="time-mode-btn" type="button"></button>
       <span class="badge badge-gray" id="hdr-date">–</span>
       <button class="badge badge-gray" id="toggle-grid-btn" onclick="toggleGridInteraction()">🔒 Locked</button>
       <button class="badge badge-gray" id="reset-layout-btn" onclick="resetGridLayout()">↺ Reset</button>
@@ -317,17 +318,11 @@
 
     const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
-    // YYYY-MM-DD in local time (toISOString() would give the UTC date)
-    function localDateStr(d) {
-      const p = (n) => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-    }
-
-    function localDayRange(dateStr) {
-      const [y, m, d] = dateStr.split('-').map(Number);
-      const start = new Date(y, m - 1, d).getTime();
-      const end = new Date(y, m - 1, d + 1).getTime();
-      return { start, end };
+    // The selected date is a calendar day in the display time zone (station
+    // time or UTC, see allsky-common.js); range in milliseconds for the axes
+    function dayRangeMs(dateStr) {
+      const r = dayRangeInZone(dateStr);
+      return { start: r.start * 1000, end: r.end * 1000 };
     }
 
     function cardinal(deg) {
@@ -370,7 +365,7 @@
             tooltipFormat: 'HH:mm',
             displayFormats: { hour: 'HH:mm', minute: 'HH:mm' }
           },
-          ticks: { ...AXIS_TICKS, maxTicksLimit: 8 },
+          ticks: chartTimeTicks({ ...AXIS_TICKS, maxTicksLimit: 8 }),
           grid: AXIS_GRID
         },
         y: {
@@ -399,6 +394,7 @@
           interaction: { mode: 'nearest', axis: 'x', intersect: false },
           scales,
           plugins: {
+            tooltip: { callbacks: { title: chartTooltipTitle } },
             title: {
               display: true,
               text: label,
@@ -478,45 +474,18 @@
     // ══════════════════════════════════════════════════════════════
     //  LOAD MEASUREMENTS
     // ══════════════════════════════════════════════════════════════
-    async function fetchRows(url) {
-      const res = await fetch(url);
-      if (res.status === 404) return [];
-      if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
-      const json = await res.json();
-      return Array.isArray(json) ? json : [];
-    }
-
-    // The sensor tool writes one database per UTC day; a local day can span
-    // two of them, so fetch both and cut out the local day.
-    async function fetchSensorRows(range) {
-      const days = new Set([
-        new Date(range.start).toISOString().slice(0, 10),
-        new Date(range.end - 1).toISOString().slice(0, 10)
-      ]);
-      const parts = await Promise.all([...days].map(day =>
-        fetchRows(`/api/sensors?date=${day}`).catch(err => {
-          console.error("Failed to load sensor data:", err);
-          return [];
-        })));
-      return parts.flat()
-        .filter(d => d.timestamp * 1000 >= range.start && d.timestamp * 1000 < range.end)
-        .sort((a, b) => a.timestamp - b.timestamp);
-    }
-
     async function loadMeasurements() {
       const date = document.getElementById("datePicker").value;
       document.getElementById("hdr-date").textContent = date || '–';
       if (!date) return;
-      const range = localDayRange(date);
 
+      // Meteo, aurora and sensors write one database per UTC day; the day
+      // shown can span two of them, fetchDayRows() joins and cuts them.
       const [meteo, sensors] = await Promise.all([
-        fetchRows(`/api/meteo?date=${date}`).catch(err => {
-          console.error("Failed to load meteo data:", err);
-          return [];
-        }),
-        fetchSensorRows(range)
+        fetchDayRows('/api/meteo', date),
+        fetchDayRows('/api/sensors', date)
       ]);
-      updateCharts(meteo, sensors, range);
+      updateCharts(meteo, sensors, dayRangeMs(date));
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -598,7 +567,7 @@
         const ts = isNum(r.timestamp) ? new Date(r.timestamp * 1000) : null;
         const ageS = ts ? Math.max(0, (Date.now() - ts.getTime()) / 1000) : Infinity;
         const ageText = ts
-          ? `${ts.toLocaleString([], { dateStyle: 'short', timeStyle: 'medium' })} · ${ageS < 90 ? 'just now' : Math.round(ageS / 60) + ' min ago'}`
+          ? `${formatDateTime(r.timestamp)} · ${ageS < 90 ? 'just now' : Math.round(ageS / 60) + ' min ago'}`
           : '';
         if (ageS > SENSOR_STALE_S)
           setSensorStatus('badge-orange', 'stale', ageText + ' · check allsky360-sensors.timer');
@@ -616,10 +585,20 @@
     // ══════════════════════════════════════════════════════════════
     function init() {
       const datePicker = document.getElementById("datePicker");
-      const today = localDateStr(new Date());
+      const today = dayStringInZone();
       datePicker.value = today;
       document.getElementById("hdr-date").textContent = today;
       datePicker.addEventListener("change", loadMeasurements);
+      initTimeModeToggle(document.getElementById('time-mode-btn'));
+      // Station zone learnt or UTC/local switched: "today" and all labels change
+      let shownToday = today;
+      window.addEventListener('allsky-timezone-change', () => {
+        const t = dayStringInZone();
+        if (datePicker.value === shownToday) datePicker.value = t;
+        shownToday = t;
+        loadMeasurements();
+        loadLatestSensors();
+      });
 
       const dashed = { borderDash: [5, 4], borderWidth: 1.25 };
 

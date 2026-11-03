@@ -17,6 +17,12 @@ location_longitude=7.4479E
 location_altitude=114
 location_city="Musterstadt/Germany"
 location_owner="Max Mustermann"
+# Time zone of the station for display: the time printed into the image and
+# the local time on the web pages (IANA name, list: timedatectl
+# list-timezones). Empty = system time zone. Summer/winter time follows
+# automatically. Everything stored (databases, images/YYYYMMDD, file names)
+# is UTC, independent of this setting and of the system time zone.
+location_timezone=Europe/Berlin
 # config.json is served unauthenticated via /api/config and is readable by
 # anyone who can reach the web interface. location_owner and the INDIGO server
 # address are never included. The coordinates are, because the dashboard needs

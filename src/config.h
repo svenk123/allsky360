@@ -194,6 +194,9 @@ typedef struct {
     int location_altitude;
     char location_city[100];
     char location_owner[100];
+    /* IANA time zone of the station for display (e.g. Europe/Berlin);
+     * empty = system time zone. Storage is always UTC. */
+    char location_timezone[100];
     /* 1 = publish exact coordinates in config.json, 0 = round to 2 decimals */
     int publish_exact_location;
 
