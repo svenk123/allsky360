@@ -1362,12 +1362,13 @@
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const scaleX = imgEl2.clientWidth  / (imgEl2.naturalWidth  || 1);
-      const scaleY = imgEl2.clientHeight / (imgEl2.naturalHeight || 1);
-
-      const centerX = crosshairCenterX * scaleX * zoomFactor + panX;
-      const centerY = crosshairCenterY * scaleY * zoomFactor + panY;
-      const radius  = crosshairRadius  * scaleX * zoomFactor;
+      /* image px -> canvas px (object-fit: contain, zoom around the
+       * centre, see imageToCanvas() in allsky-common.js) */
+      const pxScale = imageFitScale(imgEl2) * zoomFactor;
+      const zc = imageToCanvas(imgEl2, crosshairCenterX, crosshairCenterY);
+      const centerX = zc.x;
+      const centerY = zc.y;
+      const radius  = crosshairRadius * pxScale;
 
       if (showAzimutalGrid) {
 	// Cardinal directions
@@ -1412,9 +1413,9 @@
       if (showEquatorialGrid) {
         ctx.save();
         if (imageMaskRadius > 0 && imageCenterX > 0 && imageCenterY > 0) {
-          const mcx = imageCenterX * scaleX * zoomFactor + panX;
-          const mcy = imageCenterY * scaleY * zoomFactor + panY;
-          const mr  = imageMaskRadius * scaleX * zoomFactor;
+          const mc  = imageToCanvas(imgEl2, imageCenterX, imageCenterY);
+          const mcx = mc.x, mcy = mc.y;
+          const mr  = imageMaskRadius * pxScale;
           ctx.beginPath();
           ctx.arc(mcx, mcy, mr, 0, 2 * Math.PI);
           ctx.clip();
@@ -1450,9 +1451,9 @@
       if (showBrightestStars) {
         ctx.save();
         if (imageMaskRadius > 0 && imageCenterX > 0 && imageCenterY > 0) {
-          const mcx = imageCenterX * scaleX * zoomFactor + panX;
-          const mcy = imageCenterY * scaleY * zoomFactor + panY;
-          const mr  = imageMaskRadius * scaleX * zoomFactor;
+          const mc  = imageToCanvas(imgEl2, imageCenterX, imageCenterY);
+          const mcx = mc.x, mcy = mc.y;
+          const mr  = imageMaskRadius * pxScale;
           ctx.beginPath();
           ctx.arc(mcx, mcy, mr, 0, 2 * Math.PI);
           ctx.clip();
@@ -1475,7 +1476,7 @@
         ctx.save();
         ctx.strokeStyle = "rgba(255,80,80,0.3)";
         ctx.lineWidth = 1;
-        const baseRadius = crosshairRadius * scaleX;
+        const baseRadius = radius;
         ctx.font = "10px sans-serif"; ctx.fillStyle = "rgba(255,80,80,0.6)";
         ctx.textAlign = "left"; ctx.textBaseline = "middle";
         [15, 30, 45, 60, 75].forEach(el2 => {
@@ -1542,33 +1543,28 @@
       }
 
       if (showDetectedStars) {
-        const sx = imgEl2.clientWidth  / (imgEl2.naturalWidth  || 1);
-        const sy = imgEl2.clientHeight / (imgEl2.naturalHeight || 1);
         if (starPositions.length > 0) {
           ctx.fillStyle = "cyan";
           for (const star of starPositions) {
-            const px = star.x * sx * zoomFactor + panX;
-            const py = star.y * sy * zoomFactor + panY;
-            ctx.beginPath(); ctx.arc(px, py, 2, 0, 2 * Math.PI); ctx.fill();
+            const p = imageToCanvas(imgEl2, star.x, star.y);
+            ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, 2 * Math.PI); ctx.fill();
           }
         }
         if (sqmRadius > 0 && sqmCenterX > 0 && sqmCenterY > 0) {
           ctx.save();
           ctx.strokeStyle = "rgba(0,255,255,0.7)";
           ctx.lineWidth = 1.5;
-          const cx = sqmCenterX * sx * zoomFactor + panX;
-          const cy = sqmCenterY * sy * zoomFactor + panY;
-          const r  = sqmRadius  * sx * zoomFactor;
-          ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke();
+          const c = imageToCanvas(imgEl2, sqmCenterX, sqmCenterY);
+          const r = sqmRadius * pxScale;
+          ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, 2 * Math.PI); ctx.stroke();
           ctx.restore();
         }
       }
 
       if (mouseX !== null && mouseY !== null) {
-        const sx2 = imgEl2.clientWidth  / (imgEl2.naturalWidth  || 1);
-        const sy2 = imgEl2.clientHeight / (imgEl2.naturalHeight || 1);
-        const imageX = (mouseX - panX) / (sx2 * zoomFactor);
-        const imageY = (mouseY - panY) / (sy2 * zoomFactor);
+        const mi = canvasToImage(imgEl2, mouseX, mouseY);
+        const imageX = mi.x;
+        const imageY = mi.y;
         const coordRow   = document.getElementById('coord-row');
         const coordXY    = document.getElementById('coord-xy');
         const coordAzEl  = document.getElementById('coord-azel');

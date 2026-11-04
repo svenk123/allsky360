@@ -456,13 +456,41 @@ function raDecToAzAlt(raDeg, decDeg, latDeg, lonDeg, unixTime) {
   };
 }
 
+/* Image pixel <-> overlay canvas position for an <img> with
+ * object-fit: contain, shown with translate(panX, panY) scale(zoomFactor)
+ * around its centre (transform-origin: center), and a canvas covering the
+ * untransformed <img> box. Uses the page globals panX, panY, zoomFactor. */
+function imageFitScale(img) {
+  const nw = img.naturalWidth || 1, nh = img.naturalHeight || 1;
+  return Math.min(img.clientWidth / nw, img.clientHeight / nh);
+}
+
+function imageToCanvas(img, x, y) {
+  const cw = img.clientWidth, ch = img.clientHeight;
+  const fit = imageFitScale(img);
+  const offX = (cw - (img.naturalWidth || 1) * fit) / 2;
+  const offY = (ch - (img.naturalHeight || 1) * fit) / 2;
+  return {
+    x: cw / 2 + panX + zoomFactor * (offX + x * fit - cw / 2),
+    y: ch / 2 + panY + zoomFactor * (offY + y * fit - ch / 2),
+  };
+}
+
+function canvasToImage(img, cx, cy) {
+  const cw = img.clientWidth, ch = img.clientHeight;
+  const fit = imageFitScale(img) || 1;
+  const offX = (cw - (img.naturalWidth || 1) * fit) / 2;
+  const offY = (ch - (img.naturalHeight || 1) * fit) / 2;
+  return {
+    x: ((cx - cw / 2 - panX) / zoomFactor + cw / 2 - offX) / fit,
+    y: ((cy - ch / 2 - panY) / zoomFactor + ch / 2 - offY) / fit,
+  };
+}
+
 function azAltToImageXY(azimuthDeg, altitudeDeg) {
   azimuthDeg = (360 - azimuthDeg) % 360;
 
-  const scaleX = imageEl.clientWidth / imageEl.naturalWidth;
-  const scaleY = imageEl.clientHeight / imageEl.naturalHeight;
-
-  let r = crosshairRadius * scaleX;
+  let r = crosshairRadius * imageFitScale(imageEl) * zoomFactor;
   if (projectionType === "sinus") {
     r *= Math.sin((90 - altitudeDeg) * Math.PI / 180);
   } else {
@@ -470,11 +498,10 @@ function azAltToImageXY(azimuthDeg, altitudeDeg) {
   }
 
   const angleRad = (azimuthDeg + crosshairRotation) * Math.PI / 180;
-  const cx = (crosshairCenterX) * scaleX * zoomFactor + panX;
-  const cy = (crosshairCenterY) * scaleY * zoomFactor + panY;
+  const c = imageToCanvas(imageEl, crosshairCenterX, crosshairCenterY);
 
-  const x = cx + Math.sin(angleRad) * r * zoomFactor;
-  const y = cy - Math.cos(angleRad) * r * zoomFactor;
+  const x = c.x + Math.sin(angleRad) * r;
+  const y = c.y - Math.cos(angleRad) * r;
 
   return { x, y };
 }
