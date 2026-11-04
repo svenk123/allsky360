@@ -30,17 +30,26 @@
  * @param scale_g     Scaling factor for green channel (usually 1.0)
  * @param scale_b     Scaling factor for blue channel (e.g. 1.3)
  * @param lp_strength Strength of light protection (e.g. 0.1), if 0.0 then light protection is disabled
- * @param hdr_frame   1 = frame of an HDR series: no global attenuation and no
- *                    light protection, values are only clamped to 1.0. Every
- *                    frame then gets the same gains (the fusion relates them
- *                    by exposure time alone) and a sensor-clipped pixel stays
- *                    at 1.0 in every clipped channel, so the clipping
- *                    detection sees it. 0 = single image, both as configured.
  * @return int         0 on success, 1 on failure.
  */
 int white_balance_rgbf1(float *rgba, int width, int height,
                                float scale_r, float scale_g, float scale_b,
-                               float lp_strength, int hdr_frame);
+                               float lp_strength);
+
+/**
+ * Linear white balance for a fused HDR image: multiplies R, G, B by the
+ * scale factors without clamping (values above 1.0 stay, the highlight
+ * shoulder after the fusion brings them into 0..1). Alpha is untouched.
+ *
+ * In HDR mode this replaces the per-frame white_balance_rgbf1(): the fusion
+ * then works on the raw sensor values, so the clipping detection sees the
+ * real per-channel saturation instead of e.g. blue clipping at 1/1.75 of
+ * the sensor range.
+ *
+ * @return 0 on success, 1 on invalid arguments.
+ */
+int white_balance_linear_rgbf1(float *rgba, int width, int height,
+                               float scale_r, float scale_g, float scale_b);
 
 /**
  * Estimates scaling factors for red and blue channels to achieve gray balance

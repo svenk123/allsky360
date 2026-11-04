@@ -526,6 +526,27 @@ void reload_handler(int signum) {
 }
 
 /**
+ * White-balance factors for day or night (green is always 1.0).
+ * Monochrome cameras get 1.0 for all channels.
+ */
+static void get_white_balance(const config_t *cfg, int is_night, float *wb_r,
+                              float *wb_b) {
+  if (cfg->camera_monochrome) {
+    *wb_r = 1.0f;
+    *wb_b = 1.0f;
+    return;
+  }
+  *wb_r = (float)(is_night ? cfg->nighttime_white_balance_red
+                           : cfg->daytime_white_balance_red);
+  *wb_b = (float)(is_night ? cfg->nighttime_white_balance_blue
+                           : cfg->daytime_white_balance_blue);
+  if (*wb_r <= 0.0f)
+    *wb_r = 1.0f;
+  if (*wb_b <= 0.0f)
+    *wb_b = 1.0f;
+}
+
+/**
  * Raw dump handler
  * @param signum: signal number
  */
@@ -1570,9 +1591,11 @@ int main(int argc, const char *argv[]) {
             printf("[spektrum] Analyse fehlgeschlagen (code %d)\n", sret);
         }
 
-        /* RGB channel scaling */
+        /* RGB channel scaling. With HDR the frames stay raw: the fusion
+         * then sees the real per-channel sensor saturation, and the white
+         * balance is applied once to the fused image (no clamping). */
         TIMED_BLOCK("white_balance_rgbf1", {
-          if (config.camera_monochrome == 0) {
+          if (config.camera_monochrome == 0 && !config.hdr) {
             white_balance_rgbf1(frames[i].image, width, height,
                                 is_night ? config.nighttime_white_balance_red
                                          : config.daytime_white_balance_red,
@@ -1581,8 +1604,7 @@ int main(int argc, const char *argv[]) {
                                          : config.daytime_white_balance_blue,
                                 is_night
                                     ? config.nighttime_white_balance_light_protect
-                                    : config.daytime_white_balance_light_protect,
-                                config.hdr ? 1 : 0);
+                                    : config.daytime_white_balance_light_protect);
           }
         });
 
@@ -1701,7 +1723,25 @@ int main(int argc, const char *argv[]) {
               config.image_center_x, config.image_center_y,
               brightness_radius);
         });
-        printf("[DEBUG] frame %d median brightness: R=%.4f G=%.4f B=%.4f L=%.4f",
+        /* HDR frames are raw (white balance after the fusion): report the
+         * medians white-balanced, as before, so the database, the metadata
+         * and the fusion's exposure center keep their meaning. R and B scale
+         * exactly; L is scaled by the luminance ratio of the medians. */
+        if (config.hdr && config.camera_monochrome == 0) {
+          float wb_r, wb_b;
+          get_white_balance(&config, is_night, &wb_r, &wb_b);
+          double y_raw = 0.2126 * frames[i].median_r +
+                         0.7152 * frames[i].median_g +
+                         0.0722 * frames[i].median_b;
+          frames[i].median_r *= wb_r;
+          frames[i].median_b *= wb_b;
+          double y_wb = 0.2126 * frames[i].median_r +
+                        0.7152 * frames[i].median_g +
+                        0.0722 * frames[i].median_b;
+          if (y_raw > 1e-9)
+            frames[i].median_l *= (float)(y_wb / y_raw);
+        }
+        printf("[DEBUG] frame %d median brightness: R=%.4f G=%.4f B=%.4f L=%.4f\n",
                    i, frames[i].median_r, frames[i].median_g,
                    frames[i].median_b, frames[i].median_l);
 
@@ -1716,7 +1756,8 @@ int main(int argc, const char *argv[]) {
         }
 
         /* SCNR filter to reduce artificial light sources */
-        if (config.scnr_filter && is_night && config.camera_monochrome == 0) {
+        if (config.scnr_filter && is_night && config.camera_monochrome == 0 &&
+            !config.hdr) {
           /* Set protection mode */
           int scnr_protection = SCNR_PROTECT_NONE;
           if (!strcmp(config.scnr_filter_protection, "average_neutral"))
@@ -1787,6 +1828,25 @@ int main(int argc, const char *argv[]) {
           unsigned char *cairo_data = cairo_image_surface_get_data(surface1);
 
           rgbf_to_cairo(frames[i].image, cairo_data, width, height);
+
+          /* HDR frames are raw: white-balance the preview only */
+          if (config.hdr && config.camera_monochrome == 0) {
+            float wb_r, wb_b;
+            get_white_balance(&config, is_night, &wb_r, &wb_b);
+            const int stride = cairo_image_surface_get_stride(surface1);
+#pragma omp parallel for
+            for (int y = 0; y < height; y++) {
+              uint32_t *row = (uint32_t *)(cairo_data + (size_t)y * stride);
+              for (int x = 0; x < width; x++) {
+                uint32_t v = row[x]; /* RGB24: 0x00RRGGBB */
+                float r = (float)((v >> 16) & 0xff) * wb_r;
+                float b = (float)(v & 0xff) * wb_b;
+                uint32_t ri = r > 255.0f ? 255u : (uint32_t)(r + 0.5f);
+                uint32_t bi = b > 255.0f ? 255u : (uint32_t)(b + 0.5f);
+                row[x] = (v & 0x0000ff00u) | (ri << 16) | bi;
+              }
+            }
+          }
           cairo_surface_mark_dirty(surface1);
 
           save_cairo_surface_as_jpeg(surface1, hdr_frame_filename,
@@ -1856,6 +1916,9 @@ int main(int argc, const char *argv[]) {
          * Note: If Y_max_expected = 0, it will be automatically detected from
          * image data.
          */
+        float hdr_wb_r, hdr_wb_b;
+        get_white_balance(&config, is_night, &hdr_wb_r, &hdr_wb_b);
+
         float y_max_expected = config.hdr_y_max_expected;
         if (y_max_expected > 0.0f && use_max_images >= 2) {
           // Skaliere basierend auf der Anzahl der Bilder (nur wenn Wert > 0)
@@ -1883,8 +1946,31 @@ int main(int argc, const char *argv[]) {
               (float)config.hdr_noise_fusion_strength,
               config.hdr_pyramid_levels_override,
               (float)config.hdr_weight_sigma,
-              (float)config.hdr_weight_clip_factor);
+              (float)config.hdr_weight_clip_factor, hdr_wb_r, hdr_wb_b);
         });
+
+        /* White balance on the fused (linear, unclamped) image */
+        if (config.camera_monochrome == 0) {
+          TIMED_BLOCK("white_balance_linear_rgbf1", {
+            white_balance_linear_rgbf1(hdr_image, width, height, hdr_wb_r,
+                                       1.0f, hdr_wb_b);
+          });
+        }
+
+        /* SCNR needs white-balanced data, so with HDR it runs here once
+         * instead of on every (raw) frame */
+        if (config.scnr_filter && is_night && config.camera_monochrome == 0) {
+          int scnr_protection = SCNR_PROTECT_NONE;
+          if (!strcmp(config.scnr_filter_protection, "average_neutral"))
+            scnr_protection = SCNR_PROTECT_AVERAGE_NEUTRAL;
+          if (!strcmp(config.scnr_filter_protection, "maximum_neutral"))
+            scnr_protection = SCNR_PROTECT_MAXIMUM_NEUTRAL;
+
+          TIMED_BLOCK("scnr_green_filter_rgbf1", {
+            scnr_green_filter_rgbf1(hdr_image, width, height,
+                                    config.scnr_filter_amount, scnr_protection);
+          });
+        }
 
         /* High Dynamic Range Tone Mapping */
         if (config.hdrmt) {

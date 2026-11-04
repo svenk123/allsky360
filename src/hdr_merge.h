@@ -88,6 +88,10 @@ typedef struct {
  *                        If 0, automatically detected from image data.
  *                        If > 0, uses the specified value.
  * @param output_hdr: output buffer (RGBA float array)
+ * @param wb_r, wb_b: white-balance factors applied AFTER the fusion (green 1).
+ *                    The frames are fused on raw sensor values; the factors
+ *                    are only used to make areas without any data white in
+ *                    the white-balanced result. 1.0 for monochrome cameras.
  *
  * @return 0 on success, 1 on error
  */
@@ -97,7 +101,7 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
     float *output_hdr, const char *dump_images_dir, int dump_weight_maps, int dump_weight_stats,
     float contrast_weight_strength, float noise_fusion_strength,
     int pyramid_levels_override,
-    float weight_sigma, float weight_clip_factor);
+    float weight_sigma, float weight_clip_factor, float wb_r, float wb_b);
 
 /**
  * Normalizes the HDR RGBF1 image to a target output range.

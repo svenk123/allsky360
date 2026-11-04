@@ -397,7 +397,11 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
     float *output_hdr, const char *dump_images_dir, int dump_weight_maps,
     int dump_weight_stats, float contrast_weight_strength,
     float noise_fusion_strength, int pyramid_levels_override,
-    float weight_sigma, float weight_clip_factor) {
+    float weight_sigma, float weight_clip_factor, float wb_r, float wb_b) {
+  if (wb_r <= 0.0f)
+    wb_r = 1.0f;
+  if (wb_b <= 0.0f)
+    wb_b = 1.0f;
   if (!frames || !output_hdr || width <= 0 || height <= 0 ||
       use_max_images <= 0)
     return 1;
@@ -434,8 +438,9 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
    * the raw median ratio here instead would encode the exposure difference a
    * second time, and px * exp_gain * gain would scale by (t0/tk)^2.
    *
-   * Note: any global white-balance factor applied before the fusion cancels in
-   * this ratio of ratios, which is why it is not passed in any more. */
+   * Note: the frames are fused on raw sensor values (the white balance
+   * follows the fusion); a global per-channel factor would cancel in this
+   * ratio of ratios anyway. */
   float exp_gain[MAX_IMAGES] = {0};
   float r_gain[MAX_IMAGES] = {0};
   float g_gain[MAX_IMAGES] = {0};
@@ -984,18 +989,17 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
      * Why not just neutralise: the clipping weight drops these pixels at
      * full resolution, but the weights are blurred in the coarser pyramid
      * levels, so the low-pass of frame k still contributes along the edge of
-     * a clipped area. With the frames white-balanced before the fusion, blue
-     * (gain ~1.9) clips first; a clipped or neutralised pixel then lacks
-     * blue, and that deficit showed up as a reddish/orange fringe at cloud
-     * edges and towards the horizon. A smoothstep blend also avoids the hard
-     * color edge that would ring in the Laplacian.
+     * a clipped area. A clipped or neutralised pixel lacks the channels
+     * that clipped first, and that deficit shows up as a colored fringe at
+     * cloud edges and towards the horizon. A smoothstep blend also avoids the
+     * hard color edge that would ring in the Laplacian.
      *
      * Two ramps: with a replacement frame the ramp is the clipping weight
      * ramp (0.95..1.0 of clipping_threshold), so unclipped bright sky keeps
      * its color. Without one (shortest frame, or all shorter frames clipped)
-     * the neutralisation starts early (0.80..0.95): there green and blue
-     * (largest gains) clip before red, and a late ramp leaves a red/pink
-     * fringe around the clipped area.
+     * the neutralisation starts early (0.80..0.95): green clips first on
+     * this sensor (red/blue stay well below 1.0 even in the sun), and a late
+     * ramp leaves a colored fringe around the clipped area.
      *
      * After modifying level 0, the higher Gaussian levels are rebuilt so that
      * lap[i] = gauss[i] - expand(gauss[i+1]) stays self-consistent. */
@@ -1039,12 +1043,17 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
           tG = pj[1] * exp_gain[j] * g_gain[j];
           tB = pj[2] * exp_gain[j] * b_gain[j];
         } else {
-          /* No frame has data here: neutral white at the clip level (the
-           * largest channel) - a luminance grey would be darker than the
-           * unclipped surroundings. */
-          float M_n = fmaxf(fmaxf(gauss_R[k].data[0][i], gauss_G[k].data[0][i]),
-                            gauss_B[k].data[0][i]);
-          tR = tG = tB = M_n;
+          /* No frame has data here: white at the clip level (the largest
+           * channel) - a luminance grey would be darker than the unclipped
+           * surroundings. White in the white-balanced result: the frames
+           * are raw, the white balance follows the fusion, so the target
+           * is W / wb per channel. */
+          float W = fmaxf(fmaxf(gauss_R[k].data[0][i] * wb_r,
+                                gauss_G[k].data[0][i]),
+                          gauss_B[k].data[0][i] * wb_b);
+          tR = W / wb_r;
+          tG = W;
+          tB = W / wb_b;
         }
         gauss_R[k].data[0][i] += t * (tR - gauss_R[k].data[0][i]);
         gauss_G[k].data[0][i] += t * (tG - gauss_G[k].data[0][i]);
