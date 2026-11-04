@@ -1204,6 +1204,19 @@ int main(int argc, const char *argv[]) {
                                     ? config.camera_min_exposure
                                     : MIN_EXPOSURE;
 
+          /* The full step is too short, but the camera minimum is still
+           * clearly shorter than the previous frame: take one last frame at
+           * the minimum. It adds the remaining headroom for highlights that
+           * are clipped in every longer frame (e.g. bright clouds near the
+           * sun). The next step then stops the ladder below. */
+          if (frames[i].exposure < min_exposure &&
+              frames[i - 1].exposure >= 1.5 * min_exposure) {
+            printf("HDR ladder: frame %d clamped to the camera minimum "
+                   "%.8fs (computed %.8fs)\n",
+                   i, min_exposure, frames[i].exposure);
+            frames[i].exposure = min_exposure;
+          }
+
           if (frames[i].exposure < min_exposure) {
             fprintf(stderr,
                     "HDR ladder stops before frame %d: computed exposure "
@@ -1566,7 +1579,10 @@ int main(int argc, const char *argv[]) {
                                 1.0f,
                                 is_night ? config.nighttime_white_balance_blue
                                          : config.daytime_white_balance_blue,
-                                config.daytime_white_balance_light_protect);
+                                is_night
+                                    ? config.nighttime_white_balance_light_protect
+                                    : config.daytime_white_balance_light_protect,
+                                config.hdr ? 1 : 0);
           }
         });
 
@@ -1910,7 +1926,8 @@ int main(int argc, const char *argv[]) {
 
         /* Normalize to 0.0..1.0f */
         TIMED_BLOCK("hdr_normalize_range_rgbf1", {
-          hdr_normalize_range_rgbf1(hdr_image, width, height, 0.0f, 1.0f);
+          hdr_normalize_range_rgbf1(hdr_image, width, height, 0.0f, 1.0f,
+                                    (float)config.hdr_highlight_knee);
         });
       }
 

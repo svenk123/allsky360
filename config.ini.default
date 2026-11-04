@@ -305,6 +305,11 @@ hdr_min_clipped_pixels=0.00001
 hdr_y_max_expected=1.0
 hdr_weight_sigma=0.8
 hdr_weight_clip_factor=0.90
+# Highlight shoulder after the fusion (0..0.99): the image keeps the
+# brightness of frame 0, values above the knee are compressed into knee..1.
+# Brightness no longer depends on the number of frames. 0 = old behaviour
+# (divide by the image maximum, gets darker with every frame)
+hdr_highlight_knee=0.8
 hdr_contrast_weight_strength=0.6
 # 0 = off, 1 = full: downweight short exposures where linearized luma is
 # within noise (uses per-frame sigma_noise from background MAD; no effect if unset)

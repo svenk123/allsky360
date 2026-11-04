@@ -110,10 +110,16 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
  * @param height: image height in pixels.
  * @param target_min: target minimum value (typically 0.0f)
  * @param target_max: target maximum value (typically 1.0f)
+ * @param knee: highlight shoulder start in units of frame 0 (0..1, e.g. 0.8).
+ *              The fused image keeps the brightness scale of frame 0: values
+ *              up to knee are unchanged, everything above (up to the image
+ *              maximum) is compressed hue-preserving into knee..1. The result
+ *              no longer depends on the number of frames. 0 = old behaviour,
+ *              linear division by the image maximum.
  *
  * @return 0 on success, 1 on error
  */
-int hdr_normalize_range_rgbf1(float *rgbf, int width, int height, float target_min, float target_max);
+int hdr_normalize_range_rgbf1(float *rgbf, int width, int height, float target_min, float target_max, float knee);
 
 
 #endif // HDR_MERGE_H

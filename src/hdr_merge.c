@@ -880,6 +880,27 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
     float sumw = 0.0f, maxw = 0.0f;
     int maxk = 0;
 
+    /* Where the longest frame is clipped, give the shortest frame a small
+     * floor weight. Where every frame is clipped (sun, bright cloud next to
+     * it) all weights are ~0, and normalising those tiny leftovers mixed the
+     * clipped values of the long frames (linear ~1) with the short ones
+     * (~exp_gain): the area came out as a dull grey that looks pink next to
+     * the sky. With the floor the shortest frame - the closest to the true
+     * value - wins there; elsewhere the floor is negligible. */
+    if (use_max_images > 1) {
+      const float *p0 = &frames[0].image[(size_t)i * CHANNELS];
+      if (!is_masked_pixel(p0)) {
+        const float m0 = fmaxf(fmaxf(p0[0], p0[1]), p0[2]);
+        const float a = clipping_threshold * 0.95f;
+        if (m0 >= a) {
+          float t = (m0 - a) / fmaxf(clipping_threshold * 0.05f, 1e-6f);
+          t = fminf(1.0f, fmaxf(0.0f, t));
+          weight_maps[use_max_images - 1][i] +=
+              1e-2f * t * t * (3.0f - 2.0f * t);
+        }
+      }
+    }
+
     /* Sum weights */
     for (int k = 0; k < use_max_images; ++k) {
       float w = weight_maps[k][i];
@@ -952,36 +973,82 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
       goto OOM_FAIL;
     build_gaussian_pyramid(weight_maps[k], &gauss_weight[k], width, height);
 
-    /* Clip-neutralization at pyramid level 0: smooth-blend each clipped pixel
-     * from its real color toward neutral luminance as max(R,G,B) rises from
-     * clip_lo to clip_hi.  A smoothstep blend avoids the hard color edge that
-     * a sharp threshold would create in the Laplacian, which would otherwise
-     * produce a colored ringing fringe (e.g. blue/purple ring around the sun).
+    /* Clip repair at pyramid level 0: smooth-blend each clipped pixel from
+     * its own (clipped, wrong) color toward a replacement as max(R,G,B)
+     * rises from clip_lo to clip_hi. The replacement is the same pixel from
+     * the first shorter frame that is not clipped there, linearised exactly
+     * like this frame (exp_gain * channel gain), so it carries the true
+     * color and brightness. Only where every shorter frame is clipped too
+     * (e.g. the sun) the pixel is neutralised to white at its clip level.
+     *
+     * Why not just neutralise: the clipping weight drops these pixels at
+     * full resolution, but the weights are blurred in the coarser pyramid
+     * levels, so the low-pass of frame k still contributes along the edge of
+     * a clipped area. With the frames white-balanced before the fusion, blue
+     * (gain ~1.9) clips first; a clipped or neutralised pixel then lacks
+     * blue, and that deficit showed up as a reddish/orange fringe at cloud
+     * edges and towards the horizon. A smoothstep blend also avoids the hard
+     * color edge that would ring in the Laplacian.
+     *
+     * Two ramps: with a replacement frame the ramp is the clipping weight
+     * ramp (0.95..1.0 of clipping_threshold), so unclipped bright sky keeps
+     * its color. Without one (shortest frame, or all shorter frames clipped)
+     * the neutralisation starts early (0.80..0.95): there green and blue
+     * (largest gains) clip before red, and a late ramp leaves a red/pink
+     * fringe around the clipped area.
      *
      * After modifying level 0, the higher Gaussian levels are rebuilt so that
-     * lap[i] = gauss[i] - expand(gauss[i+1]) stays self-consistent.
-     * Without the rebuild, levels 1-N come from the original (un-neutralized)
-     * data and the Laplacian at level 0 encodes a huge spurious color step. */
+     * lap[i] = gauss[i] - expand(gauss[i+1]) stays self-consistent. */
     {
-      const float clip_lo  = clipping_threshold * 0.80f;
-      const float clip_hi  = clipping_threshold * 0.95f;
-      const float inv_rng  = 1.0f / fmaxf(clip_hi - clip_lo, 1e-6f);
+      /* replacement ramp (same as the clipping weight ramp) */
+      const float rep_lo = clipping_threshold * 0.95f;
+      const float rep_hi = clipping_threshold * 1.00f;
+      /* neutralisation ramp (no unclipped shorter frame) */
+      const float neu_lo = clipping_threshold * 0.80f;
+      const float neu_hi = clipping_threshold * 0.95f;
 
 #pragma omp parallel for
       for (size_t i = 0; i < pixel_count; ++i) {
         const float *px = &frames[k].image[(size_t)i * CHANNELS];
         float max_rgb = fmaxf(fmaxf(px[0], px[1]), px[2]);
-        if (max_rgb < clip_lo)
+        if (max_rgb < neu_lo || is_masked_pixel(px))
           continue;
-        float t = (max_rgb - clip_lo) * inv_rng;
+
+        /* First shorter frame without clipping at this pixel */
+        int j = -1;
+        for (int m = k + 1; m < use_max_images; ++m) {
+          const float *pm = &frames[m].image[(size_t)i * CHANNELS];
+          if (fmaxf(fmaxf(pm[0], pm[1]), pm[2]) < rep_lo) {
+            j = m;
+            break;
+          }
+        }
+
+        const float lo = (j >= 0) ? rep_lo : neu_lo;
+        const float hi = (j >= 0) ? rep_hi : neu_hi;
+        if (max_rgb < lo)
+          continue;
+        float t = (max_rgb - lo) / fmaxf(hi - lo, 1e-6f);
         t = fminf(1.0f, fmaxf(0.0f, t));
         t = t * t * (3.0f - 2.0f * t); /* smoothstep */
-        float Y_n = 0.2126f * gauss_R[k].data[0][i] +
-                    0.7152f * gauss_G[k].data[0][i] +
-                    0.0722f * gauss_B[k].data[0][i];
-        gauss_R[k].data[0][i] += t * (Y_n - gauss_R[k].data[0][i]);
-        gauss_G[k].data[0][i] += t * (Y_n - gauss_G[k].data[0][i]);
-        gauss_B[k].data[0][i] += t * (Y_n - gauss_B[k].data[0][i]);
+
+        float tR, tG, tB;
+        if (j >= 0) {
+          const float *pj = &frames[j].image[(size_t)i * CHANNELS];
+          tR = pj[0] * exp_gain[j] * r_gain[j];
+          tG = pj[1] * exp_gain[j] * g_gain[j];
+          tB = pj[2] * exp_gain[j] * b_gain[j];
+        } else {
+          /* No frame has data here: neutral white at the clip level (the
+           * largest channel) - a luminance grey would be darker than the
+           * unclipped surroundings. */
+          float M_n = fmaxf(fmaxf(gauss_R[k].data[0][i], gauss_G[k].data[0][i]),
+                            gauss_B[k].data[0][i]);
+          tR = tG = tB = M_n;
+        }
+        gauss_R[k].data[0][i] += t * (tR - gauss_R[k].data[0][i]);
+        gauss_G[k].data[0][i] += t * (tG - gauss_G[k].data[0][i]);
+        gauss_B[k].data[0][i] += t * (tB - gauss_B[k].data[0][i]);
       }
 
       /* Rebuild higher Gaussian pyramid levels from the corrected level 0 */
@@ -1249,12 +1316,72 @@ OOM_FAIL:
   return 2;
 }
 
+/* Extended Reinhard: g(0)=0, g'(0)=1, g(white)=1, monotonic for white>=1 */
+static inline float shoulder_reinhard(float u, float white) {
+  return u * (1.0f + u / (white * white)) / (1.0f + u);
+}
+
 int hdr_normalize_range_rgbf1(float *rgbf, int width, int height,
-                              float target_min, float target_max) {
+                              float target_min, float target_max,
+                              float knee) {
   if (!rgbf || width <= 0 || height <= 0 || target_max <= target_min)
     return 1;
 
   size_t pixel_count = (size_t)width * height;
+
+  if (knee > 0.0f) {
+    if (knee > 0.99f)
+      knee = 0.99f;
+
+    /* Maximum of the largest channel (frame-0 units) */
+    float max_val = 0.0f;
+#pragma omp parallel for reduction(max : max_val)
+    for (size_t i = 0; i < pixel_count; i++) {
+      const float *px = &rgbf[i * (size_t)CHANNELS];
+      float m = fmaxf(fmaxf(px[0], px[1]), px[2]);
+      if (m > max_val)
+        max_val = m;
+    }
+
+    /* Shoulder: [knee .. max_val] -> [knee .. 1], slope 1 at the knee.
+     * Applied to the largest channel, all channels scaled by the same
+     * factor, so the hue is kept and nothing exceeds 1. */
+    const float range = 1.0f - knee;
+    const float white = (max_val - knee) / range; /* in units of range */
+    const int compress = (white > 1.0f);
+
+    printf("HDR Normalize: max=%.6f knee=%.2f -> %s, target %.3f .. %.3f\n",
+           max_val, knee,
+           compress ? "highlight shoulder" : "no compression needed",
+           target_min, target_max);
+
+    const float range_out = target_max - target_min;
+
+#pragma omp parallel for
+    for (size_t i = 0; i < pixel_count; i++) {
+      float *px = &rgbf[i * (size_t)CHANNELS];
+      float r = fmaxf(px[0], 0.0f), g = fmaxf(px[1], 0.0f),
+            b = fmaxf(px[2], 0.0f);
+      float m = fmaxf(fmaxf(r, g), b);
+      float scale = 1.0f;
+      if (m > knee) {
+        float m_out = compress
+                          ? knee + range * shoulder_reinhard((m - knee) / range,
+                                                             white)
+                          : fminf(m, 1.0f);
+        scale = m_out / m;
+      }
+      float v[3] = {r * scale, g * scale, b * scale};
+      for (int c = 0; c < 3; c++) {
+        float o = target_min + fminf(v[c], 1.0f) * range_out;
+        px[c] = o;
+      }
+      px[3] = 1.0f;
+    }
+
+    printf("HDR Normalize: ok\n");
+    return 0;
+  }
 
   /* 1) Find global min/max of R, G, B */
   float min_val = 1e30f, max_val = -1e30f;

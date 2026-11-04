@@ -121,6 +121,7 @@ int load_config(const char *filename, config_t *config) {
   config->hdr_y_max_expected = 1.0;
   config->hdr_weight_sigma = 0.25;
   config->hdr_weight_clip_factor = 0.90;
+  config->hdr_highlight_knee = 0.8;
   config->hdr_contrast_weight_strength = 0.5;
   config->hdr_noise_fusion_strength = 1.0;
   config->hdr_pyramid_levels_override = 6;
@@ -418,6 +419,8 @@ int load_config(const char *filename, config_t *config) {
         config->hdr_weight_sigma = atof(value);
       else if (strcmp(key, "hdr_weight_clip_factor") == 0)
         config->hdr_weight_clip_factor = atof(value);
+      else if (strcmp(key, "hdr_highlight_knee") == 0)
+        config->hdr_highlight_knee = atof(value);
       else if (strcmp(key, "hdr_contrast_weight_strength") == 0)
         config->hdr_contrast_weight_strength = atof(value);
       else if (strcmp(key, "hdr_noise_fusion_strength") == 0)
@@ -902,6 +905,7 @@ int show_config(config_t *config) {
   printf("hdr_y_max_expected: %.1f\n", config->hdr_y_max_expected);
   printf("hdr_weight_sigma: %.2f\n", config->hdr_weight_sigma);
   printf("hdr_weight_clip_factor: %.2f\n", config->hdr_weight_clip_factor);
+  printf("hdr_highlight_knee: %.2f\n", config->hdr_highlight_knee);
   printf("hdr_contrast_weight_strength: %.1f\n",
          config->hdr_contrast_weight_strength);
   printf("hdr_noise_fusion_strength: %.2f\n",
@@ -1217,6 +1221,8 @@ int config_to_json(const char *filename, const config_t *config) {
   json_object_object_add(
       jroot, "hdr_weight_clip_factor",
       json_object_new_double(config->hdr_weight_clip_factor));
+  json_object_object_add(jroot, "hdr_highlight_knee",
+                         json_object_new_double(config->hdr_highlight_knee));
   json_object_object_add(
       jroot, "hdr_contrast_weight_strength",
       json_object_new_double(config->hdr_contrast_weight_strength));

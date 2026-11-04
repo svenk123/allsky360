@@ -35,7 +35,8 @@ static inline float smoothstep(float edge0, float edge1, float x) {
 int white_balance_rgbf1(
     float *rgba, int width, int height, float scale_r, float scale_g,
     float scale_b,
-    float lp_strength     // 0..1: how softly we approach the hard limit, if 0.0 then light protection is disabled
+    float lp_strength,    // 0..1: how softly we approach the hard limit, if 0.0 then light protection is disabled
+    int hdr_frame         // 1: no attenuation/light protection (see header)
     ) {
   if (!rgba || width <= 0 || height <= 0)
     return 1;
@@ -47,13 +48,21 @@ int white_balance_rgbf1(
   if (lp_strength > 1.f)
     lp_strength = 1.f;
 
+  /* HDR frames must keep identical gains across the series and must keep
+   * clipped pixels at 1.0: a content-dependent attenuation (or the per-pixel
+   * limiter) would turn a sensor-clipped (1,1,1) into e.g. (0.55,0.53,1.0),
+   * i.e. a blue cast the fusion no longer recognises as clipped, and would
+   * break the exposure-time ratio between the frames. */
+  if (hdr_frame)
+    lp_strength = 0.f;
+
 
   printf("White Balance scaling: red: %.6f, green: %.6f, blue: %.6f, lp_strength: %.6f\n", scale_r,scale_g,scale_b, lp_strength);
   const int N = width * height;
 
-  // 1) find per-channel maxima (pre-scale)
+  // 1) find per-channel maxima (pre-scale), only needed for the attenuation
   float r_max = 0.f, g_max = 0.f, b_max = 0.f;
-  for (int i = 0; i < N; ++i) {
+  for (int i = 0; !hdr_frame && i < N; ++i) {
     const int idx = i * CHANNELS;
     float r = rgba[idx + 0], g = rgba[idx + 1], b = rgba[idx + 2];
     if (r > r_max)
@@ -73,7 +82,8 @@ int white_balance_rgbf1(
   float post_max = fmaxf(post_r, fmaxf(post_g, post_b));
 
   const float ATTEN_TRIG = 1.10f; // start global attenuation only if > +10%
-  float atten = (post_max > ATTEN_TRIG) ? (1.f / post_max) : 1.f;
+  float atten =
+      (!hdr_frame && post_max > ATTEN_TRIG) ? (1.f / post_max) : 1.f;
 
   float sR = scale_r * atten;
   float sG = scale_g * atten;

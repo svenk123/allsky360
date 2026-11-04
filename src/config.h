@@ -65,6 +65,7 @@ typedef struct {
     double hdr_y_max_expected;
     double hdr_weight_sigma;
     double hdr_weight_clip_factor;
+    double hdr_highlight_knee;
 
     double hdr_contrast_weight_strength;
     double hdr_noise_fusion_strength;
