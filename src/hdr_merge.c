@@ -199,6 +199,8 @@ static const float gauss_k5[5] = {
 /* REDUCE: Gaussian filter + downsample by 2 */
 static void gaussian_reduce_scalar(const float *src, int sw, int sh, float *dst,
                                    int dw, int dh) {
+  /* Rows are independent: parallel and bit-identical to the serial loop */
+#pragma omp parallel for
   for (int oy = 0; oy < dh; oy++) {
     for (int ox = 0; ox < dw; ox++) {
       float sum = 0.0f;
@@ -219,6 +221,8 @@ static void gaussian_reduce_scalar(const float *src, int sw, int sh, float *dst,
 /* EXPAND: upsample by 2 using same 5-tap kernel (Burt-Adelson expand) */
 static void gaussian_expand_scalar(const float *src, int sw, int sh, float *dst,
                                    int dw, int dh) {
+  /* Rows are independent: parallel and bit-identical to the serial loop */
+#pragma omp parallel for
   for (int oy = 0; oy < dh; oy++) {
     for (int ox = 0; ox < dw; ox++) {
       float sum = 0.0f;
@@ -641,7 +645,8 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
     for (int k = 0; k < use_max_images; ++k) {
       float *C = contrast_maps[k];
       const float *L = luma_maps[k];
-      /* compute local deviation */
+      /* compute local deviation (rows are independent) */
+#pragma omp parallel for
       for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
           int idx = y * width + x;
@@ -689,12 +694,14 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
 
       /* Normalize by 99th percentile to reduce outlier influence */
       float maxv = 1e-12f;
+#pragma omp parallel for reduction(max : maxv)
       for (size_t i = 0; i < pixel_count; ++i)
         if (C[i] > maxv)
           maxv = C[i];
 
       /* Build 256-bin histogram to find 99th percentile */
       int hist[256] = {0};
+#pragma omp parallel for reduction(+ : hist[:256])
       for (size_t i = 0; i < pixel_count; ++i) {
         int bin = (int)(C[i] / maxv * 255.0f);
         hist[(bin < 0) ? 0 : (bin > 255 ? 255 : bin)]++;
@@ -711,6 +718,7 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
       }
       float inv = 1.0f / fmaxf(p99, 1e-12f);
 
+#pragma omp parallel for
       for (size_t i = 0; i < pixel_count; ++i) {
         float v = C[i] * inv;
         C[i] = (v < 0.0f) ? 0.0f : (v > 1.0f ? 1.0f : v);
