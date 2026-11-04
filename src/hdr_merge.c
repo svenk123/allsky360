@@ -252,15 +252,15 @@ static inline int is_masked_pixel(const float *px) {
   return (px[0] <= eps && px[1] <= eps && px[2] <= eps);
 }
 
-static void build_gaussian_pyramid(float *input, Pyramid *pyramid,
-                                   int base_width, int base_height) {
+static int build_gaussian_pyramid(const float *input, Pyramid *pyramid,
+                                  int base_width, int base_height) {
+  const size_t n0 = (size_t)base_width * base_height;
   pyramid->width[0] = base_width;
   pyramid->height[0] = base_height;
-  pyramid->data[0] =
-      allsky_safe_malloc(base_width * base_height * sizeof(float));
+  pyramid->data[0] = (float *)allsky_safe_malloc(n0 * sizeof(float));
   if (!pyramid->data[0])
-    return;
-  memcpy(pyramid->data[0], input, base_width * base_height * sizeof(float));
+    return 1;
+  memcpy(pyramid->data[0], input, n0 * sizeof(float));
 
   for (int level = 1; level < MAX_PYRAMID_LEVELS; level++) {
     int prev_w = pyramid->width[level - 1];
@@ -270,13 +270,15 @@ static void build_gaussian_pyramid(float *input, Pyramid *pyramid,
 
     pyramid->width[level] = new_w;
     pyramid->height[level] = new_h;
-    pyramid->data[level] = allsky_safe_malloc(new_w * new_h * sizeof(float));
+    pyramid->data[level] =
+        (float *)allsky_safe_malloc((size_t)new_w * new_h * sizeof(float));
     if (!pyramid->data[level])
-      return;
+      return 1;
 
     gaussian_reduce_scalar(pyramid->data[level - 1], prev_w, prev_h,
                            pyramid->data[level], new_w, new_h);
   }
+  return 0;
 }
 
 /* Build a Gaussian pyramid for a single channel extracted from an RGBA image
@@ -370,22 +372,6 @@ static float compute_pixel_weight(float linR, float linG, float linB,
   }
 
   return w;
-}
-
-/* Helper: count how many valid pyramid levels exist (data != NULL and size > 0)
- */
-static int get_pyr_levels(const Pyramid *pyr) {
-  int L = 0;
-
-  for (int i = 0; i < MAX_PYRAMID_LEVELS; ++i) {
-    if (!pyr->data[i])
-      break;
-
-    if (pyr->width[i] <= 0 || pyr->height[i] <= 0)
-      break;
-    L++;
-  }
-  return L;
 }
 
 /* contrast_weight_strength: 0..1; 0 disables local-contrast weighting */
@@ -501,6 +487,22 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
   float *weight_maps[MAX_IMAGES] = {0};
   float *luma_maps[MAX_IMAGES] = {0};
   float *contrast_maps[MAX_IMAGES] = {0}; // optional
+
+  /* Fusion buffers (declared here so every goto OOM_FAIL sees them set) */
+  Pyramid gR, gG, gB, gW;
+  memset(&gR, 0, sizeof(gR));
+  memset(&gG, 0, sizeof(gG));
+  memset(&gB, 0, sizeof(gB));
+  memset(&gW, 0, sizeof(gW));
+  float *w_sum[MAX_PYRAMID_LEVELS] = {0};
+  float *w_max[MAX_PYRAMID_LEVELS] = {0};
+  unsigned char *w_best[MAX_PYRAMID_LEVELS] = {0};
+  float *fused_R[MAX_PYRAMID_LEVELS] = {0};
+  float *fused_G[MAX_PYRAMID_LEVELS] = {0};
+  float *fused_B[MAX_PYRAMID_LEVELS] = {0};
+  float *lap_tmp = NULL;
+  int lev_W[MAX_PYRAMID_LEVELS] = {0};
+  int lev_H[MAX_PYRAMID_LEVELS] = {0};
 
   for (int k = 0; k < use_max_images; ++k) {
     weight_maps[k] =
@@ -958,25 +960,96 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
     }
   }
 
-  /* Build Gaussian pyramids for R, G, B (per channel) and weights */
-  Pyramid gauss_R[MAX_IMAGES], gauss_G[MAX_IMAGES], gauss_B[MAX_IMAGES];
-  Pyramid gauss_weight[MAX_IMAGES];
-  memset(gauss_R, 0, sizeof(gauss_R));
-  memset(gauss_G, 0, sizeof(gauss_G));
-  memset(gauss_B, 0, sizeof(gauss_B));
-  memset(gauss_weight, 0, sizeof(gauss_weight));
+  /* luma and contrast maps are only needed for the weights */
+  for (int k = 0; k < use_max_images; ++k) {
+    allsky_safe_free(luma_maps[k]);
+    luma_maps[k] = NULL;
+    allsky_safe_free(contrast_maps[k]);
+    contrast_maps[k] = NULL;
+  }
 
+  /* Pyramid geometry: every pyramid has the same level sizes */
+  for (int level = 0; level < MAX_PYRAMID_LEVELS; ++level) {
+    lev_W[level] = (level == 0) ? width : (lev_W[level - 1] + 1) / 2;
+    lev_H[level] = (level == 0) ? height : (lev_H[level - 1] + 1) / 2;
+  }
+  int L = MAX_PYRAMID_LEVELS;
+  if (pyramid_levels_override > 0 && pyramid_levels_override < L)
+    L = pyramid_levels_override;
+
+  /* The fusion runs frame by frame: only one frame's pyramids are in memory
+   * at a time (the old version held the Gaussian and Laplacian pyramids of
+   * all frames, ~6 GB for 5 frames at 4176x4176). The result is the same:
+   *
+   *   fused = sum_k lap_k * w_k                  where sum_k w_k > 1e-8
+   *   fused = lap of the frame with max weight   elsewhere
+   *
+   * Pass A builds the weight pyramids once to get sum_k w_k and the frame
+   * with the largest weight per pyramid pixel (same order and comparison as
+   * before); pass B accumulates the Laplacian levels frame by frame. */
+  for (int level = 0; level < L; ++level) {
+    const size_t sz = (size_t)lev_W[level] * lev_H[level];
+    w_sum[level] = (float *)allsky_safe_malloc(sz * sizeof(float));
+    w_max[level] = (float *)allsky_safe_malloc(sz * sizeof(float));
+    w_best[level] = (unsigned char *)allsky_safe_malloc(sz);
+    fused_R[level] = (float *)allsky_safe_malloc(sz * sizeof(float));
+    fused_G[level] = (float *)allsky_safe_malloc(sz * sizeof(float));
+    fused_B[level] = (float *)allsky_safe_malloc(sz * sizeof(float));
+    if (!w_sum[level] || !w_max[level] || !w_best[level] || !fused_R[level] ||
+        !fused_G[level] || !fused_B[level])
+      goto OOM_FAIL;
+    memset(w_sum[level], 0, sz * sizeof(float));
+    memset(w_max[level], 0, sz * sizeof(float));
+    memset(w_best[level], 0xff, sz); /* 0xff: no frame has weight > 0 */
+    memset(fused_R[level], 0, sz * sizeof(float));
+    memset(fused_G[level], 0, sz * sizeof(float));
+    memset(fused_B[level], 0, sz * sizeof(float));
+  }
+
+  /* Pass A: weight sum and frame with the largest weight */
+  for (int k = 0; k < use_max_images; ++k) {
+    if (build_gaussian_pyramid(weight_maps[k], &gW, width, height))
+      goto OOM_FAIL;
+    for (int level = 0; level < L; ++level) {
+      const int sz = lev_W[level] * lev_H[level];
+      const float *w = gW.data[level];
+      float *ws = w_sum[level], *wm = w_max[level];
+      unsigned char *wb = w_best[level];
+#pragma omp parallel for
+      for (int idx = 0; idx < sz; ++idx) {
+        const float w_i = w[idx];
+        ws[idx] += w_i;
+        if (w_i > wm[idx]) {
+          wm[idx] = w_i;
+          wb[idx] = (unsigned char)k;
+        }
+      }
+    }
+    free_gaussian_pyramid(&gW);
+  }
+  for (int level = 0; level < L; ++level) {
+    allsky_safe_free(w_max[level]);
+    w_max[level] = NULL;
+  }
+
+  lap_tmp = (float *)allsky_safe_malloc(pixel_count * sizeof(float));
+  if (!lap_tmp)
+    goto OOM_FAIL;
+
+  /* Pass B: per frame Gaussian pyramids R, G, B (with clip repair), their
+   * Laplacian pyramids (in place) and the weighted accumulation */
   for (int k = 0; k < use_max_images; ++k) {
     if (build_gaussian_pyramid_channel(frames[k].image, width, height, 0,
-                                       exp_gain[k], r_gain[k], &gauss_R[k]))
+                                       exp_gain[k], r_gain[k], &gR))
       goto OOM_FAIL;
     if (build_gaussian_pyramid_channel(frames[k].image, width, height, 1,
-                                       exp_gain[k], g_gain[k], &gauss_G[k]))
+                                       exp_gain[k], g_gain[k], &gG))
       goto OOM_FAIL;
     if (build_gaussian_pyramid_channel(frames[k].image, width, height, 2,
-                                       exp_gain[k], b_gain[k], &gauss_B[k]))
+                                       exp_gain[k], b_gain[k], &gB))
       goto OOM_FAIL;
-    build_gaussian_pyramid(weight_maps[k], &gauss_weight[k], width, height);
+    if (build_gaussian_pyramid(weight_maps[k], &gW, width, height))
+      goto OOM_FAIL;
 
     /* Clip repair at pyramid level 0: smooth-blend each clipped pixel from
      * its own (clipped, wrong) color toward a replacement as max(R,G,B)
@@ -1010,6 +1083,7 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
       /* neutralisation ramp (no unclipped shorter frame) */
       const float neu_lo = clipping_threshold * 0.80f;
       const float neu_hi = clipping_threshold * 0.95f;
+      float *R0 = gR.data[0], *G0 = gG.data[0], *B0 = gB.data[0];
 
 #pragma omp parallel for
       for (size_t i = 0; i < pixel_count; ++i) {
@@ -1048,165 +1122,94 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
            * surroundings. White in the white-balanced result: the frames
            * are raw, the white balance follows the fusion, so the target
            * is W / wb per channel. */
-          float W = fmaxf(fmaxf(gauss_R[k].data[0][i] * wb_r,
-                                gauss_G[k].data[0][i]),
-                          gauss_B[k].data[0][i] * wb_b);
+          float W = fmaxf(fmaxf(R0[i] * wb_r, G0[i]), B0[i] * wb_b);
           tR = W / wb_r;
           tG = W;
           tB = W / wb_b;
         }
-        gauss_R[k].data[0][i] += t * (tR - gauss_R[k].data[0][i]);
-        gauss_G[k].data[0][i] += t * (tG - gauss_G[k].data[0][i]);
-        gauss_B[k].data[0][i] += t * (tB - gauss_B[k].data[0][i]);
+        R0[i] += t * (tR - R0[i]);
+        G0[i] += t * (tG - G0[i]);
+        B0[i] += t * (tB - B0[i]);
       }
 
       /* Rebuild higher Gaussian pyramid levels from the corrected level 0 */
       for (int level = 1; level < MAX_PYRAMID_LEVELS; ++level) {
-        if (!gauss_R[k].data[level])
-          break;
-        int pw = gauss_R[k].width[level - 1], ph = gauss_R[k].height[level - 1];
-        int nw = gauss_R[k].width[level],     nh = gauss_R[k].height[level];
-        gaussian_reduce_scalar(gauss_R[k].data[level - 1], pw, ph,
-                               gauss_R[k].data[level], nw, nh);
-        gaussian_reduce_scalar(gauss_G[k].data[level - 1], pw, ph,
-                               gauss_G[k].data[level], nw, nh);
-        gaussian_reduce_scalar(gauss_B[k].data[level - 1], pw, ph,
-                               gauss_B[k].data[level], nw, nh);
+        int pw = lev_W[level - 1], ph = lev_H[level - 1];
+        int nw = lev_W[level], nh = lev_H[level];
+        gaussian_reduce_scalar(gR.data[level - 1], pw, ph, gR.data[level], nw,
+                               nh);
+        gaussian_reduce_scalar(gG.data[level - 1], pw, ph, gG.data[level], nw,
+                               nh);
+        gaussian_reduce_scalar(gB.data[level - 1], pw, ph, gB.data[level], nw,
+                               nh);
       }
     }
-  }
 
-  /* Determine usable number of levels L (min across all pyramids) */
-  int L = get_pyr_levels(&gauss_R[0]);
-  if (L <= 0)
-    goto OOM_FAIL;
-  for (int k = 0; k < use_max_images; ++k) {
-    int lk;
-    lk = get_pyr_levels(&gauss_R[k]);      if (lk < L) L = lk;
-    lk = get_pyr_levels(&gauss_G[k]);      if (lk < L) L = lk;
-    lk = get_pyr_levels(&gauss_B[k]);      if (lk < L) L = lk;
-    lk = get_pyr_levels(&gauss_weight[k]); if (lk < L) L = lk;
-  }
-  if (pyramid_levels_override > 0 && pyramid_levels_override < L)
-    L = pyramid_levels_override;
-  if (L <= 0)
-    goto OOM_FAIL;
-
-  /* Build Laplacian pyramids for R, G, B */
-  float *lap_R[MAX_IMAGES][MAX_PYRAMID_LEVELS] = {{0}};
-  float *lap_G[MAX_IMAGES][MAX_PYRAMID_LEVELS] = {{0}};
-  float *lap_B[MAX_IMAGES][MAX_PYRAMID_LEVELS] = {{0}};
-  int lap_W[MAX_PYRAMID_LEVELS] = {0};
-  int lap_H[MAX_PYRAMID_LEVELS] = {0};
-
-  for (int k = 0; k < use_max_images; ++k) {
-    for (int level = 0; level < L; ++level) {
-      int wL = gauss_R[k].width[level];
-      int hL = gauss_R[k].height[level];
-      if (k == 0) { lap_W[level] = wL; lap_H[level] = hL; }
-      size_t sz = (size_t)wL * hL * sizeof(float);
-      lap_R[k][level] = (float *)allsky_safe_malloc(sz);
-      lap_G[k][level] = (float *)allsky_safe_malloc(sz);
-      lap_B[k][level] = (float *)allsky_safe_malloc(sz);
-      if (!lap_R[k][level] || !lap_G[k][level] || !lap_B[k][level])
-        goto OOM_FAIL;
-    }
-
+    /* Laplacian pyramid in place: lap[l] = gauss[l] - expand(gauss[l+1]).
+     * Ascending order, so gauss[l+1] is still unmodified when level l is
+     * computed. The top level stays the coarsest Gaussian. */
     for (int level = 0; level < L - 1; ++level) {
-      int wL = gauss_R[k].width[level];
-      int hL = gauss_R[k].height[level];
-      int wN = gauss_R[k].width[level + 1];
-      int hN = gauss_R[k].height[level + 1];
-      size_t sz = (size_t)wL * hL;
-
-      float *tmp = (float *)allsky_safe_malloc(sz * sizeof(float));
-      if (!tmp)
-        goto OOM_FAIL;
-
-      gaussian_expand_scalar(gauss_R[k].data[level + 1], wN, hN, tmp, wL, hL);
+      const int wL = lev_W[level], hL = lev_H[level];
+      const int wN = lev_W[level + 1], hN = lev_H[level + 1];
+      const int sz = wL * hL;
+      Pyramid *g3[3] = {&gR, &gG, &gB};
+      for (int c = 0; c < 3; ++c) {
+        float *g = g3[c]->data[level];
+        gaussian_expand_scalar(g3[c]->data[level + 1], wN, hN, lap_tmp, wL,
+                               hL);
 #pragma omp parallel for
-      for (int i = 0; i < (int)sz; ++i)
-        lap_R[k][level][i] = gauss_R[k].data[level][i] - tmp[i];
-
-      gaussian_expand_scalar(gauss_G[k].data[level + 1], wN, hN, tmp, wL, hL);
-#pragma omp parallel for
-      for (int i = 0; i < (int)sz; ++i)
-        lap_G[k][level][i] = gauss_G[k].data[level][i] - tmp[i];
-
-      gaussian_expand_scalar(gauss_B[k].data[level + 1], wN, hN, tmp, wL, hL);
-#pragma omp parallel for
-      for (int i = 0; i < (int)sz; ++i)
-        lap_B[k][level][i] = gauss_B[k].data[level][i] - tmp[i];
-
-      allsky_safe_free(tmp);
-    }
-    /* Top level = coarsest Gaussian */
-    {
-      int wTop = gauss_R[k].width[L - 1], hTop = gauss_R[k].height[L - 1];
-      size_t sz = (size_t)wTop * hTop;
-      memcpy(lap_R[k][L - 1], gauss_R[k].data[L - 1], sz * sizeof(float));
-      memcpy(lap_G[k][L - 1], gauss_G[k].data[L - 1], sz * sizeof(float));
-      memcpy(lap_B[k][L - 1], gauss_B[k].data[L - 1], sz * sizeof(float));
-    }
-  }
-
-  /* Fuse Laplacian levels for R, G, B using Gaussian weight pyramids */
-  float *fused_R[MAX_PYRAMID_LEVELS] = {0};
-  float *fused_G[MAX_PYRAMID_LEVELS] = {0};
-  float *fused_B[MAX_PYRAMID_LEVELS] = {0};
-
-  for (int level = 0; level < L; ++level) {
-    int wL = lap_W[level];
-    int hL = lap_H[level];
-
-    for (int k = 0; k < use_max_images; ++k) {
-      if (gauss_weight[k].width[level] != wL ||
-          gauss_weight[k].height[level] != hL)
-        goto OOM_FAIL;
+        for (int i = 0; i < sz; ++i)
+          g[i] = g[i] - lap_tmp[i];
+      }
     }
 
-    size_t sz = (size_t)wL * hL;
-    fused_R[level] = (float *)allsky_safe_malloc(sz * sizeof(float));
-    fused_G[level] = (float *)allsky_safe_malloc(sz * sizeof(float));
-    fused_B[level] = (float *)allsky_safe_malloc(sz * sizeof(float));
-    if (!fused_R[level] || !fused_G[level] || !fused_B[level])
-      goto OOM_FAIL;
-
+    /* Accumulate. The weights are normalized per pixel, so the weighted sum
+     * is the fused value; where the weights vanish the frame with the
+     * largest weight wins. */
+    for (int level = 0; level < L; ++level) {
+      const int sz = lev_W[level] * lev_H[level];
+      const float *lR = gR.data[level], *lG = gG.data[level],
+                  *lB = gB.data[level], *w = gW.data[level];
+      const float *ws = w_sum[level];
+      const unsigned char *wb = w_best[level];
+      float *fR = fused_R[level], *fG = fused_G[level], *fB = fused_B[level];
 #pragma omp parallel for
-    for (int idx = 0; idx < (int)sz; ++idx) {
-      float sum_R = 0.f, sum_G = 0.f, sum_B = 0.f, sum_w = 0.f;
-      float max_w = 0.f, best_R = 0.f, best_G = 0.f, best_B = 0.f;
-
-      for (int k = 0; k < use_max_images; ++k) {
-        float w_i = gauss_weight[k].data[level][idx];
-        sum_R += lap_R[k][level][idx] * w_i;
-        sum_G += lap_G[k][level][idx] * w_i;
-        sum_B += lap_B[k][level][idx] * w_i;
-        sum_w += w_i;
-        if (w_i > max_w) {
-          max_w = w_i;
-          best_R = lap_R[k][level][idx];
-          best_G = lap_G[k][level][idx];
-          best_B = lap_B[k][level][idx];
+      for (int idx = 0; idx < sz; ++idx) {
+        if (ws[idx] > 1e-8f) {
+          const float w_i = w[idx];
+          fR[idx] += lR[idx] * w_i;
+          fG[idx] += lG[idx] * w_i;
+          fB[idx] += lB[idx] * w_i;
+        } else if (wb[idx] == (unsigned char)k) {
+          fR[idx] = lR[idx];
+          fG[idx] = lG[idx];
+          fB[idx] = lB[idx];
         }
       }
-
-      /* Weights are already normalized per-pixel, so sum_Lp is the fused value */
-      if (sum_w > 1e-8f) {
-        fused_R[level][idx] = sum_R;
-        fused_G[level][idx] = sum_G;
-        fused_B[level][idx] = sum_B;
-      } else {
-        fused_R[level][idx] = best_R;
-        fused_G[level][idx] = best_G;
-        fused_B[level][idx] = best_B;
-      }
     }
+
+    free_gaussian_pyramid(&gR);
+    free_gaussian_pyramid(&gG);
+    free_gaussian_pyramid(&gB);
+    free_gaussian_pyramid(&gW);
   }
 
-  /* Reconstruct R, G, B from Laplacian pyramids */
+  allsky_safe_free(lap_tmp);
+  lap_tmp = NULL;
+  for (int k = 0; k < use_max_images; ++k) {
+    allsky_safe_free(weight_maps[k]);
+    weight_maps[k] = NULL;
+  }
+  for (int level = 0; level < L; ++level) {
+    allsky_safe_free(w_sum[level]);
+    w_sum[level] = NULL;
+    allsky_safe_free(w_best[level]);
+    w_best[level] = NULL;
+  }
+
+  /* Reconstruct R, G, B from the fused Laplacian pyramids */
   {
-    size_t top_sz = (size_t)lap_W[L - 1] * lap_H[L - 1];
+    size_t top_sz = (size_t)lev_W[L - 1] * lev_H[L - 1];
     float *cur_R = (float *)allsky_safe_malloc(top_sz * sizeof(float));
     float *cur_G = (float *)allsky_safe_malloc(top_sz * sizeof(float));
     float *cur_B = (float *)allsky_safe_malloc(top_sz * sizeof(float));
@@ -1221,8 +1224,8 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
     memcpy(cur_B, fused_B[L - 1], top_sz * sizeof(float));
 
     for (int level = L - 2; level >= 0; --level) {
-      int wL = lap_W[level];
-      int hL = lap_H[level];
+      int wL = lev_W[level];
+      int hL = lev_H[level];
       float *up_R = (float *)allsky_safe_malloc((size_t)wL * hL * sizeof(float));
       float *up_G = (float *)allsky_safe_malloc((size_t)wL * hL * sizeof(float));
       float *up_B = (float *)allsky_safe_malloc((size_t)wL * hL * sizeof(float));
@@ -1231,9 +1234,9 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
         allsky_safe_free(cur_R); allsky_safe_free(cur_G); allsky_safe_free(cur_B);
         goto OOM_FAIL;
       }
-      gaussian_expand_scalar(cur_R, lap_W[level + 1], lap_H[level + 1], up_R, wL, hL);
-      gaussian_expand_scalar(cur_G, lap_W[level + 1], lap_H[level + 1], up_G, wL, hL);
-      gaussian_expand_scalar(cur_B, lap_W[level + 1], lap_H[level + 1], up_B, wL, hL);
+      gaussian_expand_scalar(cur_R, lev_W[level + 1], lev_H[level + 1], up_R, wL, hL);
+      gaussian_expand_scalar(cur_G, lev_W[level + 1], lev_H[level + 1], up_G, wL, hL);
+      gaussian_expand_scalar(cur_B, lev_W[level + 1], lev_H[level + 1], up_B, wL, hL);
 #pragma omp parallel for
       for (int i = 0; i < wL * hL; ++i) {
         up_R[i] += fused_R[level][i];
@@ -1261,32 +1264,10 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
     allsky_safe_free(cur_B);
   }
 
-  /* Cleanup */
-  for (int k = 0; k < use_max_images; ++k) {
-    if (weight_maps[k])   allsky_safe_free(weight_maps[k]);
-    if (luma_maps[k])     allsky_safe_free(luma_maps[k]);
-    if (contrast_maps[k]) allsky_safe_free(contrast_maps[k]);
-  }
-
-  for (int k = 0; k < use_max_images; ++k) {
-    for (int level = 0; level < L; ++level) {
-      if (lap_R[k][level]) allsky_safe_free(lap_R[k][level]);
-      if (lap_G[k][level]) allsky_safe_free(lap_G[k][level]);
-      if (lap_B[k][level]) allsky_safe_free(lap_B[k][level]);
-    }
-  }
-
-  for (int k = 0; k < use_max_images; ++k) {
-    free_gaussian_pyramid(&gauss_R[k]);
-    free_gaussian_pyramid(&gauss_G[k]);
-    free_gaussian_pyramid(&gauss_B[k]);
-    free_gaussian_pyramid(&gauss_weight[k]);
-  }
-
   for (int level = 0; level < L; ++level) {
-    if (fused_R[level]) allsky_safe_free(fused_R[level]);
-    if (fused_G[level]) allsky_safe_free(fused_G[level]);
-    if (fused_B[level]) allsky_safe_free(fused_B[level]);
+    allsky_safe_free(fused_R[level]);
+    allsky_safe_free(fused_G[level]);
+    allsky_safe_free(fused_B[level]);
   }
 
   printf("HDR Multi Scale Fusion: ok, L=%d, pyramid_levels_override=%d\n", L,
@@ -1295,32 +1276,25 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
   return 0;
 
 OOM_FAIL:
+  fprintf(stderr, "HDR Multi Scale Fusion: out of memory\n");
   for (int k = 0; k < use_max_images; ++k) {
-    if (weight_maps[k])   { allsky_safe_free(weight_maps[k]);   weight_maps[k]   = NULL; }
-    if (luma_maps[k])     { allsky_safe_free(luma_maps[k]);     luma_maps[k]     = NULL; }
-    if (contrast_maps[k]) { allsky_safe_free(contrast_maps[k]); contrast_maps[k] = NULL; }
+    allsky_safe_free(weight_maps[k]);
+    allsky_safe_free(luma_maps[k]);
+    allsky_safe_free(contrast_maps[k]);
   }
-
-  for (int k = 0; k < use_max_images; ++k) {
-    for (int level = 0; level < MAX_PYRAMID_LEVELS; ++level) {
-      if (lap_R[k][level]) { allsky_safe_free(lap_R[k][level]); lap_R[k][level] = NULL; }
-      if (lap_G[k][level]) { allsky_safe_free(lap_G[k][level]); lap_G[k][level] = NULL; }
-      if (lap_B[k][level]) { allsky_safe_free(lap_B[k][level]); lap_B[k][level] = NULL; }
-    }
-  }
-
-  for (int k = 0; k < use_max_images; ++k) {
-    free_gaussian_pyramid(&gauss_R[k]);
-    free_gaussian_pyramid(&gauss_G[k]);
-    free_gaussian_pyramid(&gauss_B[k]);
-    free_gaussian_pyramid(&gauss_weight[k]);
-  }
-
   for (int level = 0; level < MAX_PYRAMID_LEVELS; ++level) {
-    if (fused_R[level]) { allsky_safe_free(fused_R[level]); fused_R[level] = NULL; }
-    if (fused_G[level]) { allsky_safe_free(fused_G[level]); fused_G[level] = NULL; }
-    if (fused_B[level]) { allsky_safe_free(fused_B[level]); fused_B[level] = NULL; }
+    allsky_safe_free(w_sum[level]);
+    allsky_safe_free(w_max[level]);
+    allsky_safe_free(w_best[level]);
+    allsky_safe_free(fused_R[level]);
+    allsky_safe_free(fused_G[level]);
+    allsky_safe_free(fused_B[level]);
   }
+  allsky_safe_free(lap_tmp);
+  free_gaussian_pyramid(&gR);
+  free_gaussian_pyramid(&gG);
+  free_gaussian_pyramid(&gB);
+  free_gaussian_pyramid(&gW);
 
   return 2;
 }
