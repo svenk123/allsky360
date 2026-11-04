@@ -21,6 +21,70 @@
 
 #define CLAMPF(x) ((x) < 0.0f ? 0.0f : ((x) > 1.0f ? 1.0f : (x)))
 
+/* Get a device pointer for an image buffer without copying, if possible.
+ * main.c passes hdr_image_device: the device pointer of a zero-copy mapped
+ * host buffer (cudaHostAllocMapped). On Jetson Orin CPU and GPU share the
+ * DDR, so the kernels can work on it in place. Device, managed and mapped
+ * host memory are used directly; only plain (pageable) host memory is
+ * copied to a temporary device buffer (*tmp set, caller frees and copies
+ * back). Returns 0 on success. */
+static int image_device_ptr(float *rgbf, size_t bytes, float **dev,
+                            float **tmp, const char *name) {
+    *dev = NULL;
+    *tmp = NULL;
+
+    cudaPointerAttributes attr;
+    cudaError_t err = cudaPointerGetAttributes(&attr, rgbf);
+    if (err == cudaSuccess) {
+        if (attr.type == cudaMemoryTypeDevice ||
+            attr.type == cudaMemoryTypeManaged) {
+            *dev = rgbf;
+            return 0;
+        }
+        if (attr.type == cudaMemoryTypeHost && attr.devicePointer) {
+            *dev = (float *)attr.devicePointer;
+            return 0;
+        }
+    } else {
+        cudaGetLastError(); /* clear the error of an unknown pointer */
+    }
+
+    /* Pageable host memory: copy */
+    err = cudaMalloc(tmp, bytes);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "%s CUDA: cudaMalloc failed: %s\n", name,
+                cudaGetErrorString(err));
+        *tmp = NULL;
+        return 1;
+    }
+    err = cudaMemcpy(*tmp, rgbf, bytes, cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "%s CUDA: cudaMemcpy H2D failed: %s\n", name,
+                cudaGetErrorString(err));
+        cudaFree(*tmp);
+        *tmp = NULL;
+        return 1;
+    }
+    *dev = *tmp;
+    return 0;
+}
+
+/* Finish image_device_ptr(): copy back and free the temporary buffer, if
+ * one was needed. Returns 0 on success. */
+static int image_device_release(float *rgbf, size_t bytes, float *tmp,
+                                const char *name) {
+    if (!tmp)
+        return 0;
+    cudaError_t err = cudaMemcpy(rgbf, tmp, bytes, cudaMemcpyDeviceToHost);
+    cudaFree(tmp);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "%s CUDA: cudaMemcpy D2H failed: %s\n", name,
+                cudaGetErrorString(err));
+        return 1;
+    }
+    return 0;
+}
+
 /* Rec.709 luminance */
 __device__ static inline float luma709(float r, float g, float b) {
     return 0.2126f * r + 0.7152f * g + 0.0722f * b;
@@ -97,25 +161,12 @@ extern "C" int reinhard_tonemap_rgbf1_cuda(float *rgbf, int width, int height,
     const int pixel_count = width * height;
     const float eps = 1e-6f;
 
-    float *d_rgbf = NULL;
+    const size_t bytes = (size_t)pixel_count * 4 * sizeof(float);
+    float *d_rgbf = NULL, *d_tmp = NULL;
     cudaError_t err;
 
-    err = cudaMalloc(&d_rgbf, (size_t)pixel_count * 4 * sizeof(float));
-    if (err != cudaSuccess) {
-        fprintf(stderr, "Reinhard CUDA: cudaMalloc failed: %s\n",
-                cudaGetErrorString(err));
+    if (image_device_ptr(rgbf, bytes, &d_rgbf, &d_tmp, "Reinhard"))
         return 1;
-    }
-
-    err = cudaMemcpy(d_rgbf, rgbf,
-                     (size_t)pixel_count * 4 * sizeof(float),
-                     cudaMemcpyHostToDevice);
-    if (err != cudaSuccess) {
-        fprintf(stderr, "Reinhard CUDA: cudaMemcpy H2D failed: %s\n",
-                cudaGetErrorString(err));
-        cudaFree(d_rgbf);
-        return 1;
-    }
 
     float lw = white_point;
 
@@ -129,7 +180,7 @@ extern "C" int reinhard_tonemap_rgbf1_cuda(float *rgbf, int width, int height,
         if (err != cudaSuccess) {
             fprintf(stderr, "Reinhard CUDA: cudaMalloc block_max failed: %s\n",
                     cudaGetErrorString(err));
-            cudaFree(d_rgbf);
+            cudaFree(d_tmp);
             return 1;
         }
 
@@ -141,7 +192,7 @@ extern "C" int reinhard_tonemap_rgbf1_cuda(float *rgbf, int width, int height,
         float *h_block_max = (float *)malloc(grid_size * sizeof(float));
         if (!h_block_max) {
             cudaFree(d_block_max);
-            cudaFree(d_rgbf);
+            cudaFree(d_tmp);
             return 1;
         }
         cudaMemcpy(h_block_max, d_block_max,
@@ -166,18 +217,16 @@ extern "C" int reinhard_tonemap_rgbf1_cuda(float *rgbf, int width, int height,
     const int block_size = 256;
     const int grid_size  = (pixel_count + block_size - 1) / block_size;
     reinhard_apply_kernel<<<grid_size, block_size>>>(d_rgbf, pixel_count, lw2);
-    cudaDeviceSynchronize();
-
-    err = cudaMemcpy(rgbf, d_rgbf,
-                     (size_t)pixel_count * 4 * sizeof(float),
-                     cudaMemcpyDeviceToHost);
-    cudaFree(d_rgbf);
-
+    err = cudaDeviceSynchronize();
     if (err != cudaSuccess) {
-        fprintf(stderr, "Reinhard CUDA: cudaMemcpy D2H failed: %s\n",
+        fprintf(stderr, "Reinhard CUDA: kernel failed: %s\n",
                 cudaGetErrorString(err));
+        cudaFree(d_tmp);
         return 1;
     }
+
+    if (image_device_release(rgbf, bytes, d_tmp, "Reinhard"))
+        return 1;
 
     printf("Reinhard TMO (CUDA): ok\n");
     return 0;
@@ -236,42 +285,27 @@ extern "C" int apply_tone_curve_rgbf1_cuda(float *rgbf, int width, int height,
 
     const int pixel_count = width * height;
 
-    float *d_rgbf = NULL;
+    const size_t bytes = (size_t)pixel_count * 4 * sizeof(float);
+    float *d_rgbf = NULL, *d_tmp = NULL;
     cudaError_t err;
 
-    err = cudaMalloc(&d_rgbf, (size_t)pixel_count * 4 * sizeof(float));
-    if (err != cudaSuccess) {
-        fprintf(stderr, "Tone Curve CUDA: cudaMalloc failed: %s\n",
-                cudaGetErrorString(err));
+    if (image_device_ptr(rgbf, bytes, &d_rgbf, &d_tmp, "Tone Curve"))
         return 1;
-    }
-
-    err = cudaMemcpy(d_rgbf, rgbf,
-                     (size_t)pixel_count * 4 * sizeof(float),
-                     cudaMemcpyHostToDevice);
-    if (err != cudaSuccess) {
-        fprintf(stderr, "Tone Curve CUDA: cudaMemcpy H2D failed: %s\n",
-                cudaGetErrorString(err));
-        cudaFree(d_rgbf);
-        return 1;
-    }
 
     const int block_size = 256;
     const int grid_size  = (pixel_count + block_size - 1) / block_size;
     tone_curve_kernel<<<grid_size, block_size>>>(d_rgbf, pixel_count,
                                                  shadow_lift, midtone_contrast);
-    cudaDeviceSynchronize();
-
-    err = cudaMemcpy(rgbf, d_rgbf,
-                     (size_t)pixel_count * 4 * sizeof(float),
-                     cudaMemcpyDeviceToHost);
-    cudaFree(d_rgbf);
-
+    err = cudaDeviceSynchronize();
     if (err != cudaSuccess) {
-        fprintf(stderr, "Tone Curve CUDA: cudaMemcpy D2H failed: %s\n",
+        fprintf(stderr, "Tone Curve CUDA: kernel failed: %s\n",
                 cudaGetErrorString(err));
+        cudaFree(d_tmp);
         return 1;
     }
+
+    if (image_device_release(rgbf, bytes, d_tmp, "Tone Curve"))
+        return 1;
 
     printf("Tone Curve (CUDA): ok\n");
     return 0;
