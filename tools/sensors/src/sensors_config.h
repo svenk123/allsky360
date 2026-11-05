@@ -46,6 +46,9 @@ typedef struct {
   int wind_direction_address;
   int wind_direction_register;
   int wind_direction_offset; /* mounting correction, added modulo 360 */
+  /* Below this wind speed (m/s, anemometer) the vane turns at random: the
+   * last stored direction is kept instead of the measured one. 0 = off */
+  double wind_calm_speed;
 
   /* Control cabinet temperature/humidity (humidity at register,
    * temperature at register + 1) */

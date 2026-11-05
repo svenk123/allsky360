@@ -59,4 +59,13 @@ void sensors_reading_init(sensors_reading_t *r, time_t timestamp);
  */
 int sensors_database_store(const char *db_filename, const sensors_reading_t *r);
 
+/**
+ * Latest non-NULL value of a column of table 'sensors' with a timestamp
+ * before 'before'. column must be a fixed column name, not user input.
+ * @return 0 if found (value and its timestamp set), -1 if the database,
+ *         the table or a value is missing
+ */
+int sensors_database_last_value(const char *db_filename, const char *column,
+                                time_t before, double *value, time_t *timestamp);
+
 #endif /* SENSORS_DATABASE_H */

@@ -41,6 +41,7 @@ void sensors_config_defaults(sensors_config_t *c) {
   c->wind_speed_scale = 1.0;
   c->wind_direction_address = 0;
   c->wind_direction_register = 1;
+  c->wind_calm_speed = 0.3; /* Beaufort 0, calm: below 0.3 m/s */
   c->cabinet_address = 0;
   c->cabinet_register = 0;
 }
@@ -159,6 +160,8 @@ int sensors_config_load(const char *filename, sensors_config_t *c) {
       set_int(key, value, 0, 0xFFFF, &c->wind_direction_register);
     else if (strcmp(key, "modbus_wind_direction_offset") == 0)
       set_int(key, value, 0, 359, &c->wind_direction_offset);
+    else if (strcmp(key, "modbus_wind_calm_speed") == 0)
+      set_double(key, value, 0.0, 10.0, &c->wind_calm_speed);
     else if (strcmp(key, "modbus_cabinet_address") == 0)
       set_int(key, value, 0, 247, &c->cabinet_address);
     else if (strcmp(key, "modbus_cabinet_register") == 0)
@@ -179,8 +182,9 @@ void sensors_config_print(const sensors_config_t *c) {
          c->weather_address, c->weather_register, c->weather_wind_direction_offset);
   printf("anemometer:      address %d, register %d, scale %g\n",
          c->wind_speed_address, c->wind_speed_register, c->wind_speed_scale);
-  printf("wind vane:       address %d, register %d, offset %d\n",
-         c->wind_direction_address, c->wind_direction_register, c->wind_direction_offset);
+  printf("wind vane:       address %d, register %d, offset %d, held below %g m/s\n",
+         c->wind_direction_address, c->wind_direction_register, c->wind_direction_offset,
+         c->wind_calm_speed);
   printf("cabinet sensor:  address %d, register %d\n", c->cabinet_address,
          c->cabinet_register);
 }

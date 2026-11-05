@@ -451,6 +451,12 @@ Values outside plausible ranges (e.g. humidity > 100 %, pressure outside
 300-1100 hPa) are stored as `NULL`, as are values of sensors that did not
 answer.
 
+In calm air the wind vane turns at random. When the anemometer reports less
+than `modbus_wind_calm_speed` (default `0.3` m/s, Beaufort 0; `0` switches it
+off), the tool stores the last stored `wind_direction` (today's or yesterday's
+database) instead of the measured one; without an earlier direction it stores
+`NULL`. If the anemometer did not answer, the measured direction is kept.
+
 ### Running automatically
 
 `allsky360-sensors.timer` starts the tool every 5 minutes (`OnUnitActiveSec=5min`,

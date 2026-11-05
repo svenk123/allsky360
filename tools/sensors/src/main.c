@@ -26,6 +26,10 @@
  *  - anemometer (wind speed) and wind vane (wind direction)
  *  - temperature/humidity sensor in the control cabinet
  *
+ * Calm: when the anemometer reports less than modbus_wind_calm_speed, the
+ * wind vane turns at random, so the last stored direction is kept instead of
+ * the measured one (looked up in today's and yesterday's database).
+ *
  * Exit status: 0 = at least one sensor read (or none configured),
  *              2 = no configured sensor answered, 1 = configuration, bus or
  *              database error.
@@ -164,6 +168,49 @@ static int read_cabinet(modbus_bus_t *bus, const sensors_config_t *c,
   return 0;
 }
 
+/* Daily database of a UTC day, like the camera daemon */
+static void database_path(char *buf, size_t size, const char *dir, time_t t) {
+  struct tm tm_utc;
+  gmtime_r(&t, &tm_utc);
+  snprintf(buf, size, "%s/database_%04d%02d%02d.db", dir, tm_utc.tm_year + 1900,
+           tm_utc.tm_mon + 1, tm_utc.tm_mday);
+}
+
+/* Calm: replace the vane reading by the last stored direction. Without an
+ * earlier direction (first run in calm) it stays NULL, since the measured
+ * value is random. Without a wind speed (anemometer failed) the measured
+ * direction is kept. */
+static void hold_direction_in_calm(const sensors_config_t *c, sensors_reading_t *r) {
+  if (c->wind_calm_speed <= 0.0 || isnan(r->wind_speed) || isnan(r->wind_direction) ||
+      r->wind_speed >= c->wind_calm_speed)
+    return;
+
+  double measured = r->wind_direction, last;
+  time_t last_t;
+  int found = -1;
+  /* Today's database, then yesterday's (first reading after 00:00 UTC) */
+  for (int day = 0; day < 2 && found != 0; day++) {
+    char path[512];
+    database_path(path, sizeof(path), c->database_directory, r->timestamp - day * 86400);
+    found = sensors_database_last_value(path, "wind_direction", r->timestamp, &last, &last_t);
+  }
+  r->wind_direction = found == 0 ? last : NAN;
+
+  if (verbose) {
+    if (found == 0) {
+      char when[32];
+      struct tm tm_utc;
+      gmtime_r(&last_t, &tm_utc);
+      strftime(when, sizeof(when), "%Y-%m-%d %H:%M UTC", &tm_utc);
+      printf("calm (%.1f m/s < %g): wind direction %.0f deg kept from %s, measured %.0f deg ignored\n",
+             r->wind_speed, c->wind_calm_speed, last, when, measured);
+    } else {
+      printf("calm (%.1f m/s < %g): no earlier wind direction, measured %.0f deg ignored\n",
+             r->wind_speed, c->wind_calm_speed, measured);
+    }
+  }
+}
+
 static void json_add(json_object *o, const char *key, double value) {
   json_object_object_add(o, key, isnan(value) ? NULL : json_object_new_double(value));
 }
@@ -270,6 +317,8 @@ int main(int argc, char *argv[]) {
     ok++;
   modbus_close(&bus);
 
+  hold_direction_in_calm(&config, &r);
+
   char *json = reading_to_json(&r);
   if (dry_run || verbose)
     printf("%s\n", json);
@@ -284,13 +333,8 @@ int main(int argc, char *argv[]) {
   free(json);
 
   if (ok > 0 && !dry_run) {
-    /* One database per UTC day, like the camera daemon */
-    struct tm tm_utc;
-    gmtime_r(&r.timestamp, &tm_utc);
     char db_path[512];
-    snprintf(db_path, sizeof(db_path), "%s/database_%04d%02d%02d.db",
-             config.database_directory, tm_utc.tm_year + 1900, tm_utc.tm_mon + 1,
-             tm_utc.tm_mday);
+    database_path(db_path, sizeof(db_path), config.database_directory, r.timestamp);
     if (sensors_database_store(db_path, &r) != 0)
       ret = 1;
     else if (verbose)

@@ -159,6 +159,9 @@ modbus_wind_speed_scale=1.0
 modbus_wind_direction_address=0
 modbus_wind_direction_register=1
 modbus_wind_direction_offset=0
+# Calm: below this wind speed (m/s, anemometer) the vane turns at random, so
+# the last stored direction is kept instead of the measured one. 0 = off
+modbus_wind_calm_speed=0.3
 
 # Temperature/humidity sensor in the control cabinet
 # (humidity at the register, temperature at register + 1)

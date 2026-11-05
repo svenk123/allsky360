@@ -56,6 +56,36 @@ static void bind_value(sqlite3_stmt *stmt, int index, double value) {
     sqlite3_bind_double(stmt, index, value);
 }
 
+int sensors_database_last_value(const char *db_filename, const char *column,
+                                time_t before, double *value, time_t *timestamp) {
+  sqlite3 *db = NULL;
+  /* Read only: a missing database (new day, first run) is not created */
+  if (sqlite3_open_v2(db_filename, &db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK) {
+    sqlite3_close(db);
+    return -1;
+  }
+  sqlite3_busy_timeout(db, 5000);
+
+  char sql[256];
+  snprintf(sql, sizeof(sql),
+           "SELECT timestamp, %s FROM sensors WHERE %s IS NOT NULL AND timestamp < ? "
+           "ORDER BY timestamp DESC LIMIT 1;",
+           column, column);
+  sqlite3_stmt *stmt = NULL;
+  int ret = -1;
+  if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+    sqlite3_bind_int64(stmt, 1, (sqlite3_int64)before);
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+      *timestamp = (time_t)sqlite3_column_int64(stmt, 0);
+      *value = sqlite3_column_double(stmt, 1);
+      ret = 0;
+    }
+  }
+  sqlite3_finalize(stmt);
+  sqlite3_close(db);
+  return ret;
+}
+
 int sensors_database_store(const char *db_filename, const sensors_reading_t *r) {
   sqlite3 *db = NULL;
   if (sqlite3_open(db_filename, &db) != SQLITE_OK) {
