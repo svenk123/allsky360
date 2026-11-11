@@ -29,8 +29,7 @@ const path = require('path');
 const TIMER_INTERVAL_S = {
     'allsky360-meteo.service': 30 * 60,
     'allsky360-aurora.service': 5 * 60,
-    'allsky360-mount-position.service': 60,
-    'allsky360-sensors.service': 5 * 60
+    'allsky360-mount-position.service': 60
 };
 const STALE_FACTOR = 3;
 

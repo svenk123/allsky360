@@ -1,14 +1,18 @@
 [Unit]
-Description=Allsky360 fetch: RS485/Modbus sensors (oneshot)
+Description=Allsky360 RS485/Modbus sensors (wind every 10 s, a reading every 5 minutes)
 
 [Service]
-Type=oneshot
+# Runs continuously: anemometer and wind vane are sampled every
+# modbus_wind_sample_interval seconds into a ring buffer in RAM, one row per modbus_interval goes to the database (see
+# TOOLS.md). Replaces the former allsky360-sensors.timer.
+Type=simple
 User=allskyuser
 Group=allskygroup
 WorkingDirectory=/home/allskyuser/database
-ExecStart=/opt/allsky360/bin/allsky360-sensors -c /home/allskyuser/config.ini -d /home/allskyuser/database -f /opt/allsky360/allsky-api/public/latest_sensor_data.json
-# Hard limit for one run: 4 sensors x retries x timeout stays well below
-TimeoutStartSec=50s
+ExecStart=/opt/allsky360/bin/allsky360-sensors --daemon -c /home/allskyuser/config.ini -d /home/allskyuser/database -f /opt/allsky360/allsky-api/public/latest_sensor_data.json
+# Bus or GPIO not available (e.g. USB adapter unplugged): try again later
+Restart=on-failure
+RestartSec=30
 
 # --- Sandbox (review.md, SEC-09) ------------------------------------------
 # Like the other fetch tools, but instead of PrivateDevices= an allow list
@@ -51,3 +55,6 @@ SystemCallFilter=@system-service
 SystemCallFilter=~@privileged
 SystemCallErrorNumber=EPERM
 UMask=0022
+
+[Install]
+WantedBy=multi-user.target

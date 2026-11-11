@@ -408,7 +408,7 @@ This installs all the tools along with the main `allsky360-camera` application.
 
 ## allsky360-sensors (RS485 / Modbus sensors)
 
-Reads the sensors on the station's RS485 bus once per run and stores one row
+Runs continuously and stores one row every 5 minutes (`modbus_interval`)
 in the table `sensors` of the daily database (`database_YYYYMMDD.db`, UTC day,
 same file as the camera data). The last reading is also written to
 `allsky-api/public/latest_sensor_data.json` (served as `/latest_sensor_data.json`);
@@ -451,31 +451,73 @@ Values outside plausible ranges (e.g. humidity > 100 %, pressure outside
 300-1100 hPa) are stored as `NULL`, as are values of sensors that did not
 answer.
 
-In calm air the wind vane turns at random. When the anemometer reports less
-than `modbus_wind_calm_speed` (default `0.3` m/s, Beaufort 0; `0` switches it
-off), the tool stores the last stored `wind_direction` (today's or yesterday's
-database) instead of the measured one; without an earlier direction it stores
-`NULL`. If the anemometer did not answer, the measured direction is kept.
+#### Wind: 10-minute mean
+
+A single reading of the wind vane every 5 minutes is a random snapshot in
+gusty or changing wind. As recommended by the WMO (CIMO guide, WMO-No. 8)
+the tool therefore samples the anemometer and the wind vane together every
+`modbus_wind_sample_interval` seconds (default `10`, i.e. 60 samples in
+10 minutes; 1..60) and stores the mean over the last
+`modbus_wind_average_minutes` (default `10`):
+
+* `wind_speed`: scalar mean of the samples (m/s, two decimals).
+* `wind_direction`: vector mean weighted by the wind speed of the same sample
+  (the resultant wind), so 350° and 10° average to 0°, not 180°.
+
+The samples live only in a ring buffer in RAM (one hour at most); nothing is
+written per sample, the SD card sees one database row and one JSON file per
+interval as before. After a (re)start the first row follows after at least two
+minutes of samples, on the next multiple of `modbus_interval`. A wind sample
+is requested only once (no retries, a missed sample costs little); failures
+are counted in the journal line of the next row, a warning follows only when
+a sensor stays silent for 60 s, and then a line when it answers again. The
+weather sensor and the cabinet sensor are read once per row (instantaneous
+values, with `modbus_retries`).
+
+Calm: below `modbus_wind_calm_speed` (default `0.3` m/s, Beaufort 0; `0`
+switches it off) the vane turns at random, so such samples do not count for
+the direction. With less than 30 s of windy samples in the window (at least 3
+samples) the last direction is kept (in RAM; after a restart the last stored one from today's
+or yesterday's database, `NULL` if there is none). Without an anemometer
+every vane sample has the same weight.
+
+The journal line of every row shows the mean, the strongest sample, the
+consistency of the direction (1 = steady, near 0 = variable) and how many
+samples were windy:
+
+```
+2026-11-11 10:05:00 UTC: 4 of 4 sensors; wind 10 min: 2.31 m/s (max 4.2), 245 deg, consistency 0.82, 41 of 60 samples windy; failed reads: anemometer 0, vane 2
+```
 
 ### Running automatically
 
-`allsky360-sensors.timer` starts the tool every 5 minutes (`OnUnitActiveSec=5min`,
-change it with `sudo systemctl edit allsky360-sensors.timer`). Like the other timers
-it is installed but not enabled by `make install`:
+`allsky360-sensors.service` runs `allsky360-sensors --daemon` continuously
+(restarted after 30 s if the bus is not available). Like the camera it is
+installed but not enabled by a fresh `make install`:
 
 ```bash
-sudo systemctl enable --now allsky360-sensors.timer
+sudo systemctl enable --now allsky360-sensors.service
 journalctl -u allsky360-sensors.service -f
 ```
+
+Up to November 2026 the tool was started by `allsky360-sensors.timer` every
+5 minutes. `make install` removes that timer and enables the service if the
+timer was enabled.
 
 The service account needs the groups `dialout` (serial port) and `gpio`
 (direction GPIO on the Jetson); `make install` adds them.
 
 ### Manual usage
 
+Without `--daemon` the tool reads every sensor once (instantaneous values,
+calm rule against the last stored direction). The daemon holds the lock on the
+serial port, so stop it first:
+
 ```bash
+sudo systemctl stop allsky360-sensors.service
 allsky360-sensors -c /home/allskyuser/config.ini -n -v   # read and print, no database
-allsky360-sensors -c config.ini -d /home/allskyuser/database -f latest_sensor_data.json
+allsky360-sensors -c /home/allskyuser/config.ini -n -D -vv   # daemon, every wind sample, no database
+sudo systemctl start allsky360-sensors.service
 ```
 
 | Option | Meaning |
@@ -483,8 +525,9 @@ allsky360-sensors -c config.ini -d /home/allskyuser/database -f latest_sensor_da
 | `-c, --config FILE` | config.ini (required) |
 | `-d, --databasedir DIR` | override `database_directory` |
 | `-f, --outfile FILE` | also write the reading as JSON (atomic) |
+| `-D, --daemon` | run continuously: wind every `modbus_wind_sample_interval` s into the RAM ring buffer, a stored row every `modbus_interval` s |
 | `-n, --dry-run` | read and print, do not write the database |
-| `-v, --verbose` | print the configuration and every failed attempt with the received bytes |
+| `-v, --verbose` | print the configuration and every failed attempt with the received bytes; twice: every wind sample (daemon) |
 
 Exit status: `0` at least one sensor read (or none configured), `2` no
 configured sensor answered, `1` configuration, bus or database error.

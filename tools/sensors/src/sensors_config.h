@@ -31,6 +31,7 @@ typedef struct {
   int timeout_ms;
   int retries;
   int function; /* 0x03 holding or 0x04 input registers */
+  int interval;  /* seconds between two stored readings (daemon mode) */
 
   /* Weather sensor (Halisense HLS-UWS-SDTHA) */
   int weather_address;
@@ -49,6 +50,11 @@ typedef struct {
   /* Below this wind speed (m/s, anemometer) the vane turns at random: the
    * last stored direction is kept instead of the measured one. 0 = off */
   double wind_calm_speed;
+  /* Daemon mode: anemometer and vane are sampled every wind_sample_interval
+   * seconds into a RAM ring buffer; speed and direction are the mean over
+   * wind_average_minutes */
+  int wind_sample_interval;
+  int wind_average_minutes;
 
   /* Control cabinet temperature/humidity (humidity at register,
    * temperature at register + 1) */

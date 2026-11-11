@@ -35,7 +35,7 @@ OBJECTS = $(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(SOURCES)) $(OBJDIR)/atomic_
 # libgpiod v1 API (gpiod_chip_get_line); Ubuntu 24.04 / JetPack 7 ship 1.6
 LIBS    = -lgpiod -lsqlite3 -ljson-c -lm
 
-.PHONY: all clean
+.PHONY: all clean test
 
 all: $(BINDIR)/$(TARGET)
 
@@ -47,6 +47,13 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
 
 $(OBJDIR)/atomic_file.o: $(MAIN_SRCDIR)/atomic_file.c | $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+# Unit test of the wind ring buffer / vector mean (no bus needed)
+test: $(BINDIR)/test_wind_average
+	$(BINDIR)/test_wind_average
+
+$(BINDIR)/test_wind_average: test/test_wind_average.c $(OBJDIR)/wind_average.o | $(BINDIR)
+	$(CC) $(CFLAGS) -I$(SRCDIR) -o $@ $^ -lm
 
 $(OBJDIR) $(BINDIR):
 	mkdir -p $@

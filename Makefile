@@ -424,7 +424,7 @@ SYSTEMCTL         := systemctl
 OBSOLETE_UNITS := allsky360-location
 START_MANUALLY_UNITS := allsky360-camera.service allsky360-aurora.timer \
                         allsky360-meteo.timer \
-                        allsky360-mount-position.timer allsky360-sensors.timer
+                        allsky360-mount-position.timer allsky360-sensors.service
 
 APP_DIR           := /opt/allsky360/bin
 SYSTEMD_DIR       := /etc/systemd/system
@@ -621,7 +621,6 @@ systemd:
 	# Timer
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-aurora.timer $(SYSTEMD_DIR)/
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-meteo.timer $(SYSTEMD_DIR)/
-	$(INSTALL) -m 644 etc/systemd/system/allsky360-sensors.timer $(SYSTEMD_DIR)/
 	$(INSTALL) -m 644 etc/systemd/system/allsky360-mount-position.timer $(SYSTEMD_DIR)/
 
 	# Reload unit files. Camera and timers are only enabled by the user.
@@ -642,6 +641,20 @@ systemd:
 			echo "$$unit installed but not enabled (edit config.ini first)"; \
 		fi; \
 	done
+	@# allsky360-sensors runs continuously since it samples the wind
+	@# periodically; its former timer is removed and its state carried over
+	@if [ -e $(SYSTEMD_DIR)/allsky360-sensors.timer ]; then \
+		enabled=0; \
+		$(SYSTEMCTL) is-enabled --quiet allsky360-sensors.timer && enabled=1; \
+		$(SYSTEMCTL) disable --now allsky360-sensors.timer 2>/dev/null || true; \
+		rm -f $(SYSTEMD_DIR)/allsky360-sensors.timer; \
+		$(SYSTEMCTL) daemon-reload; \
+		echo "allsky360-sensors.timer removed, the sensors now run as allsky360-sensors.service"; \
+		if [ $$enabled = 1 ]; then \
+			echo "The timer was enabled: enabling and starting allsky360-sensors.service"; \
+			$(SYSTEMCTL) enable --now allsky360-sensors.service; \
+		fi; \
+	fi
 	@# The API works with the template config and is needed to look at the
 	@# station. 'restart' (not 'enable --now') so an update loads the new code.
 	$(SYSTEMCTL) enable allsky360-api.service
@@ -803,6 +816,7 @@ uninstall:
 	@# allsky360-location: removed tool, cleaned up on old installations
 	@for t in aurora meteo location mount-position sensors; do \
 	    $(SYSTEMCTL) disable --now allsky360-$$t.timer 2>/dev/null || true; \
+	    $(SYSTEMCTL) disable --now allsky360-$$t.service 2>/dev/null || true; \
 	    rm -f $(SYSTEMD_DIR)/allsky360-$$t.service $(SYSTEMD_DIR)/allsky360-$$t.timer; \
 	done
 	$(SYSTEMCTL) daemon-reload

@@ -90,8 +90,8 @@ const ALLOWED_SERVICES = [
 const TIMER_UNITS = {
     'allsky360-meteo.service': 'allsky360-meteo.timer',
     'allsky360-aurora.service': 'allsky360-aurora.timer',
-    'allsky360-mount-position.service': 'allsky360-mount-position.timer',
-    'allsky360-sensors.service': 'allsky360-sensors.timer'
+    'allsky360-mount-position.service': 'allsky360-mount-position.timer'
+    // allsky360-sensors.service runs continuously (wind sampled every 10 s)
 };
 
 // Services whose binary may also run outside systemd ("make camera-run"

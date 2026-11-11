@@ -33,6 +33,7 @@ void sensors_config_defaults(sensors_config_t *c) {
   c->timeout_ms = 1200;
   c->retries = 3;
   c->function = 0x03;
+  c->interval = 300;
 
   c->weather_address = 0;
   c->weather_register = 0x01F4;
@@ -42,6 +43,8 @@ void sensors_config_defaults(sensors_config_t *c) {
   c->wind_direction_address = 0;
   c->wind_direction_register = 1;
   c->wind_calm_speed = 0.3; /* Beaufort 0, calm: below 0.3 m/s */
+  c->wind_sample_interval = 10;
+  c->wind_average_minutes = 10; /* WMO mean wind */
   c->cabinet_address = 0;
   c->cabinet_register = 0;
 }
@@ -142,6 +145,8 @@ int sensors_config_load(const char *filename, sensors_config_t *c) {
       set_int(key, value, 1, 10, &c->retries);
     else if (strcmp(key, "modbus_function") == 0)
       set_int(key, value, 3, 4, &c->function);
+    else if (strcmp(key, "modbus_interval") == 0)
+      set_int(key, value, 60, 3600, &c->interval);
     else if (strcmp(key, "modbus_weather_address") == 0)
       set_int(key, value, 0, 247, &c->weather_address);
     else if (strcmp(key, "modbus_weather_register") == 0)
@@ -162,6 +167,10 @@ int sensors_config_load(const char *filename, sensors_config_t *c) {
       set_int(key, value, 0, 359, &c->wind_direction_offset);
     else if (strcmp(key, "modbus_wind_calm_speed") == 0)
       set_double(key, value, 0.0, 10.0, &c->wind_calm_speed);
+    else if (strcmp(key, "modbus_wind_sample_interval") == 0)
+      set_int(key, value, 1, 60, &c->wind_sample_interval);
+    else if (strcmp(key, "modbus_wind_average_minutes") == 0)
+      set_int(key, value, 1, 60, &c->wind_average_minutes);
     else if (strcmp(key, "modbus_cabinet_address") == 0)
       set_int(key, value, 0, 247, &c->cabinet_address);
     else if (strcmp(key, "modbus_cabinet_register") == 0)
@@ -178,6 +187,8 @@ void sensors_config_print(const sensors_config_t *c) {
   printf("bus: %s %d baud, DE GPIO %s line %d, timeout %d ms, %d attempts, function 0x%02X\n",
          c->device, c->baudrate, c->gpio_chip, c->gpio_line, c->timeout_ms,
          c->retries, c->function);
+  printf("daemon: a reading every %d s, wind sampled every %d s, mean over %d min\n",
+         c->interval, c->wind_sample_interval, c->wind_average_minutes);
   printf("weather sensor:  address %d, register 0x%04X, wind offset %d\n",
          c->weather_address, c->weather_register, c->weather_wind_direction_offset);
   printf("anemometer:      address %d, register %d, scale %g\n",

@@ -16,9 +16,8 @@
  *
  *****************************************************************************/
 /*
- * allsky360-sensors: reads the RS485/Modbus sensors of the station once and
- * stores the values in the daily database (table 'sensors'). Started
- * periodically by allsky360-sensors.timer.
+ * allsky360-sensors: reads the RS485/Modbus sensors of the station and
+ * stores the values in the daily database (table 'sensors').
  *
  * Sensors (addresses and registers in config.ini, keys modbus_*):
  *  - weather sensor Halisense HLS-UWS-SDTHA: temperature, humidity, pressure,
@@ -26,17 +25,29 @@
  *  - anemometer (wind speed) and wind vane (wind direction)
  *  - temperature/humidity sensor in the control cabinet
  *
- * Calm: when the anemometer reports less than modbus_wind_calm_speed, the
- * wind vane turns at random, so the last stored direction is kept instead of
- * the measured one (looked up in today's and yesterday's database).
+ * Daemon mode (--daemon, allsky360-sensors.service): anemometer and vane are
+ * sampled every modbus_wind_sample_interval seconds into a ring buffer in RAM (wind_average.c); every
+ * modbus_interval seconds the other sensors are read and one row is stored
+ * with the wind mean over modbus_wind_average_minutes (scalar mean speed,
+ * speed-weighted vector mean direction). Only that row touches the disk.
  *
- * Exit status: 0 = at least one sensor read (or none configured),
- *              2 = no configured sensor answered, 1 = configuration, bus or
- *              database error.
+ * Without --daemon: one reading of every sensor, instantaneous values, for
+ * manual checks (the daemon holds the bus lock, stop it first).
+ *
+ * Calm: samples below modbus_wind_calm_speed do not count for the direction
+ * (the vane turns at random); without enough wind the last direction is kept
+ * (in the daemon from RAM, at start and in single mode from today's or
+ * yesterday's database).
+ *
+ * Exit status: 0 = at least one sensor read (or none configured; daemon:
+ *              stopped by a signal), 2 = no configured sensor answered,
+ *              1 = configuration, bus or database error.
  */
+#include <errno.h>
 #include <getopt.h>
 #include <json-c/json.h>
 #include <math.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,6 +57,12 @@
 #include "modbus_rtu.h"
 #include "sensors_config.h"
 #include "sensors_database.h"
+#include "wind_average.h"
+
+/* Daemon: seconds of samples before the first stored reading, and the least
+ * windy time in the window (seconds, as samples) that gives a mean direction */
+#define DAEMON_WARMUP_S 120
+#define MIN_DIRECTION_SECONDS 30
 
 /* Register layout of the weather sensor, offsets from modbus_weather_register
  * (DFRobot SEN0658 / HLS-UWS-SDTHA, see examples/weather-sensor) */
@@ -119,36 +136,62 @@ static int read_weather(modbus_bus_t *bus, const sensors_config_t *c,
   return 0;
 }
 
-static int read_wind_speed(modbus_bus_t *bus, const sensors_config_t *c,
-                           sensors_reading_t *r) {
+/* Implausible register value (wind samples, reported by the caller) */
+#define SAMPLE_IMPLAUSIBLE -100
+
+/* One anemometer sample without any output (the daemon reads it every
+ * second and reports failures itself). @return MODBUS_OK, a MODBUS_ERR_* or
+ * SAMPLE_IMPLAUSIBLE */
+static int sample_wind_speed(modbus_bus_t *bus, const sensors_config_t *c, double *speed) {
   uint16_t raw;
+  *speed = NAN;
   int rc = modbus_read_registers(bus, (uint8_t)c->wind_speed_address,
                                  (uint8_t)c->function,
                                  (uint16_t)c->wind_speed_register, 1, &raw);
-  if (rc != MODBUS_OK) {
-    fprintf(stderr, "WARNING: anemometer (address %d): %s\n",
-            c->wind_speed_address, modbus_error(rc));
-    return -1;
-  }
-  r->wind_speed = plausible("wind speed", raw / c->wind_speed_scale, 0, 60);
-  return isnan(r->wind_speed) ? -1 : 0;
+  if (rc != MODBUS_OK)
+    return rc;
+  double v = raw / c->wind_speed_scale;
+  if (v < 0.0 || v > 60.0)
+    return SAMPLE_IMPLAUSIBLE;
+  *speed = v;
+  return MODBUS_OK;
+}
+
+static int sample_wind_direction(modbus_bus_t *bus, const sensors_config_t *c,
+                                 double *direction) {
+  uint16_t raw;
+  *direction = NAN;
+  int rc = modbus_read_registers(bus, (uint8_t)c->wind_direction_address,
+                                 (uint8_t)c->function,
+                                 (uint16_t)c->wind_direction_register, 1, &raw);
+  if (rc != MODBUS_OK)
+    return rc;
+  if (raw > 360)
+    return SAMPLE_IMPLAUSIBLE;
+  *direction = (double)((raw % 360 + c->wind_direction_offset) % 360);
+  return MODBUS_OK;
+}
+
+static const char *sample_error(int rc) {
+  return rc == SAMPLE_IMPLAUSIBLE ? "value outside the plausible range" : modbus_error(rc);
+}
+
+static int read_wind_speed(modbus_bus_t *bus, const sensors_config_t *c,
+                           sensors_reading_t *r) {
+  int rc = sample_wind_speed(bus, c, &r->wind_speed);
+  if (rc != MODBUS_OK)
+    fprintf(stderr, "WARNING: anemometer (address %d): %s\n", c->wind_speed_address,
+            sample_error(rc));
+  return rc == MODBUS_OK ? 0 : -1;
 }
 
 static int read_wind_direction(modbus_bus_t *bus, const sensors_config_t *c,
                                sensors_reading_t *r) {
-  uint16_t raw;
-  int rc = modbus_read_registers(bus, (uint8_t)c->wind_direction_address,
-                                 (uint8_t)c->function,
-                                 (uint16_t)c->wind_direction_register, 1, &raw);
-  if (rc != MODBUS_OK) {
-    fprintf(stderr, "WARNING: wind vane (address %d): %s\n",
-            c->wind_direction_address, modbus_error(rc));
-    return -1;
-  }
-  if (isnan(plausible("wind direction", raw, 0, 360)))
-    return -1;
-  r->wind_direction = (double)((raw % 360 + c->wind_direction_offset) % 360);
-  return 0;
+  int rc = sample_wind_direction(bus, c, &r->wind_direction);
+  if (rc != MODBUS_OK)
+    fprintf(stderr, "WARNING: wind vane (address %d): %s\n", c->wind_direction_address,
+            sample_error(rc));
+  return rc == MODBUS_OK ? 0 : -1;
 }
 
 static int read_cabinet(modbus_bus_t *bus, const sensors_config_t *c,
@@ -176,10 +219,29 @@ static void database_path(char *buf, size_t size, const char *dir, time_t t) {
            tm_utc.tm_mon + 1, tm_utc.tm_mday);
 }
 
-/* Calm: replace the vane reading by the last stored direction. Without an
- * earlier direction (first run in calm) it stays NULL, since the measured
- * value is random. Without a wind speed (anemometer failed) the measured
- * direction is kept. */
+static void format_utc(char *buf, size_t size, time_t t) {
+  struct tm tm_utc;
+  gmtime_r(&t, &tm_utc);
+  strftime(buf, size, "%Y-%m-%d %H:%M:%S UTC", &tm_utc);
+}
+
+/* Last stored wind direction before 'before': today's database, then
+ * yesterday's (first reading after 00:00 UTC). @return 0 if found */
+static int last_stored_direction(const sensors_config_t *c, time_t before,
+                                 double *direction, time_t *when) {
+  for (int day = 0; day < 2; day++) {
+    char path[512];
+    database_path(path, sizeof(path), c->database_directory, before - day * 86400);
+    if (sensors_database_last_value(path, "wind_direction", before, direction, when) == 0)
+      return 0;
+  }
+  return -1;
+}
+
+/* Single mode, calm: replace the vane reading by the last stored direction.
+ * Without an earlier direction (first run in calm) it stays NULL, since the
+ * measured value is random. Without a wind speed (anemometer failed) the
+ * measured direction is kept. */
 static void hold_direction_in_calm(const sensors_config_t *c, sensors_reading_t *r) {
   if (c->wind_calm_speed <= 0.0 || isnan(r->wind_speed) || isnan(r->wind_direction) ||
       r->wind_speed >= c->wind_calm_speed)
@@ -187,21 +249,13 @@ static void hold_direction_in_calm(const sensors_config_t *c, sensors_reading_t 
 
   double measured = r->wind_direction, last;
   time_t last_t;
-  int found = -1;
-  /* Today's database, then yesterday's (first reading after 00:00 UTC) */
-  for (int day = 0; day < 2 && found != 0; day++) {
-    char path[512];
-    database_path(path, sizeof(path), c->database_directory, r->timestamp - day * 86400);
-    found = sensors_database_last_value(path, "wind_direction", r->timestamp, &last, &last_t);
-  }
+  int found = last_stored_direction(c, r->timestamp, &last, &last_t);
   r->wind_direction = found == 0 ? last : NAN;
 
   if (verbose) {
     if (found == 0) {
       char when[32];
-      struct tm tm_utc;
-      gmtime_r(&last_t, &tm_utc);
-      strftime(when, sizeof(when), "%Y-%m-%d %H:%M UTC", &tm_utc);
+      format_utc(when, sizeof(when), last_t);
       printf("calm (%.1f m/s < %g): wind direction %.0f deg kept from %s, measured %.0f deg ignored\n",
              r->wind_speed, c->wind_calm_speed, last, when, measured);
     } else {
@@ -241,37 +295,247 @@ static char *reading_to_json(const sensors_reading_t *r) {
   return text;
 }
 
+/* JSON file and database row of one reading. @return 0, or 1 on an error */
+static int store_reading(const sensors_config_t *c, const sensors_reading_t *r,
+                         const char *outfile, int dry_run) {
+  int ret = 0;
+  char *json = reading_to_json(r);
+  if (dry_run || verbose)
+    printf("%s\n", json);
+  if (outfile && write_text_file_atomic(outfile, json) != 0) {
+    fprintf(stderr, "ERROR: cannot write %s\n", outfile);
+    ret = 1;
+  }
+  free(json);
+
+  if (!dry_run) {
+    char db_path[512];
+    database_path(db_path, sizeof(db_path), c->database_directory, r->timestamp);
+    if (sensors_database_store(db_path, r) != 0)
+      ret = 1;
+    else if (verbose)
+      printf("stored in %s\n", db_path);
+  }
+  return ret;
+}
+
+/* ---- Daemon ---------------------------------------------------------- */
+
+static volatile sig_atomic_t stop_requested = 0;
+
+static void on_signal(int sig) {
+  (void)sig;
+  stop_requested = 1;
+}
+
+/* Failures of the periodic wind samples. A single missed sample costs
+ * nothing (the next one follows a second later), so failures are only counted
+ * for the line of the next stored reading. Only a sensor that stays silent for
+ * FAILING_LOG_S gets a warning, and then a line when it answers again: no log
+ * lines for short dropouts in the journal, which also lives on the SD card. */
+#define FAILING_LOG_S 60
+
+typedef struct {
+  const char *name;
+  int address;
+  time_t failing_since; /* 0 = last read was good */
+  int warned;
+  int failed; /* since the last stored reading */
+} sample_stats_t;
+
+static void count_sample(sample_stats_t *s, int rc, time_t now) {
+  if (rc == MODBUS_OK) {
+    if (s->warned)
+      printf("%s (address %d) answers again\n", s->name, s->address);
+    s->failing_since = 0;
+    s->warned = 0;
+    return;
+  }
+  s->failed++;
+  if (!s->failing_since)
+    s->failing_since = now;
+  if (!s->warned && now - s->failing_since >= FAILING_LOG_S) {
+    fprintf(stderr, "WARNING: %s (address %d): %s for %d s\n", s->name, s->address,
+            sample_error(rc), (int)(now - s->failing_since));
+    s->warned = 1;
+  }
+}
+
+static time_t next_boundary(time_t t, int interval) { return (t / interval + 1) * interval; }
+
+static double round_to(double v, double step) { return isnan(v) ? v : round(v / step) * step; }
+
+static int run_daemon(modbus_bus_t *bus, const sensors_config_t *c, const char *outfile,
+                      int dry_run) {
+  const int have_speed = c->wind_speed_address > 0;
+  const int have_direction = c->wind_direction_address > 0;
+  const int window_s = c->wind_average_minutes * 60;
+
+  wind_buffer_t *wind = malloc(sizeof(*wind));
+  if (!wind) {
+    fprintf(stderr, "ERROR: out of memory\n");
+    return 1;
+  }
+  wind_buffer_init(wind);
+  setvbuf(stdout, NULL, _IOLBF, 0); /* journal gets every line at once */
+
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_handler = on_signal; /* no SA_RESTART: interrupts the sleep */
+  sigaction(SIGTERM, &sa, NULL);
+  sigaction(SIGINT, &sa, NULL);
+
+  time_t start = time(NULL);
+  /* Direction kept in calm air: starts with the last stored one, then lives
+   * in RAM */
+  double held_direction = NAN;
+  time_t held_t;
+  if (have_direction && last_stored_direction(c, start, &held_direction, &held_t) != 0)
+    held_direction = NAN;
+
+  sample_stats_t speed_stats = {"anemometer", c->wind_speed_address, 0, 0, 0};
+  sample_stats_t direction_stats = {"wind vane", c->wind_direction_address, 0, 0, 0};
+
+  time_t next_record = next_boundary(start + DAEMON_WARMUP_S, c->interval);
+  char when[32];
+  format_utc(when, sizeof(when), next_record);
+  /* At least 3 samples, e.g. 30 s of wind = 3 samples at 10 s */
+  int min_direction_samples =
+      (MIN_DIRECTION_SECONDS + c->wind_sample_interval - 1) / c->wind_sample_interval;
+  if (min_direction_samples < 3)
+    min_direction_samples = 3;
+  time_t next_sample = 0;
+
+  printf("daemon: wind sampled every %d s, mean over %d min; a reading every %d s, "
+         "first at %s\n",
+         c->wind_sample_interval, c->wind_average_minutes, c->interval, when);
+
+  struct timespec tick;
+  clock_gettime(CLOCK_MONOTONIC, &tick);
+
+  while (!stop_requested) {
+    time_t now = time(NULL);
+
+    if ((have_speed || have_direction) && now >= next_sample) {
+      next_sample = now + c->wind_sample_interval;
+      /* One attempt per sample: retries (up to modbus_retries x timeout) would
+       * only block the loop for seconds, a missed sample costs little */
+      double speed = NAN, direction = NAN;
+      bus->retries = 1;
+      if (have_speed)
+        count_sample(&speed_stats, sample_wind_speed(bus, c, &speed), now);
+      if (have_direction)
+        count_sample(&direction_stats, sample_wind_direction(bus, c, &direction), now);
+      bus->retries = c->retries; /* weather and cabinet sensor: with retries */
+      wind_buffer_add(wind, now, speed, direction);
+      if (verbose > 1)
+        printf("sample: %.1f m/s, %.0f deg\n", speed, direction);
+    }
+
+    if (now >= next_record) {
+      sensors_reading_t r;
+      sensors_reading_init(&r, next_record);
+      int ok = 0;
+      if (c->weather_address > 0 && read_weather(bus, c, &r) == 0)
+        ok++;
+      if (c->cabinet_address > 0 && read_cabinet(bus, c, &r) == 0)
+        ok++;
+
+      wind_average_t avg;
+      wind_buffer_average(wind, now, window_s, c->wind_calm_speed, min_direction_samples,
+                          &avg);
+      r.wind_speed = round_to(avg.speed, 0.01);
+      ok += avg.speed_samples > 0;
+      const char *direction_note = "";
+      if (avg.direction_samples == 0) {
+        r.wind_direction = NAN; /* vane silent (or not configured) */
+      } else {
+        ok++;
+        if (!isnan(avg.direction)) {
+          held_direction = r.wind_direction = round(avg.direction);
+        } else {
+          r.wind_direction = held_direction; /* calm: keep the last one */
+          direction_note = isnan(held_direction) ? " (calm, no earlier direction)"
+                                                 : " (calm, last direction kept)";
+        }
+      }
+
+      int enabled = (c->weather_address > 0) + (c->cabinet_address > 0) + have_speed +
+                    have_direction;
+      format_utc(when, sizeof(when), r.timestamp);
+      printf("%s: %d of %d sensors", when, ok, enabled);
+      if (have_speed || have_direction)
+        printf("; wind %d min: %.2f m/s (max %.1f), %.0f deg%s, consistency %.2f, "
+               "%d of %d samples windy",
+               c->wind_average_minutes, avg.speed, avg.speed_max, r.wind_direction,
+               direction_note, avg.consistency, avg.used_for_direction, avg.samples);
+      if (speed_stats.failed || direction_stats.failed)
+        printf("; failed reads: anemometer %d, vane %d", speed_stats.failed,
+               direction_stats.failed);
+      printf("\n");
+      speed_stats.failed = direction_stats.failed = 0;
+
+      if (ok > 0)
+        store_reading(c, &r, outfile, dry_run);
+      next_record = next_boundary(now, c->interval);
+    }
+
+    /* Next second on the monotonic clock; after a long overrun (a sensor
+     * that times out with retries) start again from now instead of catching
+     * up with a burst of samples */
+    tick.tv_sec += 1;
+    struct timespec mono;
+    clock_gettime(CLOCK_MONOTONIC, &mono);
+    if (mono.tv_sec > tick.tv_sec + 1)
+      tick = mono;
+    while (!stop_requested &&
+           clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &tick, NULL) == EINTR)
+      ;
+  }
+
+  printf("daemon: stopped\n");
+  free(wind);
+  return 0;
+}
+
 static void usage(const char *prog) {
   printf("Usage: %s -c CONFIG [options]\n"
          "  -c, --config FILE      config.ini (modbus_* keys, database_directory)\n"
          "  -d, --databasedir DIR  override database_directory\n"
          "  -f, --outfile FILE     also write the reading as JSON (atomic)\n"
+         "  -D, --daemon           run continuously: wind every modbus_wind_sample_interval\n"
+         "                         s (RAM ring buffer), a stored reading every\n"
+         "                         modbus_interval s\n"
          "  -n, --dry-run          read and print, do not write the database\n"
          "  -v, --verbose          show the configuration and every retry\n"
-         "  -h, --help             this help\n",
+         "                         (twice in daemon mode: every wind sample)\n"
+         "  -h, --help             this help\n"
+         "Without --daemon all sensors are read once (instantaneous values).\n",
          prog);
 }
 
 int main(int argc, char *argv[]) {
   const char *config_path = NULL, *database_dir = NULL, *outfile = NULL;
-  int dry_run = 0;
+  int dry_run = 0, daemon_mode = 0;
 
   static struct option long_opts[] = {
       {"config", required_argument, 0, 'c'},
       {"databasedir", required_argument, 0, 'd'},
       {"outfile", required_argument, 0, 'f'},
+      {"daemon", no_argument, 0, 'D'},
       {"dry-run", no_argument, 0, 'n'},
       {"verbose", no_argument, 0, 'v'},
       {"help", no_argument, 0, 'h'},
       {0, 0, 0, 0}};
   int opt;
-  while ((opt = getopt_long(argc, argv, "c:d:f:nvh", long_opts, NULL)) != -1) {
+  while ((opt = getopt_long(argc, argv, "c:d:f:Dnvh", long_opts, NULL)) != -1) {
     switch (opt) {
     case 'c': config_path = optarg; break;
     case 'd': database_dir = optarg; break;
     case 'f': outfile = optarg; break;
+    case 'D': daemon_mode = 1; break;
     case 'n': dry_run = 1; break;
-    case 'v': verbose = 1; break;
+    case 'v': verbose++; break;
     case 'h': usage(argv[0]); return 0;
     default: usage(argv[0]); return 1;
     }
@@ -304,6 +568,12 @@ int main(int argc, char *argv[]) {
     return 1;
   bus.verbose = verbose;
 
+  if (daemon_mode) {
+    int ret = run_daemon(&bus, &config, outfile, dry_run);
+    modbus_close(&bus);
+    return ret;
+  }
+
   sensors_reading_t r;
   sensors_reading_init(&r, time(NULL));
   int ok = 0;
@@ -318,27 +588,8 @@ int main(int argc, char *argv[]) {
   modbus_close(&bus);
 
   hold_direction_in_calm(&config, &r);
-
-  char *json = reading_to_json(&r);
-  if (dry_run || verbose)
-    printf("%s\n", json);
   printf("%d of %d sensors read\n", ok, enabled);
-
-  int ret = ok > 0 ? 0 : 2;
-
-  if (ok > 0 && outfile && write_text_file_atomic(outfile, json) != 0) {
-    fprintf(stderr, "ERROR: cannot write %s\n", outfile);
-    ret = 1;
-  }
-  free(json);
-
-  if (ok > 0 && !dry_run) {
-    char db_path[512];
-    database_path(db_path, sizeof(db_path), config.database_directory, r.timestamp);
-    if (sensors_database_store(db_path, &r) != 0)
-      ret = 1;
-    else if (verbose)
-      printf("stored in %s\n", db_path);
-  }
-  return ret;
+  if (ok == 0)
+    return 2;
+  return store_reading(&config, &r, outfile, dry_run);
 }

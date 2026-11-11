@@ -142,6 +142,8 @@ modbus_timeout_ms=1200
 modbus_retries=3
 # Read function: 3 = holding registers, 4 = input registers
 modbus_function=3
+# Seconds between two stored readings (one database row each)
+modbus_interval=300
 
 # Weather sensor Halisense HLS-UWS-SDTHA: temperature, humidity, pressure,
 # wind, noise, PM2.5/PM10, illuminance, rain (block from 0x01F4)
@@ -159,8 +161,15 @@ modbus_wind_speed_scale=1.0
 modbus_wind_direction_address=0
 modbus_wind_direction_register=1
 modbus_wind_direction_offset=0
-# Calm: below this wind speed (m/s, anemometer) the vane turns at random, so
-# the last stored direction is kept instead of the measured one. 0 = off
+# Anemometer and vane are sampled every modbus_wind_sample_interval seconds
+# (1..60) into a ring buffer in RAM (nothing is written per sample); a stored
+# reading holds the mean over modbus_wind_average_minutes: scalar mean speed
+# and speed-weighted vector mean direction (WMO: 10 minutes)
+modbus_wind_sample_interval=10
+modbus_wind_average_minutes=10
+# Calm: samples below this wind speed (m/s, anemometer) do not count for the
+# direction, the vane turns at random. With less than 30 s of wind (at least
+# 3 samples) in the window the last direction is kept. 0 = off
 modbus_wind_calm_speed=0.3
 
 # Temperature/humidity sensor in the control cabinet

@@ -109,7 +109,8 @@ GET /api/image?date=2025-07-22
 #### `GET /api/sensors`
 
 Returns the readings of the local RS485/Modbus sensors for a given day
-(table `sensors`, written every 5 minutes by `allsky360-sensors.service`).
+(table `sensors`, written every 5 minutes by `allsky360-sensors.service`;
+`wind_speed`/`wind_direction` are 10-minute means, see TOOLS.md).
 Values of sensors that are not configured or did not answer are `null`.
 
 **Query parameters**
@@ -438,7 +439,7 @@ the timers of the timer-driven services.
 | `allsky360-meteo.service`       | Meteorological data fetcher (timer-driven) |
 | `allsky360-aurora.service`      | Aurora / space weather fetcher (timer-driven) |
 | `allsky360-mount-position.service` | Mount position service (timer-driven) |
-| `allsky360-sensors.service`     | RS485 sensors (timer-driven)      |
+| `allsky360-sensors.service`     | RS485 sensors (runs continuously) |
 
 Requests for any service not in the list above are rejected with HTTP 500.
 

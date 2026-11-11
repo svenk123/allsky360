@@ -31,7 +31,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_USER="allskyuser"
 CONFIG_FILE="/home/${SERVICE_USER}/config.ini"
 INDIGO_ROOT="${INDIGO_ROOT:-$(cd "$REPO_DIR/.." && pwd)/indigo}"
-START_UNITS="allsky360-camera.service allsky360-aurora.timer allsky360-meteo.timer allsky360-mount-position.timer allsky360-sensors.timer"
+START_UNITS="allsky360-camera.service allsky360-aurora.timer allsky360-meteo.timer allsky360-mount-position.timer allsky360-sensors.service"
 MIN_FREE_GB=5
 
 # Options

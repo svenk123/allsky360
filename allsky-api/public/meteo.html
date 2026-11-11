@@ -535,7 +535,7 @@
         const res = await fetch('latest_sensor_data.json');
         if (res.status === 404) {
           setSensorStatus('badge-gray', 'no data', '');
-          tiles.innerHTML = '<div class="sensor-empty">No sensor reading yet. Set the modbus_*_address keys in config.ini and enable allsky360-sensors.timer.</div>';
+          tiles.innerHTML = '<div class="sensor-empty">No sensor reading yet. Set the modbus_*_address keys in config.ini and enable allsky360-sensors.service.</div>';
           return;
         }
         if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -546,7 +546,7 @@
           ? `${formatDateTime(r.timestamp)} · ${ageS < 90 ? 'just now' : Math.round(ageS / 60) + ' min ago'}`
           : '';
         if (ageS > SENSOR_STALE_S)
-          setSensorStatus('badge-orange', 'stale', ageText + ' · check allsky360-sensors.timer');
+          setSensorStatus('badge-orange', 'stale', ageText + ' · check allsky360-sensors.service');
         else
           setSensorStatus('badge-green', 'live', ageText);
         tiles.innerHTML = renderSensorTiles(r);
