@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.json" />
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Allsky360 Config">
-  <meta name="theme-color" content="#0d1117" />
+  <meta name="theme-color" content="#0b0d14" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
   <script src="js/allsky-common.js"></script>
@@ -31,18 +31,18 @@
 
     /* ── SERVICES HINT (service control is on status.html) ─────── */
     #services-hint {
-      font-size: 11px; color: #6b7280;
-      padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-size: 11px; color: #7a8296;
+      padding: 8px 16px; border-bottom: 1px solid rgba(255,255,255,0.06);
     }
-    #services-hint a { color: #3b82f6; text-decoration: none; }
+    #services-hint a { color: #8ab4f0; text-decoration: none; }
 
     /* ── CONFIG AREA ────────────────────────────────────────────── */
     #config-area {
       flex: 1;
       min-height: 0;
       display: flex;
-      gap: 10px;
-      padding: 8px 10px 10px;
+      gap: 12px;
+      padding: 8px 12px 12px;
     }
 
     /* ── CATEGORY NAV ───────────────────────────────────────────── */
@@ -55,33 +55,32 @@
       overflow-y: auto;
     }
     .cat-section-label {
-      font-size: 9px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.1em; color: #4b5563;
-      padding: 8px 8px 3px;
+      font-size: 12px; font-weight: 500; color: #7a8296;
+      padding: 8px 8px 4px;
     }
     .cat-item {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 5px 8px;
+      padding: 4px 8px;
       border-radius: 8px;
-      font-size: 11px; font-weight: 600;
-      color: #6b7280;
+      font-size: 11px; font-weight: 500;
+      color: #7a8296;
       cursor: pointer;
-      transition: all 0.14s;
+      transition: background-color 0.14s, color 0.14s, border-color 0.14s;
       user-select: none;
     }
     .cat-item:hover { background:rgba(255,255,255,0.07); color:#c9d1d9; }
-    .cat-item.active { background:rgba(59,130,246,0.15); color:#3b82f6; }
+    .cat-item.active { background:rgba(138,180,240,0.15); color:#8ab4f0; }
     .cat-count {
-      font-size: 9px; font-weight: 500;
+      font-size: 11px; font-weight: 500;
       background: rgba(255,255,255,0.08);
       border-radius: 10px;
-      padding: 1px 5px;
+      padding: 1px 4px;
       min-width: 20px;
       text-align: center;
     }
-    .cat-item.active .cat-count { background: rgba(59,130,246,0.2); }
+    .cat-item.active .cat-count { background: rgba(138,180,240,0.2); }
 
     /* ── CONFIG CENTER ──────────────────────────────────────────── */
     #config-center {
@@ -89,7 +88,7 @@
       min-width: 0;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
     }
     #search-wrap {
       flex-shrink: 0;
@@ -106,15 +105,15 @@
       background: rgba(255,255,255,0.05);
       border: 1px solid rgba(255,255,255,0.09);
       border-radius: 10px;
-      padding: 6px 10px 6px 30px;
-      color: #e5e7eb;
+      padding: 8px 12px 8px 30px;
+      color: #eef0f5;
       font-size: 12px;
       font-family: inherit;
       outline: none;
       transition: border-color 0.15s;
     }
-    #config-search:focus { border-color: rgba(59,130,246,0.4); }
-    #config-search::placeholder { color: #4b5563; }
+    #config-search:focus { border-color: rgba(138,180,240,0.4); }
+    #config-search::placeholder { color: #7a8296; }
 
     #config-list-wrap {
       flex: 1;
@@ -124,37 +123,36 @@
     #config-list { display: flex; flex-direction: column; gap: 1px; }
 
     .cfg-group-label {
-      font-size: 9px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.1em; color: #4b5563;
-      padding: 8px 8px 3px;
+      font-size: 12px; font-weight: 500; color: #7a8296;
+      padding: 8px 8px 4px;
     }
     .cfg-item {
       display: grid;
       grid-template-columns: minmax(180px, 260px) 1fr;
       align-items: center;
-      padding: 5px 8px;
+      padding: 4px 8px;
       border-radius: 8px;
       cursor: pointer;
-      transition: all 0.12s;
+      transition: background-color 0.12s, color 0.12s, border-color 0.12s;
       border: 1px solid transparent;
       gap: 8px;
     }
     .cfg-item:hover { background: rgba(255,255,255,0.05); }
     .cfg-item.selected {
-      background: rgba(59,130,246,0.1);
-      border-color: rgba(59,130,246,0.28);
+      background: rgba(138,180,240,0.1);
+      border-color: rgba(138,180,240,0.28);
     }
     .cfg-key {
-      font-size: 11px; font-weight: 600;
+      font-size: 11px; font-weight: 500;
       color: #60a5fa;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .cfg-value {
-      font-size: 11px; color: #9ca3af;
+      font-size: 11px; color: #a3a9b8;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .cfg-empty {
-      color: #4b5563; font-size: 12px;
+      color: #7a8296; font-size: 12px;
       padding: 20px 8px; text-align: center;
     }
 
@@ -162,46 +160,45 @@
     #detail-panel {
       width: 280px;
       flex-shrink: 0;
-      background: rgba(22,27,34,0.85);
+      background: #07080d;
       border: 1px solid rgba(255,255,255,0.07);
       border-radius: 14px;
-      padding: 14px 14px 10px;
+      padding: 16px 16px 12px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 0;
     }
     .detail-hint {
-      color: #4b5563;
+      color: #7a8296;
       font-size: 12px;
       text-align: center;
       margin-top: 28px;
       line-height: 1.7;
     }
     #detail-key-name {
-      font-size: 12px; font-weight: 700;
+      font-size: 12px; font-weight: 500;
       color: #60a5fa;
       word-break: break-all;
-      margin-bottom: 3px;
+      margin-bottom: 4px;
     }
     #detail-key-value {
-      font-size: 11px; color: #9ca3af;
-      margin-bottom: 10px;
-      padding-bottom: 10px;
+      font-size: 11px; color: #a3a9b8;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
       border-bottom: 1px solid rgba(255,255,255,0.07);
       word-break: break-all;
     }
     .detail-row {
-      padding: 7px 0;
+      padding: 8px 0;
       border-bottom: 1px solid rgba(255,255,255,0.05);
     }
     .detail-row:last-child { border-bottom: none; }
     .detail-label {
-      font-size: 9px; text-transform: uppercase;
-      letter-spacing: 0.1em; color: #6b7280;
-      font-weight: 700; margin-bottom: 3px;
+      font-size: 12px; color: #7a8296;
+      font-weight: 500; margin-bottom: 4px;
     }
-    .detail-val { font-size: 12px; color: #e5e7eb; line-height: 1.5; }
+    .detail-val { font-size: 12px; color: #eef0f5; line-height: 1.5; }
     .detail-val.mono { font-family: 'Fira Mono', 'Consolas', monospace; font-size: 11px; color: #a3e635; }
   </style>
 </head>
@@ -247,7 +244,7 @@
         <!-- Center: search + list -->
         <div id="config-center">
           <div id="search-wrap">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7a8296" stroke-width="2">
               <circle cx="11" cy="11" r="8"></circle>
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
@@ -401,7 +398,7 @@
       const entry = helpData[key];
 
       let html = `<div id="detail-key-name">${key}</div>`;
-      html += `<div id="detail-key-value">Current value: <strong style="color:#e5e7eb">${value}</strong></div>`;
+      html += `<div id="detail-key-value">Current value: <strong style="color:#eef0f5">${value}</strong></div>`;
 
       if (!entry) {
         html += '<p class="detail-hint" style="margin-top:12px">No description available.</p>';

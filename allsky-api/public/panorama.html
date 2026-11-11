@@ -37,7 +37,7 @@
     <!-- Navigation Menu -->
     <nav id="nav-menu" class="nav-menu">
       <ul class="nav-list" id="nav-list"></ul>
-      <script>renderTextNav(document.getElementById('nav-list'), [{ href: 'panorama.html', title: 'Panorama' }, { href: 'processing.html', title: 'Processing' }]);</script>
+      <script>renderTextNav(document.getElementById('nav-list'), [{ href: 'panorama.html', title: 'Panorama' }]);</script>
     </nav>
   </div>
   <div id="subheader">
@@ -221,7 +221,7 @@
           const imgMetaResp = await fetch(imageMetaPath, { cache: "no-cache" });
           imageMeta = await imgMetaResp.json();
         } catch (e) {
-          console.warn("⚠️ Image metadata not found:", imageMetaPath);
+          console.warn("Image metadata not found:", imageMetaPath);
         }
 
         // Wetter-Metadaten laden
@@ -231,7 +231,7 @@
           const weatherResp = await fetch(weatherMetaPath, { cache: "no-cache" });
           weatherMeta = await weatherResp.json();
         } catch (e) {
-          console.warn("⚠️ Weather metadata not found:", weatherMetaPath);
+          console.warn("Weather metadata not found:", weatherMetaPath);
         }
 
 
@@ -242,7 +242,7 @@
         };
 
         imageEl.onerror = () => {
-          console.error("❌ Image load error:", latestImagePath);
+          console.error("Image load error:", latestImagePath);
           loading = false;
         };
 
@@ -352,7 +352,7 @@
 
         metadataEl.innerHTML = html;
       } catch (err) {
-        console.error("⚠️ Unexpected load error:", err);
+        console.error("Unexpected load error:", err);
         loading = false;
       }
     }

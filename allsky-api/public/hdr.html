@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Allsky360 – HDR Debug</title>
+  <title>Allsky360 – Camera HDR</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
   <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180" />
@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.json" />
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Allsky360">
-  <meta name="theme-color" content="#0d1117" />
+  <meta name="theme-color" content="#0b0d14" />
 
   <script src="js/allsky-common.js"></script>
 
@@ -28,10 +28,10 @@
       min-width: 0;
       display: flex;
       flex-direction: column;
-      padding: 10px;
-      gap: 9px;
+      padding: 12px;
+      gap: 8px;
       overflow: hidden;
-      background: #0d1117;
+      background: #0b0d14;
     }
 
     /* ── ALLSKY IMAGE ───────────────────────────────────────────── */
@@ -46,8 +46,7 @@
     }
     #allsky-wrap .pano-label {
       position: absolute; top: 8px; left: 10px;
-      font-size: 10px; font-weight: 700; color: #6b7280;
-      text-transform: uppercase; letter-spacing: 0.09em;
+      font-size: 12px; font-weight: 500; color: #7a8296;
       z-index: 2; pointer-events: none;
     }
     #image {
@@ -64,7 +63,7 @@
     /* ── BOTTOM ROW ─────────────────────────────────────────────── */
     #bottom-row {
       display: flex;
-      gap: 9px;
+      gap: 8px;
       flex-shrink: 0;
       height: 210px;
     }
@@ -72,23 +71,22 @@
     /* ── HDR EXPOSURES CARD ─────────────────────────────────────── */
     #exposures-card {
       flex-shrink: 0;
-      padding: 10px 12px;
+      padding: 12px 12px;
     }
     #exposures-card h3 {
-      font-size: 10px; font-weight: 700; color: #6b7280;
-      text-transform: uppercase; letter-spacing: 0.09em;
-      margin-bottom: 7px;
+      font-size: 12px; font-weight: 500; color: #7a8296;
+      margin-bottom: 8px;
     }
     .exposure-gallery {
       display: flex;
-      gap: 5px;
+      gap: 4px;
       height: 155px;
     }
     .exposure-gallery .exp-item {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 3px;
+      gap: 4px;
     }
     .exposure-gallery img {
       height: 130px;
@@ -100,11 +98,10 @@
       transition: border-color 0.15s;
     }
     .exposure-gallery img:hover {
-      border-color: rgba(59,130,246,0.6);
+      border-color: rgba(138,180,240,0.6);
     }
     .exp-label {
-      font-size: 9px; color: #6b7280; font-weight: 600;
-      text-transform: uppercase; letter-spacing: 0.04em;
+      font-size: 12px; color: #7a8296; font-weight: 500;
       white-space: nowrap;
     }
 
@@ -112,17 +109,16 @@
     #weightmaps-card {
       flex: 1;
       min-width: 0;
-      padding: 10px 12px;
+      padding: 12px 12px;
       overflow: hidden;
     }
     #weightmaps-card h3 {
-      font-size: 10px; font-weight: 700; color: #6b7280;
-      text-transform: uppercase; letter-spacing: 0.09em;
-      margin-bottom: 7px;
+      font-size: 12px; font-weight: 500; color: #7a8296;
+      margin-bottom: 8px;
     }
     .weightmap-gallery {
       display: flex;
-      gap: 5px;
+      gap: 4px;
       height: 155px;
       overflow-x: auto;
     }
@@ -130,7 +126,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 3px;
+      gap: 4px;
       flex-shrink: 0;
     }
     .weightmap-gallery img {
@@ -143,26 +139,19 @@
       transition: border-color 0.15s;
     }
     .weightmap-gallery img:hover {
-      border-color: rgba(168,85,247,0.6);
+      border-color: rgba(138,180,240,0.5);
     }
     .wm-label {
-      font-size: 9px; color: #6b7280; font-weight: 600;
-      text-transform: uppercase; letter-spacing: 0.04em;
+      font-size: 12px; color: #7a8296; font-weight: 500;
       white-space: nowrap;
     }
     #wm-unavailable {
       display: none;
-      font-size: 11px; color: #4b5563;
+      font-size: 11px; color: #7a8296;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
     }
 
-    /* ── ANIMATIONS ─────────────────────────────────────────────── */
-    @keyframes fadeInUp {
-      from { opacity:0; transform:translateY(10px); }
-      to   { opacity:1; transform:translateY(0); }
-    }
-    .card { animation: fadeInUp 0.35s ease-out both; }
   </style>
 </head>
 
@@ -176,13 +165,16 @@
       <img src="allsky360_256x256.png" alt="Allsky360" width="30" height="30" />
       <div class="hdr-brand-text">
         <div class="hdr-title">Allsky360</div>
-        <div class="hdr-crumb">HDR Debug</div>
+        <div class="hdr-crumb">Camera · HDR</div>
       </div>
     </a>
 
+    <nav class="sub-tabs" id="cam-tabs"></nav>
+    <script>renderCameraTabs();</script>
+
     <div class="hdr-badges">
       <span class="badge badge-green">
-        <span class="badge-dot live-pulse"></span>LIVE
+        <span class="badge-dot"></span>Live
       </span>
       <span class="badge badge-blue"   id="hdr-timer">-- s</span>
       <span class="badge badge-orange" id="hdr-mode">--</span>
@@ -202,12 +194,12 @@
 
       <!-- Capture Parameters -->
       <div class="card">
-        <div id="capture-params"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
+        <div id="capture-params"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
       </div>
 
       <!-- HDR Configuration -->
       <div class="card">
-        <div id="hdr-config"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
+        <div id="hdr-config"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
       </div>
 
     </aside>
@@ -315,7 +307,7 @@
     async function loadHdrConfig() {
       const cfg = await fetchConfig();
       if (!cfg) {
-        hdrConfigEl.innerHTML = '<div style="color:#4b5563;font-size:11px;">Config not available</div>';
+        hdrConfigEl.innerHTML = '<div style="color:#7a8296;font-size:11px;">Config not available</div>';
         return;
       }
 
@@ -405,7 +397,7 @@
     function updateHeaderBadges(imageMeta) {
       const modeEl  = document.getElementById('hdr-mode');
       const countEl = document.getElementById('hdr-count');
-      if (modeEl)  modeEl.textContent  = imageMeta.night_mode ? '🌙 Night' : '☀️ Day';
+      if (modeEl)  modeEl.innerHTML  = dayNightLabel(imageMeta.night_mode);
       if (countEl) countEl.textContent = `${imageMeta.hdr ?? '?'} HDR`;
     }
 
@@ -448,7 +440,7 @@
           ${rowFix('SQM (mag/arcs²)', imageMeta.sqm, 1)}`;
       }
       html += `${row('Interval (s)', imageMeta.capture_interval)}
-        <div>Night mode <span>${imageMeta.night_mode ? '🌙' : '☀️'}</span></div>
+        <div>Night mode <span>${dayNightLabel(imageMeta.night_mode)}</span></div>
         ${row('HDR exposures', imageMeta.hdr)}
       </div>`;
 

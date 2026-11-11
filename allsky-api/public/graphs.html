@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.json" />
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Allsky360 Stats">
-  <meta name="theme-color" content="#0d1117" />
+  <meta name="theme-color" content="#0b0d14" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@9.2.2/dist/gridstack.min.css">
@@ -36,7 +36,7 @@
       overflow: hidden;
     }
 
-    #controls-bar { padding: 10px 10px 0; }
+    #controls-bar { padding: 12px 12px 0; }
 
     /* ── GRAPHS SCROLL ──────────────────────────────────────────── */
     #graphs-scroll {
@@ -48,19 +48,19 @@
 
 
     /* ── LATEST IMAGE: histogram and HDR exposures (from the dashboard) ── */
-    .cam-card { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; overflow: hidden; }
-    .cam-title { text-align: center; font-size: 12px; font-weight: 600; color: #e5e7eb; }
-    .cam-title span { font-weight: 400; color: #6b7280; }
+    .cam-card { display: flex; flex-direction: column; gap: 8px; padding: 12px 12px; overflow: hidden; }
+    .cam-title { text-align: center; font-size: 12px; font-weight: 500; color: #eef0f5; }
+    .cam-title span { font-weight: 400; color: #7a8296; }
     #histogram { display: block; width: 100%; flex: 1; min-height: 0; border-radius: 6px; background: rgba(0,0,0,0.35); }
-    #histogram-stats { display: flex; flex-wrap: wrap; gap: 0 12px; font-size: 11px; color: #6b7280; }
+    #histogram-stats { display: flex; flex-wrap: wrap; gap: 0 12px; font-size: 11px; color: #7a8296; }
     #histogram-stats > div { margin-bottom: 0 !important; }
-    .exposure-gallery { flex: 1; min-height: 0; display: flex; gap: 6px; overflow-x: auto; }
-    .exposure-gallery figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+    .exposure-gallery { flex: 1; min-height: 0; display: flex; gap: 8px; overflow-x: auto; }
+    .exposure-gallery figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
     .exposure-gallery img {
       flex: 1; min-height: 0; max-width: 100%; width: auto; object-fit: contain;
       border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: #000;
     }
-    .exposure-gallery figcaption { font-size: 10px; color: #6b7280; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .exposure-gallery figcaption { font-size: 11px; color: #7a8296; font-variant-numeric: tabular-nums; white-space: nowrap; }
   </style>
 </head>
 
@@ -79,11 +79,14 @@
       </div>
     </a>
 
+    <nav class="sub-tabs" id="cam-tabs"></nav>
+    <script>renderCameraTabs();</script>
+
     <div class="hdr-badges">
       <button class="badge badge-gray" id="time-mode-btn" type="button"></button>
       <span class="badge badge-gray" id="hdr-date">–</span>
-      <button class="badge badge-gray" id="toggle-grid-btn" onclick="toggleGridInteraction()">🔒 Locked</button>
-      <button class="badge badge-gray" id="reset-layout-btn" onclick="resetGridLayout()">↺ Reset</button>
+      <button class="badge badge-gray" id="toggle-grid-btn" onclick="toggleGridInteraction()"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Locked</button>
+      <button class="badge badge-gray" id="reset-layout-btn" onclick="resetGridLayout()"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> Reset</button>
     </div>
   </header>
 
@@ -100,7 +103,7 @@
       <!-- Controls -->
       <div id="controls-bar">
         <div class="ctrl-group">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#7a8296" stroke-width="2">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
             <line x1="16" y1="2" x2="16" y2="6"></line>
             <line x1="8"  y1="2" x2="8"  y2="6"></line>
@@ -295,7 +298,7 @@
                 displayFormats: { hour: 'HH:mm', minute: 'HH:mm' }
               },
               // Labels in the display time zone (station or UTC)
-              ticks: chartTimeTicks({ color: '#9ca3af', maxTicksLimit: 8, font: { size: 10 } }),
+              ticks: chartTimeTicks({ color: '#a3a9b8', maxTicksLimit: 8, font: { size: 10 } }),
               grid: { color: 'rgba(255,255,255,0.06)' }
             },
             y: {
@@ -303,7 +306,7 @@
               min: logScale ? 0.00001 : undefined,
               beginAtZero: !logScale,
               ticks: {
-                color: '#9ca3af',
+                color: '#a3a9b8',
                 font: { size: 10 },
                 callback: (v) => logScale ? v.toFixed(6) : v.toString()
               },
@@ -315,13 +318,13 @@
             title: {
               display: true,
               text: label,
-              color: '#e5e7eb',
+              color: '#eef0f5',
               font: { size: 12, weight: '600' },
               padding: { top: 6, bottom: 4 }
             },
             legend: {
               display: showLegend,
-              labels: { color: '#9ca3af', boxWidth: 2, boxHeight: 2, font: { size: 11 } }
+              labels: { color: '#a3a9b8', boxWidth: 2, boxHeight: 2, font: { size: 11 } }
             },
             backgroundSun: {
               periods: getSunPeriods()
@@ -549,13 +552,13 @@
         if (gridUnlocked) {
           grid.enableMove(true);
           grid.enableResize(true);
-          toggleBtn.textContent = '🔓 Unlocked';
+          toggleBtn.innerHTML = icon('unlock') + ' Unlocked';
           toggleBtn.classList.remove('badge-gray');
           toggleBtn.classList.add('badge-blue');
         } else {
           grid.enableMove(false);
           grid.enableResize(false);
-          toggleBtn.textContent = '🔒 Locked';
+          toggleBtn.innerHTML = icon('lock') + ' Locked';
           toggleBtn.classList.remove('badge-blue');
           toggleBtn.classList.add('badge-gray');
         }

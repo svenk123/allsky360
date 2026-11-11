@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.json" />
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Allsky360">
-  <meta name="theme-color" content="#0d1117" />
+  <meta name="theme-color" content="#0b0d14" />
 
   <script src="js/allsky-common.js"></script>
   <script src="js/meteors.js"></script>
@@ -24,12 +24,12 @@
   <link rel="stylesheet" href="allsky.css">
   <style>
     /* ── SIDEBAR WIDTHS ─────────────────────────────────────────── */
-    #left-sidebar  { width: 302px; border-right: 1px solid rgba(255,255,255,0.06); }
+    #left-sidebar  { width: 288px; border-right: 1px solid rgba(255,255,255,0.06); }
     #right-sidebar { width: 288px; border-left:  1px solid rgba(255,255,255,0.06); }
 
     /* ── OVERRIDES ──────────────────────────────────────────────── */
     .metadata-section h2 { margin-top: 2px; }
-    #controls-bar { gap: 6px; }
+    #controls-bar { gap: 8px; }
 
     /* ── CENTER AREA ────────────────────────────────────────────── */
     #center-area {
@@ -37,10 +37,10 @@
       min-width: 0;
       display: flex;
       flex-direction: column;
-      padding: 10px;
-      gap: 9px;
+      padding: 12px;
+      gap: 8px;
       overflow: hidden;
-      background: #0d1117;
+      background: #0b0d14;
     }
 
     /* ── ALLSKY PANEL ───────────────────────────────────────────── */
@@ -49,7 +49,7 @@
       min-height: 0;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
     }
 
     #allsky-circle-wrap {
@@ -90,16 +90,17 @@
       position: absolute;
       bottom: 18px; left: 50%;
       transform: translateX(-50%);
-      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
       pointer-events: none; z-index: 5;
     }
-    .sky-badge-row { display: flex; gap: 6px; }
+    .sky-badge-row { display: flex; gap: 8px; }
     .sky-badge {
-      background: rgba(0,0,0,0.62);
-      backdrop-filter: blur(8px);
-      border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 10px; padding: 3px 9px;
-      font-size: 11px; font-weight: 600; color: #fff;
+      display: inline-flex; align-items: center; gap: 4px;
+      background: rgba(7,8,13,0.72);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px; padding: 4px 8px;
+      font-family: var(--mono); font-variant-numeric: tabular-nums;
+      font-size: 12px; font-weight: 400; color: #eef0f5;
       white-space: nowrap;
     }
 
@@ -110,7 +111,7 @@
       height: 100%;
       display: flex;
       flex-direction: column;
-      gap: 9px;
+      gap: 8px;
     }
 
     #panorama-container {
@@ -124,8 +125,7 @@
     }
     .pano-label {
       position: absolute; top: 8px; left: 10px;
-      font-size: 10px; font-weight: 700; color: #6b7280;
-      text-transform: uppercase; letter-spacing: 0.09em;
+      font-size: 12px; font-weight: 500; color: #7a8296;
       z-index: 2; pointer-events: none;
     }
     /* Size and position are set by layoutPanorama() */
@@ -151,25 +151,17 @@
     }
 
     /* ── CONDITIONS (right sidebar) ────────────────────────────── */
-    .h2-sub { font-weight: 400; color: #6b7280; text-transform: none; letter-spacing: 0; }
-    .metadata-section > div span.warn { color: #f59e0b; }
-    .metadata-section > div span.bad  { color: #ef4444; }
-    .metadata-section > div span.good { color: #22c55e; }
+    .h2-sub { font-weight: 400; color: #7a8296; text-transform: none; letter-spacing: 0; }
+    .metadata-section > div span.warn { color: #e0a33a; }
+    .metadata-section > div span.bad  { color: #e5484d; }
+    .metadata-section > div span.good { color: #4cc38a; }
     .cloud-swatch {
       display: inline-block; width: 1.2em; height: 0.8em;
       border-radius: 2px; vertical-align: -1px; margin-left: 4px;
     }
-    .cond-link { border: none !important; margin-top: 6px; }
-    .cond-note { font-size: 11px; color: #6b7280; border: none !important; }
+    .cond-link { border: none !important; margin-top: 8px; }
+    .cond-note { font-size: 11px; color: #7a8296; border: none !important; }
 
-    /* ── ANIMATIONS ─────────────────────────────────────────────── */
-    @keyframes fadeInUp {
-      from { opacity:0; transform:translateY(10px); }
-      to   { opacity:1; transform:translateY(0); }
-    }
-    .card {
-      animation: fadeInUp 0.35s ease-out both;
-    }
   </style>
 </head>
 
@@ -192,11 +184,11 @@
 <div class="hdr-badges">
       <button class="badge badge-gray" id="time-mode-btn" type="button"></button>
       <span class="badge badge-green">
-        <span class="badge-dot live-pulse"></span>LIVE
+        <span class="badge-dot"></span>Live
       </span>
       <span class="badge badge-blue"   id="hdr-timer">-- s</span>
       <span class="badge badge-orange" id="hdr-mode">--</span>
-      <span class="badge badge-violet" id="hdr-stars">-- ★</span>
+      <span class="badge badge-violet" id="hdr-stars">-- stars</span>
     </div>
   </header>
 
@@ -211,11 +203,11 @@
     <aside id="left-sidebar" class="sidebar">
 
       <div class="card">
-        <div id="image-data"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
+        <div id="image-data"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
       </div>
 
       <div class="card">
-        <div id="sunandmoon"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
+        <div id="sunandmoon"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
         <div style="position:relative;height:130px;margin-top:8px;">
           <canvas id="chartSunMoonAltitude"></canvas>
         </div>
@@ -252,7 +244,7 @@
           <input type="checkbox" id="sunMoonCheckbox" onchange="toggleSunMoonOverlay()"> Sun/Moon
         </label>
         <label class="ctrl-label">
-          <input type="checkbox" id="detectedStarsCheckbox" onchange="toggleDetectedStarsOverlay()"> Detected ★
+          <input type="checkbox" id="detectedStarsCheckbox" onchange="toggleDetectedStarsOverlay()"> Detected stars
         </label>
         <label class="ctrl-label">
           <input type="checkbox" id="mountPositionCheckbox" onchange="toggleMountPosition()"> Mount
@@ -277,7 +269,7 @@
             <div class="sky-badge-row">
               <span class="sky-badge" id="sky-mode">--</span>
               <span class="sky-badge" id="sky-sqm">SQM --</span>
-              <span class="sky-badge" id="sky-stars">-- ★</span>
+              <span class="sky-badge" id="sky-stars">-- stars</span>
             </div>
             <div class="sky-badge-row" id="coord-row" style="display:none;">
               <span class="sky-badge" id="coord-xy">X: –, Y: –</span>
@@ -314,15 +306,15 @@
     <aside id="right-sidebar" class="sidebar">
 
       <div class="card">
-        <div id="weather"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
+        <div id="weather"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
       </div>
 
       <div class="card">
-        <div id="tonight"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
+        <div id="tonight"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
       </div>
 
       <div class="card">
-        <div id="aurora"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
+        <div id="aurora"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
       </div>
 
     </aside>
@@ -380,20 +372,20 @@
             scales: {
               x: {
                 type: 'linear', position: 'bottom',
-                title: { display: true, text: 'Hours from now', color: '#6b7280', font:{size:9} },
-                ticks: { color: '#6b7280', stepSize: 4, maxTicksLimit: 7 },
+                title: { display: true, text: 'Hours from now', color: '#7a8296', font:{size:9} },
+                ticks: { color: '#7a8296', stepSize: 4, maxTicksLimit: 7 },
                 grid:  { color: 'rgba(255,255,255,0.06)' }
               },
               y: {
                 type: 'linear', min: 0,
-                title: { display: true, text: 'Altitude (°)', color: '#6b7280', font:{size:9} },
-                ticks: { color: '#6b7280' },
+                title: { display: true, text: 'Altitude (°)', color: '#7a8296', font:{size:9} },
+                ticks: { color: '#7a8296' },
                 grid:  { color: 'rgba(255,255,255,0.06)' }
               }
             },
             plugins: {
-              title:  { display: true, text: "Sun/Moon Altitude (24h)", color: "#9ca3af", font:{size:11}, padding:{bottom:4} },
-              legend: { display: true, labels: { color: '#9ca3af', boxWidth: 2, boxHeight: 2, font:{size:10} } },
+              title:  { display: true, text: "Sun/Moon Altitude (24h)", color: "#a3a9b8", font:{size:11}, padding:{bottom:4} },
+              legend: { display: true, labels: { color: '#a3a9b8', boxWidth: 2, boxHeight: 2, font:{size:10} } },
               backgroundSun: { periods: [] }
             }
           }
@@ -530,7 +522,7 @@
         html += '<h2>Aurora</h2><div class="cond-note">No aurora data yet.</div>';
       } else {
         const level = auroraLevel(a);
-        html += `<h2>Aurora <span class="h2-sub">· <span class="${level.cls}" style="font-weight:600">${level.text}</span></span></h2>`;
+        html += `<h2>Aurora <span class="h2-sub">· <span class="${level.cls}" style="font-weight:500">${level.text}</span></span></h2>`;
         html += row('Kp index', fmtNum(a.kp_index, 1), isNum(a.kp_index) && a.kp_index >= 5 ? 'good' : '');
         html += row('Probability', `${fmtNum(a.probability_percent, 0)} %`);
         html += row('Bz', isNum(a.bz) ? `${a.bz.toFixed(1)} nT${a.bz < 0 ? ' (south)' : ''}` : '–',
@@ -1241,7 +1233,7 @@
           const sunTimeUntil  = getTimeUntilSunRiseSet(sunTimesObj.sunRise, sunTimesObj.sunSet, imageTimestamp, timezoneOffset);
 
           const sunandmoonHtml = `<div class="metadata-section">
-            <h2>Sun &amp; Moon <span style="font-weight:400;color:#6b7280">· times ${timeZoneLabel(imageTimestamp)}</span></h2>
+            <h2>Sun &amp; Moon <span style="font-weight:400;color:#7a8296">· times ${timeZoneLabel(imageTimestamp)}</span></h2>
             <div>Sun altitude (°) <span>${imageMeta.sun_altitude != null ? imageMeta.sun_altitude.toFixed(1) : "N/A"}</span></div>
             <div>Sun rise <span>${sunRiseStr}</span></div>
             <div>Sun set  <span>${sunSetStr}</span></div>
@@ -1264,7 +1256,7 @@
         updateSunMoonAltitudeChart();
 
       } catch (err) {
-        console.error("⚠️ Unexpected load error:", err);
+        console.error("Unexpected load error:", err);
         loading = false;
         // Ensure the timer doesn't rapid-fire on repeated fetch errors
         lastImageLoadTime = Date.now();
@@ -1274,9 +1266,9 @@
     function updateHeaderBadges(imageMeta) {
       const modeEl  = document.getElementById('hdr-mode');
       const starsEl = document.getElementById('hdr-stars');
-      if (modeEl) modeEl.textContent = imageMeta.night_mode ? '🌙 Night' : '☀️ Day';
+      if (modeEl) modeEl.innerHTML = dayNightLabel(imageMeta.night_mode);
       if (starsEl && imageMeta.night_mode && imageMeta.stars !== undefined)
-        starsEl.textContent = `${imageMeta.stars} ★`;
+        starsEl.textContent = `${imageMeta.stars} stars`;
       else if (starsEl) starsEl.textContent = '--';
     }
 
@@ -1284,9 +1276,9 @@
       const modeEl  = document.getElementById('sky-mode');
       const sqmEl   = document.getElementById('sky-sqm');
       const starsEl = document.getElementById('sky-stars');
-      if (modeEl)  modeEl.textContent  = imageMeta.night_mode ? '🌙 Night' : '☀️ Day';
+      if (modeEl)  modeEl.innerHTML  = dayNightLabel(imageMeta.night_mode);
       if (sqmEl)   sqmEl.textContent   = imageMeta.night_mode ? `SQM ${imageMeta.sqm.toFixed(1)}` : 'SQM --';
-      if (starsEl) starsEl.textContent = imageMeta.night_mode ? `${imageMeta.stars} ★` : '--';
+      if (starsEl) starsEl.textContent = imageMeta.night_mode ? `${imageMeta.stars} stars` : '--';
     }
 
     function updateSunMoonAltitudeChart() {

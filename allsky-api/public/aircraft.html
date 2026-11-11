@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.json" />
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Allsky360">
-  <meta name="theme-color" content="#0d1117" />
+  <meta name="theme-color" content="#0b0d14" />
 
   <script src="js/allsky-common.js"></script>
 
@@ -28,10 +28,10 @@
       min-width: 0;
       display: flex;
       flex-direction: column;
-      padding: 10px;
-      gap: 9px;
+      padding: 12px;
+      gap: 8px;
       overflow: hidden;
-      background: #0d1117;
+      background: #0b0d14;
     }
 
     /* ── ALLSKY IMAGE ───────────────────────────────────────────── */
@@ -46,8 +46,7 @@
     }
     #allsky-wrap .pano-label {
       position: absolute; top: 8px; left: 10px;
-      font-size: 10px; font-weight: 700; color: #6b7280;
-      text-transform: uppercase; letter-spacing: 0.09em;
+      font-size: 12px; font-weight: 500; color: #7a8296;
       z-index: 2; pointer-events: none;
     }
     #image {
@@ -65,26 +64,25 @@
     #aircraft-card {
       flex-shrink: 0;
       height: 240px;
-      padding: 10px 12px;
+      padding: 12px 12px;
       overflow: hidden;
       display: flex;
       flex-direction: column;
     }
     #aircraft-card h3 {
-      font-size: 10px; font-weight: 700; color: #6b7280;
-      text-transform: uppercase; letter-spacing: 0.09em;
-      margin-bottom: 7px; flex-shrink: 0;
+      font-size: 12px; font-weight: 500; color: #7a8296;
+      margin-bottom: 8px; flex-shrink: 0;
       display: flex; align-items: center; gap: 8px;
     }
     #unit-toggle {
-      font-size: 9px; font-weight: 700; letter-spacing: 0.05em;
-      padding: 2px 7px; border-radius: 4px; cursor: pointer;
-      background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.35);
+      font-size: 11px; font-weight: 500;
+      padding: 2px 8px; border-radius: 4px; cursor: pointer;
+      background: rgba(138,180,240,0.15); border: 1px solid rgba(138,180,240,0.35);
       color: #60a5fa; text-transform: none;
       transition: background 0.15s, border-color 0.15s;
     }
     #unit-toggle:hover {
-      background: rgba(59,130,246,0.28); border-color: rgba(59,130,246,0.6);
+      background: rgba(138,180,240,0.28); border-color: rgba(138,180,240,0.6);
     }
     #aircraft-table-wrap {
       flex: 1;
@@ -99,12 +97,10 @@
     }
     #aircraft-table thead th {
       position: sticky; top: 0;
-      background: #161b22;
-      color: #6b7280;
-      font-weight: 700;
-      font-size: 9px;
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
+      background: #11141c;
+      color: #7a8296;
+      font-weight: 500;
+      font-size: 12px;
       padding: 4px 8px;
       text-align: left;
       border-bottom: 1px solid rgba(255,255,255,0.06);
@@ -117,18 +113,18 @@
     #aircraft-table tbody tr.no-pos { opacity: 0.45; }
     #aircraft-table td {
       padding: 4px 8px;
-      color: #d1d5db;
+      color: #eef0f5;
       font-family: monospace;
     }
-    #aircraft-table td.flight { color: #60a5fa; font-weight: 700; font-family: inherit; }
-    #aircraft-table td.hex    { color: #9ca3af; }
+    #aircraft-table td.flight { color: #60a5fa; font-weight: 500; font-family: inherit; }
+    #aircraft-table td.hex    { color: #a3a9b8; }
     #aircraft-table td.alt-cl { color: #34d399; }
     #aircraft-table td.alt-desc { color: #f87171; }
-    #aircraft-table td.alt-lvl  { color: #d1d5db; }
+    #aircraft-table td.alt-lvl  { color: #eef0f5; }
     #aircraft-table td.seen-fresh { color: #34d399; }
-    #aircraft-table td.seen-old   { color: #6b7280; }
+    #aircraft-table td.seen-old   { color: #7a8296; }
     #aircraft-empty {
-      color: #4b5563; font-size: 12px;
+      color: #7a8296; font-size: 12px;
       padding: 20px; text-align: center;
     }
 
@@ -138,7 +134,7 @@
       align-items: center;
       gap: 8px;
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 500;
       padding: 8px 0 4px;
     }
     .proc-dot {
@@ -146,24 +142,18 @@
       border-radius: 50%;
       flex-shrink: 0;
     }
-    .proc-dot.running  { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.6); }
-    .proc-dot.stopped  { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.6); }
-    .proc-dot.unknown  { background: #6b7280; }
-    .proc-label.running { color: #22c55e; }
-    .proc-label.stopped { color: #ef4444; }
-    .proc-label.unknown { color: #6b7280; }
-    .proc-name { color: #9ca3af; font-size: 10px; font-weight: 400; }
+    .proc-dot.running  { background: #4cc38a; }
+    .proc-dot.stopped  { background: #e5484d; }
+    .proc-dot.unknown  { background: #7a8296; }
+    .proc-label.running { color: #4cc38a; }
+    .proc-label.stopped { color: #e5484d; }
+    .proc-label.unknown { color: #7a8296; }
+    .proc-name { color: #a3a9b8; font-size: 11px; font-weight: 400; }
 
     /* ── STATS ROWS ─────────────────────────────────────────────── */
     #sidebar-stats .metadata-section div { display: flex; justify-content: space-between; }
-    #sidebar-stats .metadata-section span { color: #e5e7eb; font-weight: 500; }
+    #sidebar-stats .metadata-section span { color: #eef0f5; font-weight: 500; }
 
-    /* ── ANIMATIONS ─────────────────────────────────────────────── */
-    @keyframes fadeInUp {
-      from { opacity:0; transform:translateY(10px); }
-      to   { opacity:1; transform:translateY(0); }
-    }
-    .card { animation: fadeInUp 0.35s ease-out both; }
   </style>
 </head>
 
@@ -183,10 +173,10 @@
 
     <div class="hdr-badges">
       <span class="badge badge-green">
-        <span class="badge-dot live-pulse"></span>LIVE
+        <span class="badge-dot"></span>Live
       </span>
-      <span class="badge badge-blue"   id="ac-count">-- AC</span>
-      <span class="badge badge-violet" id="ac-messages">-- MSG</span>
+      <span class="badge badge-blue"   id="ac-count">-- aircraft</span>
+      <span class="badge badge-violet" id="ac-messages">-- messages</span>
       <span class="badge badge-orange" id="ac-updated">--</span>
     </div>
   </header>
@@ -215,12 +205,12 @@
 
       <!-- Location -->
       <div class="card">
-        <div id="location-widget"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
+        <div id="location-widget"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
       </div>
 
       <!-- Statistics -->
       <div class="card" id="sidebar-stats">
-        <div id="stats-content"><div style="color:#6b7280;font-size:12px;">Loading…</div></div>
+        <div id="stats-content"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
       </div>
 
     </aside>
@@ -426,7 +416,7 @@
       const countEl    = document.getElementById('ac-count');
       const messagesEl = document.getElementById('ac-messages');
       if (countEl)    countEl.textContent    = `${aircraft.length} AC`;
-      if (messagesEl) messagesEl.textContent = data.messages ? `${data.messages.toLocaleString()} MSG` : '-- MSG';
+      if (messagesEl) messagesEl.textContent = data.messages ? `${data.messages.toLocaleString()} messages` : '-- messages';
 
       // Update sidebar stats
       const withPos    = aircraft.filter(a => a.lat !== undefined).length;
@@ -480,12 +470,12 @@
         const seenClass = (a.seen !== undefined && a.seen < 10) ? 'seen-fresh' : 'seen-old';
 
         return `<tr class="${hasPos ? '' : 'no-pos'}">
-          <td class="flight">${flight ? escHtml(flight) : '<span style="color:#4b5563">—</span>'}</td>
+          <td class="flight">${flight ? escHtml(flight) : '<span style="color:#7a8296">—</span>'}</td>
           <td class="hex">${escHtml(a.hex || '')}</td>
-          <td>${a.squawk ? escHtml(a.squawk) : '<span style="color:#4b5563">—</span>'}</td>
-          <td class="${altClass}">${altDisplay !== null ? altDisplay : '<span style="color:#4b5563">—</span>'}</td>
-          <td>${spdDisplay !== null ? spdDisplay : '<span style="color:#4b5563">—</span>'}</td>
-          <td>${a.track !== undefined ? a.track + '°' : '<span style="color:#4b5563">—</span>'}</td>
+          <td>${a.squawk ? escHtml(a.squawk) : '<span style="color:#7a8296">—</span>'}</td>
+          <td class="${altClass}">${altDisplay !== null ? altDisplay : '<span style="color:#7a8296">—</span>'}</td>
+          <td>${spdDisplay !== null ? spdDisplay : '<span style="color:#7a8296">—</span>'}</td>
+          <td>${a.track !== undefined ? a.track + '°' : '<span style="color:#7a8296">—</span>'}</td>
           <td>${(() => {
             if (hasPos &&
                 locationLat !== null && locationLon !== null &&
@@ -493,11 +483,11 @@
               const d = haversineKm(locationLat, locationLon, a.lat, a.lon);
               return d.toFixed(1) + ' km';
             }
-            return '<span style="color:#4b5563">—</span>';
+            return '<span style="color:#7a8296">—</span>';
           })()}</td>
-          <td class="${vr !== undefined && vr > 128 ? 'alt-cl' : vr !== undefined && vr < -128 ? 'alt-desc' : ''}">${vr !== undefined ? (vr > 0 ? '+' : '') + vr : '<span style="color:#4b5563">—</span>'}</td>
-          <td>${a.category ? escHtml(a.category) : '<span style="color:#4b5563">—</span>'}</td>
-          <td>${a.rssi !== undefined ? a.rssi.toFixed(1) : '<span style="color:#4b5563">—</span>'}</td>
+          <td class="${vr !== undefined && vr > 128 ? 'alt-cl' : vr !== undefined && vr < -128 ? 'alt-desc' : ''}">${vr !== undefined ? (vr > 0 ? '+' : '') + vr : '<span style="color:#7a8296">—</span>'}</td>
+          <td>${a.category ? escHtml(a.category) : '<span style="color:#7a8296">—</span>'}</td>
+          <td>${a.rssi !== undefined ? a.rssi.toFixed(1) : '<span style="color:#7a8296">—</span>'}</td>
           <td class="${seenClass}">${a.seen !== undefined ? a.seen.toFixed(1) : '—'}</td>
           <td>${a.messages !== undefined ? a.messages.toLocaleString() : '—'}</td>
         </tr>`;
@@ -538,7 +528,7 @@
       const cfg = await fetchConfig();
       if (!cfg) {
         document.getElementById('location-widget').innerHTML =
-          '<div style="color:#4b5563;font-size:11px;">Config not available</div>';
+          '<div style="color:#7a8296;font-size:11px;">Config not available</div>';
         return;
       }
 

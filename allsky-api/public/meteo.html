@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.json" />
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Allsky360 Meteo">
-  <meta name="theme-color" content="#0d1117" />
+  <meta name="theme-color" content="#0b0d14" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@9.2.2/dist/gridstack.min.css">
@@ -32,7 +32,7 @@
       overflow: hidden;
     }
 
-    #controls-bar { padding: 10px 10px 0; }
+    #controls-bar { padding: 12px 12px 0; }
 
     /* ── CHARTS SCROLL ──────────────────────────────────────────── */
     #meteo-scroll {
@@ -42,16 +42,53 @@
       padding: 8px 8px 20px;
     }
 
+    /* ── WIND ROSE (share per sector, stacked by Beaufort class) ── */
+    .wind-polar { position: relative; height: 100%; display: flex; flex-direction: column; }
+    .wp-head {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      padding: 8px 12px 0;
+    }
+    .wp-title { font-size: 12px; font-weight: 500; color: #eef0f5; }
+    .wp-legend { display: flex; gap: 12px; margin-left: auto; flex-wrap: wrap; }
+    .wp-key {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; color: #a3a9b8; cursor: pointer; user-select: none;
+      background: none; border: none; font-family: inherit; padding: 0;
+    }
+    .wp-key.off { opacity: 0.4; }
+    .wp-key i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .wp-key i.ring { background: none; border: 1px solid currentColor; }
+    .wr-src { padding: 1px 6px; border-radius: 4px; border: 1px solid transparent; }
+    .wr-src.on { color: #eef0f5; border-color: rgba(238,240,245,0.18); background: rgba(238,240,245,0.05); }
+    .wr-src:focus-visible { outline: 2px solid #5598e7; outline-offset: 1px; }
+    .wr-classes {
+      display: flex; gap: 10px; flex-wrap: wrap; padding: 4px 12px 0;
+      font-size: 10px; color: #a3a9b8;
+    }
+    .wr-class { display: inline-flex; align-items: center; gap: 4px; }
+    .wr-class i { width: 8px; height: 8px; border-radius: 2px; }
+    .wr-class i.ring { border-radius: 50%; border: 1px solid #7a8296; }
+    .wp-plot { flex: 1; min-height: 0; position: relative; }
+    .wp-plot canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .wp-tip {
+      position: absolute; pointer-events: none; display: none; z-index: 5;
+      background: rgba(7,8,13,0.92); border: 1px solid rgba(238,240,245,0.14);
+      border-radius: 6px; padding: 4px 8px;
+      font-family: var(--mono); font-variant-numeric: tabular-nums;
+      font-size: 11px; color: #eef0f5; white-space: nowrap;
+    }
+    .wp-tip span { color: #7a8296; }
+
     /* ── STATION SENSORS (allsky360-sensors) ────────────────────── */
     .sensor-live {
       height: 100%;
       display: flex; flex-direction: column; gap: 8px;
-      padding: 10px 12px;
+      padding: 12px 12px;
       overflow-y: auto;
     }
     .sensor-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .sensor-head-title { font-size: 12px; font-weight: 600; color: #e5e7eb; }
-    .sensor-head-meta { font-size: 11px; color: #6b7280; font-variant-numeric: tabular-nums; }
+    .sensor-head-title { font-size: 12px; font-weight: 500; color: #eef0f5; }
+    .sensor-head-meta { font-size: 11px; color: #7a8296; font-variant-numeric: tabular-nums; }
     .sensor-tiles {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -61,54 +98,53 @@
       background: rgba(255,255,255,0.03);
       border: 1px solid rgba(255,255,255,0.06);
       border-radius: 10px;
-      padding: 7px 9px;
+      padding: 8px 8px;
       min-width: 0;
     }
     .s-label {
-      font-size: 10px; font-weight: 700; color: #6b7280;
-      text-transform: uppercase; letter-spacing: 0.07em;
+      font-size: 12px; font-weight: 500; color: #7a8296;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .s-value {
-      display: flex; align-items: center; gap: 6px;
+      display: flex; align-items: center; gap: 8px;
       margin-top: 2px;
-      font-size: 20px; font-weight: 600; color: #e5e7eb;
+      font-size: 20px; font-weight: 500; color: #eef0f5;
       font-variant-numeric: tabular-nums;
     }
-    .s-unit { font-size: 11px; font-weight: 500; color: #9ca3af; }
-    .s-sub { margin-top: 1px; font-size: 10px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .s-unit { font-size: 11px; font-weight: 500; color: #a3a9b8; }
+    .s-sub { margin-top: 1px; font-size: 11px; color: #7a8296; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .s-tile.s-warn { border-color: rgba(245,158,11,0.35); }
-    .s-tile.s-warn .s-value, .s-tile.s-warn .s-sub { color: #f59e0b; }
+    .s-tile.s-warn .s-value, .s-tile.s-warn .s-sub { color: #e0a33a; }
     .s-compass { width: 20px; height: 20px; flex-shrink: 0; transition: transform 0.4s; }
-    .sensor-empty { font-size: 12px; color: #6b7280; }
+    .sensor-empty { font-size: 12px; color: #7a8296; }
 
     /* ── FORECAST (forecast_meteo.json, next 24 h) ──────────────── */
     .fc-wrap {
       height: 100%;
       display: flex; flex-direction: column; gap: 8px;
-      padding: 6px 12px 10px;
+      padding: 8px 12px 12px;
       min-width: 0;
     }
     /* like the Chart.js titles of the other widgets */
-    .fc-title { text-align: center; font-size: 12px; font-weight: 600; color: #e5e7eb; }
-    .fc-summary { display: flex; flex-wrap: wrap; gap: 6px; }
+    .fc-title { text-align: center; font-size: 12px; font-weight: 500; color: #eef0f5; }
+    .fc-summary { display: flex; flex-wrap: wrap; gap: 8px; }
     .fc-scroll { flex: 1; min-height: 0; overflow: auto; }
     .fc-table {
       display: grid;
       /* label column + one column per hour */
       grid-template-columns: 100px repeat(var(--fc-cols), minmax(34px, 1fr));
-      font-size: 10px; font-variant-numeric: tabular-nums;
-      color: #d1d5db;
+      font-size: 11px; font-variant-numeric: tabular-nums;
+      color: #eef0f5;
       min-width: max-content;
     }
     .fc-lbl {
       position: sticky; left: 0; z-index: 1;
-      /* opaque: card colour (rgba(255,255,255,0.04) over #0d1117) */
+      /* opaque: card colour (rgba(255,255,255,0.04) over #0b0d14) */
       background: #171c22;
-      color: #6b7280; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
-      font-size: 9px;
+      color: #7a8296; font-weight: 500;
+      font-size: 12px;
       display: flex; align-items: center;
-      padding-right: 6px;
+      padding-right: 8px;
       white-space: nowrap;
     }
     .fc-c {
@@ -118,15 +154,15 @@
       white-space: nowrap;
     }
     .fc-c.night { background: rgba(0,0,0,0.28); }
-    .fc-c.now { box-shadow: inset 2px 0 0 #3b82f6; }
-    .fc-hour { color: #9ca3af; font-weight: 600; }
-    .fc-hour.midnight { color: #e5e7eb; }
-    .fc-cloud { border-radius: 3px; margin: 1px; font-weight: 600; }
-    .fc-dim { color: #4b5563; }
+    .fc-c.now { box-shadow: inset 2px 0 0 #8ab4f0; }
+    .fc-hour { color: #a3a9b8; font-weight: 500; }
+    .fc-hour.midnight { color: #eef0f5; }
+    .fc-cloud { border-radius: 3px; margin: 1px; font-weight: 500; }
+    .fc-dim { color: #7a8296; }
     .fc-drop { width: 8px; height: 10px; margin-right: 1px; flex: none; fill: #38bdf8; }
-    .fc-warn { color: #f59e0b; font-weight: 600; }
-    .fc-rain { color: #38bdf8; font-weight: 600; }
-    .fc-empty { font-size: 12px; color: #6b7280; }
+    .fc-warn { color: #e0a33a; font-weight: 500; }
+    .fc-rain { color: #38bdf8; font-weight: 500; }
+    .fc-empty { font-size: 12px; color: #7a8296; }
   </style>
 </head>
 
@@ -148,8 +184,8 @@
     <div class="hdr-badges">
       <button class="badge badge-gray" id="time-mode-btn" type="button"></button>
       <span class="badge badge-gray" id="hdr-date">–</span>
-      <button class="badge badge-gray" id="toggle-grid-btn" onclick="toggleGridInteraction()">🔒 Locked</button>
-      <button class="badge badge-gray" id="reset-layout-btn" onclick="resetGridLayout()">↺ Reset</button>
+      <button class="badge badge-gray" id="toggle-grid-btn" onclick="toggleGridInteraction()"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Locked</button>
+      <button class="badge badge-gray" id="reset-layout-btn" onclick="resetGridLayout()"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> Reset</button>
     </div>
   </header>
 
@@ -166,7 +202,7 @@
       <!-- Controls -->
       <div id="controls-bar">
         <div class="ctrl-group">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#7a8296" stroke-width="2">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
             <line x1="16" y1="2" x2="16" y2="6"></line>
             <line x1="8"  y1="2" x2="8"  y2="6"></line>
@@ -235,43 +271,57 @@
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-rain-light" gs-x="0" gs-y="14" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-wind-rose" gs-x="0" gs-y="14" gs-w="6" gs-h="4">
+            <div class="grid-stack-item-content">
+              <div class="wind-polar" id="windRose">
+                <div class="wp-head">
+                  <span class="wp-title">Wind rose</span>
+                  <span class="wp-legend" id="windRoseSource"></span>
+                </div>
+                <div class="wr-classes"></div>
+                <div class="wp-plot"><canvas id="windRoseCanvas"></canvas></div>
+                <div class="wp-tip" id="windRoseTip"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid-stack-item" gs-id="chart-rain-light" gs-x="6" gs-y="14" gs-w="6" gs-h="4">
             <div class="grid-stack-item-content">
               <canvas id="chartRainLight"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-air" gs-x="6" gs-y="14" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-air" gs-x="0" gs-y="18" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartAir"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-clouds" gs-x="0" gs-y="17" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-clouds" gs-x="6" gs-y="18" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartClouds"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-global-cloud" gs-x="6" gs-y="17" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-global-cloud" gs-x="0" gs-y="21" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartGlobalCloud"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-visibility" gs-x="0" gs-y="20" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-visibility" gs-x="6" gs-y="21" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartVisibility"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-jetstream" gs-x="6" gs-y="20" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-jetstream" gs-x="0" gs-y="24" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartJetstream"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-cabinet" gs-x="0" gs-y="23" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-cabinet" gs-x="6" gs-y="24" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartCabinet"></canvas>
             </div>
@@ -295,6 +345,12 @@
     const SENSOR_SPAN_MS = 15 * 60 * 1000;
 
     const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+
+    // Sensors with an address in config.ini ("configured" in
+    // latest_sensor_data.json: weather, anemometer, wind_vane, cabinet).
+    // null = unknown (older allsky360-sensors): everything is shown
+    let sensorsConfigured = null;
+    const sensorShown = (key) => !key || !sensorsConfigured || sensorsConfigured[key] !== false;
 
     // The selected date is a calendar day in the display time zone (station
     // time or UTC, see allsky-common.js); range in milliseconds for the axes
@@ -321,7 +377,7 @@
     //  CHART FACTORY
     // ══════════════════════════════════════════════════════════════
     const charts = {};
-    const AXIS_TICKS = { color: '#9ca3af', font: { size: 10 } };
+    const AXIS_TICKS = { color: '#a3a9b8', font: { size: 10 } };
     const AXIS_GRID = { color: 'rgba(255,255,255,0.06)' };
 
     function line(label, color, extra = {}) {
@@ -358,7 +414,7 @@
           position: 'right',
           ticks: AXIS_TICKS,
           grid: { drawOnChartArea: false },
-          title: { display: !!title, text: title, color: '#6b7280', font: { size: 10 } },
+          title: { display: !!title, text: title, color: '#7a8296', font: { size: 10 } },
           ...rest
         };
       }
@@ -376,17 +432,288 @@
             title: {
               display: true,
               text: label,
-              color: '#e5e7eb',
+              color: '#eef0f5',
               font: { size: 12, weight: '600' },
               padding: { top: 6, bottom: 4 }
             },
             legend: {
               display: showLegend,
-              labels: { color: '#9ca3af', boxWidth: 10, boxHeight: 2, font: { size: 11 } }
+              labels: { color: '#a3a9b8', boxWidth: 10, boxHeight: 2, font: { size: 11 },
+                        filter: (item, data) => sensorShown(data.datasets[item.datasetIndex].sensor) }
             }
           }
         }
       });
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  WIND ROSE
+    //  Share of the day's readings per direction sector (16 sectors, N up,
+    //  clockwise, the bar points where the wind comes from), stacked by
+    //  Beaufort class from the center outward. Readings below CALM_MS have
+    //  no direction of their own (allsky360-sensors keeps the last one),
+    //  they are counted as calm in the center instead of in a sector.
+    // ══════════════════════════════════════════════════════════════
+    // Same as modbus_wind_calm_speed (config.ini default). The anemometer
+    // only starts turning at up to 2 m/s, so calm means "below its start"
+    const CALM_MS = 0.3;
+    // Beaufort classes (lower bound in m/s, readings are 10-minute means
+    // with two decimals) on one blue ramp: darker = lighter wind
+    const WIND_CLASSES = [
+      { min: CALM_MS, label: 'Bft 1', range: '0.3–1.5 m/s', color: '#184f95' },
+      { min: 1.55,    label: 'Bft 2', range: '1.6–3.3 m/s', color: '#2a78d6' },
+      { min: 3.35,    label: 'Bft 3', range: '3.4–5.4 m/s', color: '#5598e7' },
+      { min: 5.45,    label: 'Bft 4', range: '5.5–7.9 m/s', color: '#86b6ef' },
+      { min: 7.95,    label: 'Bft 5+', range: '≥ 8 m/s',    color: '#cde2fb' }
+    ];
+    const WIND_NO_SPEED = { label: 'no speed', color: '#7a8296' };
+    const WIND_MUTED = '#7a8296';
+
+    // Class index, -1 = calm, null = no speed reading
+    function windClass(speed) {
+      if (!isNum(speed)) return null;
+      if (speed < CALM_MS) return -1;
+      let k = 0;
+      WIND_CLASSES.forEach((c, i) => { if (speed >= c.min) k = i; });
+      return k;
+    }
+
+    const WIND_SOURCES = [
+      { label: 'Wind vane', table: 'sensors', sensor: 'wind_vane',
+        dir: d => d.wind_direction, speed: d => d.wind_speed },
+      { label: 'Weather sensor', table: 'sensors', sensor: 'weather',
+        dir: d => d.ws_wind_direction, speed: d => d.ws_wind_speed },
+      { label: 'Forecast 10 m', table: 'meteo',
+        dir: d => d.wind_dir_10m, speed: d => isNum(d.wind_speed_10m) ? d.wind_speed_10m / MS_TO_KMH : null }
+    ];
+
+    let windRose = null;
+
+    function createWindRose(root) {
+      const canvas = root.querySelector('canvas');
+      const tip = root.querySelector('.wp-tip');
+      const sourceEl = root.querySelector('.wp-legend');
+      const classEl = root.querySelector('.wr-classes');
+      const surface = getComputedStyle(document.documentElement).getPropertyValue('--card').trim() || '#11141c';
+      let tables = { sensors: [], meteo: [] };
+      let source = 0, picked = false, stats = null, geom = null;
+
+      const rad = (deg) => (deg - 90) * Math.PI / 180;   // 0° = north, up
+      const pct = (n) => stats.total ? `${(100 * n / stats.total).toFixed(n && 100 * n / stats.total < 1 ? 1 : 0)} %` : '–';
+
+      function renderControls() {
+        sourceEl.innerHTML = WIND_SOURCES.map((s, i) => sensorShown(s.sensor)
+          ? `<button type="button" class="wp-key wr-src${i === source ? ' on' : ''}" data-i="${i}" aria-pressed="${i === source}">${s.label}</button>`
+          : ''
+        ).join('');
+      }
+      classEl.innerHTML =
+        `<span class="wr-class"><i class="ring"></i>calm &lt; ${CALM_MS} m/s (center)</span>` +
+        WIND_CLASSES.map(c => `<span class="wr-class" title="${c.range}"><i style="background:${c.color}"></i>${c.label}</span>`).join('');
+      sourceEl.addEventListener('click', (e) => {
+        const b = e.target.closest('.wr-src');
+        if (!b) return;
+        source = +b.dataset.i;
+        picked = true;
+        renderControls();
+        compute();
+        draw();
+      });
+
+      function compute() {
+        const src = WIND_SOURCES[source];
+        const sectors = Array.from({ length: 16 }, () => ({ n: 0, byClass: new Array(WIND_CLASSES.length + 1).fill(0) }));
+        let calm = 0, total = 0;
+        for (const d of tables[src.table]) {
+          const dir = src.dir(d);
+          if (!isNum(dir)) continue;
+          total++;
+          const k = windClass(src.speed(d));
+          if (k === -1) { calm++; continue; }
+          const s = sectors[Math.round((((dir % 360) + 360) % 360) / 22.5) % 16];
+          s.n++;
+          s.byClass[k === null ? WIND_CLASSES.length : k]++;
+        }
+        stats = { sectors, calm, total };
+      }
+
+      function niceMax(share) {
+        for (const m of [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.8, 1]) if (share <= m) return m;
+        return 1;
+      }
+
+      function draw() {
+        const dpr = window.devicePixelRatio || 1;
+        const w = canvas.clientWidth, h = canvas.clientHeight;
+        if (!w || !h) return;
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+
+        const cx = w / 2, cy = h / 2;
+        const R = Math.max(24, Math.min(w, h) / 2 - 20);     // room for N/E/S/W
+        const r0 = Math.max(18, R * 0.22);                   // center disc: calm share
+        const maxShare = stats && stats.total
+          ? niceMax(Math.max(...stats.sectors.map(s => s.n)) / stats.total) : 0.1;
+        const rOf = (share) => r0 + (R - r0) * share / maxShare;
+        geom = { cx, cy, R, r0, rOf };
+
+        // Compass spokes and labels
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 16; i++) {
+          const a = rad(i * 22.5);
+          ctx.strokeStyle = i % 2 ? 'rgba(238,240,245,0.04)' : 'rgba(238,240,245,0.09)';
+          ctx.beginPath();
+          ctx.moveTo(cx + r0 * Math.cos(a), cy + r0 * Math.sin(a));
+          ctx.lineTo(cx + R * Math.cos(a), cy + R * Math.sin(a));
+          ctx.stroke();
+        }
+        ctx.font = '500 11px "IBM Plex Sans", system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'].forEach((t, i) => {
+          const a = rad(i * 45);
+          ctx.fillStyle = t === 'N' ? '#eef0f5' : (i % 2 ? WIND_MUTED : '#a3a9b8');
+          ctx.fillText(t, cx + (R + 11) * Math.cos(a), cy + (R + 11) * Math.sin(a));
+        });
+
+        // Share rings, labeled along the SSE spoke
+        const step = maxShare <= 0.1 ? 0.025 : maxShare <= 0.3 ? 0.05 : 0.1;
+        ctx.font = '10px "IBM Plex Mono", ui-monospace, monospace';
+        const la = rad(157.5);
+        for (let s = step; s <= maxShare + 1e-9; s += step) {
+          const r = rOf(s);
+          ctx.strokeStyle = 'rgba(238,240,245,0.08)';
+          ctx.setLineDash(s + step > maxShare + 1e-9 ? [] : [2, 3]);
+          ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke();
+          ctx.setLineDash([]);
+          const label = `${Math.round(s * 1000) / 10} %`;
+          const lx = cx + r * Math.cos(la), ly = cy + r * Math.sin(la);
+          const tw = ctx.measureText(label).width;
+          ctx.fillStyle = 'rgba(17,20,28,0.9)';
+          ctx.fillRect(lx - tw / 2 - 2, ly - 6, tw + 4, 12);
+          ctx.fillStyle = WIND_MUTED;
+          ctx.fillText(label, lx, ly);
+        }
+        ctx.strokeStyle = 'rgba(238,240,245,0.14)';
+        ctx.beginPath(); ctx.arc(cx, cy, r0, 0, 2 * Math.PI); ctx.stroke();
+
+        if (!stats || !stats.total) {
+          centerText(ctx, cx, cy, r0, '–', 'no data');
+          return;
+        }
+
+        // Sector bars: one wedge per sector, classes stacked outward, a
+        // surface-colored outline separates the segments
+        const half = (22.5 / 2 - 1.6) * Math.PI / 180;
+        stats.sectors.forEach((s, i) => {
+          if (!s.n) return;
+          const a = rad(i * 22.5);
+          let acc = 0;
+          s.byClass.forEach((n, k) => {
+            if (!n) return;
+            const rIn = rOf(acc / stats.total);
+            acc += n;
+            const rOut = rOf(acc / stats.total);
+            ctx.beginPath();
+            ctx.arc(cx, cy, rOut, a - half, a + half);
+            ctx.arc(cx, cy, rIn, a + half, a - half, true);
+            ctx.closePath();
+            ctx.fillStyle = k < WIND_CLASSES.length ? WIND_CLASSES[k].color : WIND_NO_SPEED.color;
+            ctx.fill();
+            ctx.strokeStyle = surface;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          });
+        });
+        ctx.lineWidth = 1;
+
+        centerText(ctx, cx, cy, r0, pct(stats.calm), 'calm');
+      }
+
+      function centerText(ctx, cx, cy, r0, big, small) {
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const bigPx = Math.max(11, Math.min(18, Math.round(r0 * 0.45)));
+        ctx.fillStyle = '#eef0f5';
+        ctx.font = `500 ${bigPx}px "IBM Plex Mono", ui-monospace, monospace`;
+        ctx.fillText(big, cx, cy - 5);
+        ctx.fillStyle = WIND_MUTED;
+        ctx.font = '10px "IBM Plex Sans", system-ui, sans-serif';
+        ctx.fillText(small, cx, cy + bigPx * 0.5 + 3);
+      }
+
+      // rows: { sensors, meteo } of the selected day
+      function update(newTables) {
+        tables = newTables;
+        refresh();
+      }
+
+      // Also after a change of the configured sensors
+      function refresh() {
+        const usable = (s) => sensorShown(s.sensor);
+        if (!usable(WIND_SOURCES[source])) picked = false;
+        // Without a choice of the user: the first source that has data
+        if (!picked) {
+          const has = (s) => usable(s) && tables[s.table].some(d => isNum(s.dir(d)));
+          const first = WIND_SOURCES.findIndex(has);
+          source = first >= 0 ? first : Math.max(0, WIND_SOURCES.findIndex(usable));
+        }
+        renderControls();
+        compute();
+        draw();
+      }
+
+      // Tooltip: sector under the pointer, or the calm share in the center
+      canvas.addEventListener('mousemove', (e) => {
+        if (!geom || !stats || !stats.total) { tip.style.display = 'none'; return; }
+        const b = canvas.getBoundingClientRect();
+        const dx = e.clientX - b.left - geom.cx, dy = e.clientY - b.top - geom.cy;
+        const r = Math.hypot(dx, dy);
+        let html = null;
+        if (r <= geom.r0) {
+          html = `calm (&lt; ${CALM_MS} m/s) · ${pct(stats.calm)} <span>${stats.calm} of ${stats.total} readings, direction not counted</span>`;
+        } else if (r <= geom.R + 4) {
+          const deg = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
+          const i = Math.round(deg / 22.5) % 16;
+          const s = stats.sectors[i];
+          const parts = s.byClass.map((n, k) => n
+            ? `${k < WIND_CLASSES.length ? WIND_CLASSES[k].label : WIND_NO_SPEED.label} ${pct(n)}` : null).filter(Boolean);
+          html = `${cardinal(i * 22.5)} · ${pct(s.n)} <span>${s.n} of ${stats.total} readings</span>` +
+                 (parts.length ? `<br><span>${parts.join(' · ')}</span>` : '');
+        }
+        if (!html) { tip.style.display = 'none'; return; }
+        tip.innerHTML = html;
+        tip.style.display = 'block';
+        const rb = root.getBoundingClientRect();
+        let left = e.clientX - rb.left + 12;
+        if (left + tip.offsetWidth > rb.width - 4) left = e.clientX - rb.left - tip.offsetWidth - 12;
+        tip.style.left = `${left}px`;
+        tip.style.top = `${e.clientY - rb.top + 12}px`;
+      });
+      canvas.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+
+      renderControls();
+      new ResizeObserver(() => draw()).observe(canvas.parentElement);
+      document.fonts?.ready.then(draw);
+      return { update, refresh, draw };
+    }
+
+    // Points of a direction series for the time chart: s = speed in m/s
+    function dirPoints(rows, src) {
+      return rows.filter(d => isNum(src.dir(d)))
+        .map(d => ({ x: d.timestamp * 1000, y: src.dir(d), s: src.speed(d) }));
+    }
+
+    // Wind vane points: colored by Beaufort class like the rose; calm
+    // readings (direction kept from before) as gray rings
+    function vanePointColor(ctx, part) {
+      const k = windClass(ctx.raw?.s);
+      if (k === -1) return part === 'fill' ? 'transparent' : WIND_MUTED;
+      if (k === null) return ctx.raw ? WIND_NO_SPEED.color : WIND_CLASSES[2].color;
+      return WIND_CLASSES[k].color;
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -417,9 +744,10 @@
           xy(sensors, d => isNum(d.wind_speed) ? d.wind_speed * MS_TO_KMH : null),
           xy(sensors, d => isNum(d.ws_wind_speed) ? d.ws_wind_speed * MS_TO_KMH : null));
       set(charts.chartWindDir,
-          xy(meteo, d => d.wind_dir_10m),
-          xy(sensors, d => d.wind_direction),
-          xy(sensors, d => d.ws_wind_direction));
+          dirPoints(meteo, WIND_SOURCES[2]),
+          dirPoints(sensors, WIND_SOURCES[0]),
+          dirPoints(sensors, WIND_SOURCES[1]));
+      windRose.update({ sensors, meteo });
       set(charts.chartRainLight,
           xy(sensors, d => d.rainfall),
           xy(sensors, d => d.illuminance));
@@ -500,28 +828,48 @@
       const kmh = (v) => isNum(v) ? `${(v * MS_TO_KMH).toFixed(1)} km/h` : '';
       const dirSub = (v) => isNum(v) ? cardinal(v) : '';
 
+      // [sensor, tile]: tiles of sensors that are not configured are left out
       return [
-        tile('Temperature', fmt(r.temperature, 1), '°C'),
-        tile('Humidity', fmt(r.humidity, 0), '%'),
-        tile('Dew point', fmt(r.dew_point, 1), '°C',
-             isNum(outSpread) ? `${outSpread.toFixed(1)} K below air${dewWarn ? ' · dew likely' : ''}` : '', dewWarn),
-        tile('Pressure', fmt(r.pressure, 0), 'hPa'),
-        tile('Wind (anemometer)', fmt(r.wind_speed, 1), 'm/s', kmh(r.wind_speed)),
-        tile('Wind dir (vane)', fmt(r.wind_direction, 0), '°', dirSub(r.wind_direction), false,
-             compassSvg(r.wind_direction)),
-        tile('Wind (weather sensor)', fmt(r.ws_wind_speed, 1), 'm/s',
+        ['weather', tile('Temperature', fmt(r.temperature, 1), '°C')],
+        ['weather', tile('Humidity', fmt(r.humidity, 0), '%')],
+        ['weather', tile('Dew point', fmt(r.dew_point, 1), '°C',
+             isNum(outSpread) ? `${outSpread.toFixed(1)} K below air${dewWarn ? ' · dew likely' : ''}` : '', dewWarn)],
+        ['weather', tile('Pressure', fmt(r.pressure, 0), 'hPa')],
+        // Anemometer and vane: 10-minute means (allsky360-sensors)
+        ['anemometer', tile('Wind (anemometer)', fmt(r.wind_speed, 1), 'm/s',
+             [kmh(r.wind_speed), isNum(r.wind_speed) ? '10-min mean' : ''].filter(Boolean).join(' · '))],
+        ['wind_vane', tile('Wind dir (vane)', fmt(r.wind_direction, 0), '°',
+             isNum(r.wind_direction) && windClass(r.wind_speed) === -1
+               ? `${cardinal(r.wind_direction)} · last direction (calm)` : dirSub(r.wind_direction),
+             false, compassSvg(r.wind_direction))],
+        ['weather', tile('Wind (weather sensor)', fmt(r.ws_wind_speed, 1), 'm/s',
              [kmh(r.ws_wind_speed), isNum(r.ws_wind_direction) ? `${r.ws_wind_direction.toFixed(0)}° ${cardinal(r.ws_wind_direction)}` : '']
-               .filter(Boolean).join(' · ')),
-        tile('Rain', fmt(r.rainfall, 1), 'mm'),
-        tile('Illuminance', isNum(r.illuminance) ? Math.round(r.illuminance).toLocaleString() : '–', 'lx'),
-        tile('Noise', fmt(r.noise, 0), 'dB'),
-        tile('PM2.5', fmt(r.pm25, 0), 'µg/m³'),
-        tile('PM10', fmt(r.pm10, 0), 'µg/m³'),
-        tile('Cabinet temp', fmt(r.cabinet_temperature, 1), '°C'),
-        tile('Cabinet humidity', fmt(r.cabinet_humidity, 0), '%'),
-        tile('Cabinet dew point', fmt(r.cabinet_dew_point, 1), '°C',
-             isNum(cabSpread) ? `${cabSpread.toFixed(1)} K margin${cabWarn ? ' · condensation risk' : ''}` : '', cabWarn)
-      ].join('');
+               .filter(Boolean).join(' · '))],
+        ['weather', tile('Rain', fmt(r.rainfall, 1), 'mm')],
+        ['weather', tile('Illuminance', isNum(r.illuminance) ? Math.round(r.illuminance).toLocaleString() : '–', 'lx')],
+        ['weather', tile('Noise', fmt(r.noise, 0), 'dB')],
+        ['weather', tile('PM2.5', fmt(r.pm25, 0), 'µg/m³')],
+        ['weather', tile('PM10', fmt(r.pm10, 0), 'µg/m³')],
+        ['cabinet', tile('Cabinet temp', fmt(r.cabinet_temperature, 1), '°C')],
+        ['cabinet', tile('Cabinet humidity', fmt(r.cabinet_humidity, 0), '%')],
+        ['cabinet', tile('Cabinet dew point', fmt(r.cabinet_dew_point, 1), '°C',
+             isNum(cabSpread) ? `${cabSpread.toFixed(1)} K margin${cabWarn ? ' · condensation risk' : ''}` : '', cabWarn)]
+      ].filter(([sensor]) => sensorShown(sensor)).map(([, html]) => html).join('');
+    }
+
+    // Hide the chart series of sensors that are not configured; a chart
+    // left without any series says so in its title
+    function applySensorVisibility() {
+      Object.values(charts).forEach((chart) => {
+        const sets = chart.data.datasets;
+        sets.forEach((ds) => { if (ds.sensor) ds.hidden = !sensorShown(ds.sensor); });
+        const title = chart.options.plugins.title;
+        chart.$baseTitle ??= title.text;
+        const off = sets.length > 0 && sets.every(ds => ds.sensor && !sensorShown(ds.sensor));
+        title.text = off ? `${chart.$baseTitle} · sensor not configured` : chart.$baseTitle;
+        chart.update('none');
+      });
+      windRose?.refresh();
     }
 
     // No header line: the reading time and state are the tooltip of the tiles
@@ -549,6 +897,11 @@
           setSensorStatus('badge-orange', 'stale', ageText + ' · check allsky360-sensors.service');
         else
           setSensorStatus('badge-green', 'live', ageText);
+        const known = r.configured && typeof r.configured === 'object' ? r.configured : null;
+        if (JSON.stringify(known) !== JSON.stringify(sensorsConfigured)) {
+          sensorsConfigured = known;
+          applySensorVisibility();
+        }
         tiles.innerHTML = renderSensorTiles(r);
       } catch (err) {
         console.error('Failed to load latest sensor data:', err);
@@ -606,7 +959,7 @@
       const cloudCell = (h, v) => {
         if (!isNum(v)) return cell(h, 'fc-dim', '–');
         // dark text on the light colours of overcast sky
-        const fg = v >= 60 ? '#111827' : '#e5e7eb';
+        const fg = v >= 60 ? '#111827' : '#eef0f5';
         return cell(h, '', `<span class="fc-cloud" style="background:${cloudCoverToRGB(v)};color:${fg};width:100%;text-align:center">${Math.round(v)}</span>`);
       };
       const row = (label, fn) => `<div class="fc-lbl">${label}</div>` + hours.map(fn).join('');
@@ -643,7 +996,7 @@
           const v = h.wind_speed_300hPa;
           if (!isNum(v)) return cell(h, 'fc-dim', '–');
           // same colour scale as the seeing label on the dashboard
-          return cell(h, '', `<span style="color:${getSeeingColor(v)};font-weight:600">${v.toFixed(0)}</span>`,
+          return cell(h, '', `<span style="color:${getSeeingColor(v)};font-weight:500">${v.toFixed(0)}</span>`,
                       'Wind at 300 hPa (9.2 km), rough hint for seeing');
         })
       ];
@@ -720,60 +1073,83 @@
 
       charts.chartTemp = createChart("chartTemp", "Temperature (°C)", [
         line("Forecast", "#f97316", dashed),
-        station("Station", "#fb923c")
+        station("Station", "#fb923c", { sensor: "weather" })
       ], "line", true);
 
       charts.chartHumidity = createChart("chartHumidity", "Relative Humidity (%)", [
         line("Forecast", "#60a5fa", dashed),
-        station("Station", "#93c5fd")
+        station("Station", "#93c5fd", { sensor: "weather" })
       ], "line", true);
 
       charts.chartPressure = createChart("chartPressure", "Pressure (hPa)", [
         line("Forecast MSL", "#a3e635", dashed),
         line("Forecast surface", "#22d3ee", dashed),
-        station("Station", "#e5e7eb")
+        station("Station", "#eef0f5", { sensor: "weather" })
       ], "line", true);
 
       charts.chartDewPoint = createChart("chartDewPoint", "Dew Point (°C)", [
-        line("Forecast", "#9ca3af", dashed),
-        station("Station", "#e5e7eb")
+        line("Forecast", "#a3a9b8", dashed),
+        station("Station", "#eef0f5", { sensor: "weather" })
       ], "line", true);
 
       charts.chartWindSpeed = createChart("chartWindSpeed", "Wind Speed (km/h)", [
         line("Forecast 10 m", "#86efac", dashed),
-        station("Anemometer", "#22c55e"),
-        station("Weather sensor", "#2dd4bf", { borderWidth: 1.25 })
+        station("Anemometer", "#4cc38a", { sensor: "anemometer" }),
+        station("Weather sensor", "#2dd4bf", { borderWidth: 1.25, sensor: "weather" })
       ], "line", true, { min: 0 });
 
-      // Directions wrap at 360°, so the measured values are drawn as points
-      const dirPoints = { showLine: false, pointRadius: 1.8, pointHoverRadius: 3 };
-      charts.chartWindDir = createChart("chartWindDir", "Wind Direction (°)", [
-        line("Forecast 10 m", "#fca5a5", dashed),
-        station("Wind vane", "#f87171", dirPoints),
-        station("Weather sensor", "#fdba74", dirPoints)
-      ], "line", true, { min: 0, max: 360, ticks: { ...AXIS_TICKS, stepSize: 90 } });
+      // Direction over time: points only (no lines across 0°/360°)
+      const dirSet = (label, extra) => ({ label, data: [], showLine: false, borderWidth: 1,
+                                          pointRadius: 2.5, pointHoverRadius: 4, ...extra });
+      charts.chartWindDir = createChart("chartWindDir", "Wind direction (°)", [
+        dirSet("Forecast 10 m", { borderColor: "#fca5a5", backgroundColor: "transparent", pointRadius: 3 }),
+        dirSet("Wind vane", { sensor: "wind_vane", borderColor: "#5598e7", backgroundColor: "#5598e7", pointRadius: 3, pointHoverRadius: 5,
+                              pointBackgroundColor: (c) => vanePointColor(c, 'fill'),
+                              pointBorderColor: (c) => vanePointColor(c, 'border') }),
+        dirSet("Weather sensor", { sensor: "weather", borderColor: "#fdba74", backgroundColor: "#fdba74", pointRadius: 2 })
+      ], "line", true, {
+        min: 0, max: 360,
+        ticks: { ...AXIS_TICKS, stepSize: 90, callback: (v) => ({ 0: 'N', 90: 'E', 180: 'S', 270: 'W', 360: 'N' })[v] ?? '' }
+      });
+      {
+        const o = charts.chartWindDir.options;
+        o.interaction = { mode: 'nearest', intersect: false };
+        o.plugins.legend.labels.usePointStyle = true;
+        o.plugins.legend.labels.boxWidth = 6;
+        o.plugins.legend.labels.boxHeight = 6;
+        o.plugins.tooltip.callbacks.label = (c) => {
+          const p = c.raw;
+          let text = `${c.dataset.label}: ${p.y.toFixed(0)}° ${cardinal(p.y)}`;
+          if (isNum(p.s)) text += ` · ${p.s.toFixed(1)} m/s`;
+          if (c.datasetIndex === 1 && windClass(p.s) === -1) text += ' (calm, direction kept)';
+          return text;
+        };
+        charts.chartWindDir.update();
+      }
+
+      windRose = createWindRose(document.getElementById('windRose'));
 
       charts.chartRainLight = createChart("chartRainLight", "Rain (mm) · Illuminance (lx)", [
-        station("Rain", "#38bdf8", { type: "bar", backgroundColor: "rgba(56,189,248,0.55)", yAxisID: "y" }),
-        station("Illuminance", "#facc15", { yAxisID: "y1" })
+        station("Rain", "#38bdf8", { type: "bar", backgroundColor: "rgba(56,189,248,0.55)", yAxisID: "y", sensor: "weather" }),
+        station("Illuminance", "#facc15", { yAxisID: "y1", sensor: "weather" })
       ], "line", true, { min: 0 }, { title: "lx", min: 0 });
 
       charts.chartAir = createChart("chartAir", "Air Quality (µg/m³) · Noise (dB)", [
-        station("PM2.5", "#c084fc", { yAxisID: "y" }),
-        station("PM10", "#a78bfa", { yAxisID: "y", borderWidth: 1.25 }),
-        station("Noise", "#9ca3af", { yAxisID: "y1", borderDash: [2, 3], borderWidth: 1.25 })
+        station("PM2.5", "#c084fc", { yAxisID: "y", sensor: "weather" }),
+        station("PM10", "#a78bfa", { yAxisID: "y", borderWidth: 1.25, sensor: "weather" }),
+        station("Noise", "#a3a9b8", { yAxisID: "y1", borderDash: [2, 3], borderWidth: 1.25, sensor: "weather" })
       ], "line", true, { min: 0 }, { title: "dB" });
 
       charts.chartCabinet = createChart("chartCabinet", "Control Cabinet (°C · %)", [
-        station("Temperature", "#fb923c", { yAxisID: "y" }),
-        station("Dew point", "#e5e7eb", { yAxisID: "y", borderWidth: 1.25 }),
-        station("Humidity", "#60a5fa", { yAxisID: "y1", borderDash: [5, 4], borderWidth: 1.25 })
+        station("Temperature", "#fb923c", { yAxisID: "y", sensor: "cabinet" }),
+        station("Dew point", "#eef0f5", { yAxisID: "y", borderWidth: 1.25, sensor: "cabinet" }),
+        station("Humidity", "#60a5fa", { yAxisID: "y1", borderDash: [5, 4], borderWidth: 1.25, sensor: "cabinet" })
       ], "line", true, {}, { title: "%", min: 0, max: 100 });
 
       charts.chartClouds = createChart("chartClouds", "Cloud Cover by Layer (%)", [
-        line("Low", "#6b7280"),
-        line("Mid", "#9ca3af"),
-        line("High", "#e5e7eb")
+        line("Low", "#7a8296"),
+        line("Mid", "#a3a9b8"),
+        line("High", "#eef0f5")
       ], "line", true);
 
       charts.chartGlobalCloud = createChart("chartGlobalCloud", "Total Cloud Cover (%)", [
@@ -821,20 +1197,20 @@
         if (gridUnlocked) {
           grid.enableMove(true);
           grid.enableResize(true);
-          toggleBtn.textContent = '🔓 Unlocked';
+          toggleBtn.innerHTML = icon('unlock') + ' Unlocked';
           toggleBtn.classList.remove('badge-gray');
           toggleBtn.classList.add('badge-blue');
         } else {
           grid.enableMove(false);
           grid.enableResize(false);
-          toggleBtn.textContent = '🔒 Locked';
+          toggleBtn.innerHTML = icon('lock') + ' Locked';
           toggleBtn.classList.remove('badge-blue');
           toggleBtn.classList.add('badge-gray');
         }
       };
 
-      // v3: forecast timeline added (older saved layouts are ignored)
-      const LS_KEY = 'allsky360.meteo1.layout.v3';
+      // v4: wind rose and direction chart (older saved layouts are ignored)
+      const LS_KEY = 'allsky360.meteo1.layout.v4';
       const defaultLayout = [
         { id: "sensor-live",        x: 0, y:  0, w: 12, h: 2 },
         { id: "forecast",           x: 0, y:  2, w: 12, h: 3 },
@@ -844,13 +1220,14 @@
         { id: "chart-dew-point",    x: 6, y:  8, w:  6, h: 3 },
         { id: "chart-wind-speed",   x: 0, y: 11, w:  6, h: 3 },
         { id: "chart-wind-dir",     x: 6, y: 11, w:  6, h: 3 },
-        { id: "chart-rain-light",   x: 0, y: 14, w:  6, h: 3 },
-        { id: "chart-air",          x: 6, y: 14, w:  6, h: 3 },
-        { id: "chart-clouds",       x: 0, y: 17, w:  6, h: 3 },
-        { id: "chart-global-cloud", x: 6, y: 17, w:  6, h: 3 },
-        { id: "chart-visibility",   x: 0, y: 20, w:  6, h: 3 },
-        { id: "chart-jetstream",    x: 6, y: 20, w:  6, h: 3 },
-        { id: "chart-cabinet",      x: 0, y: 23, w:  6, h: 3 }
+        { id: "chart-wind-rose",    x: 0, y: 14, w:  6, h: 4 },
+        { id: "chart-rain-light",   x: 6, y: 14, w:  6, h: 4 },
+        { id: "chart-air",          x: 0, y: 18, w:  6, h: 3 },
+        { id: "chart-clouds",       x: 6, y: 18, w:  6, h: 3 },
+        { id: "chart-global-cloud", x: 0, y: 21, w:  6, h: 3 },
+        { id: "chart-visibility",   x: 6, y: 21, w:  6, h: 3 },
+        { id: "chart-jetstream",    x: 0, y: 24, w:  6, h: 3 },
+        { id: "chart-cabinet",      x: 6, y: 24, w:  6, h: 3 }
       ];
 
       function applyLayout(layout) {
