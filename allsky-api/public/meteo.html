@@ -303,25 +303,19 @@
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-global-cloud" gs-x="0" gs-y="21" gs-w="6" gs-h="3">
-            <div class="grid-stack-item-content">
-              <canvas id="chartGlobalCloud"></canvas>
-            </div>
-          </div>
-
-          <div class="grid-stack-item" gs-id="chart-visibility" gs-x="6" gs-y="21" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-visibility" gs-x="0" gs-y="21" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartVisibility"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-jetstream" gs-x="0" gs-y="24" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-jetstream" gs-x="6" gs-y="21" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartJetstream"></canvas>
             </div>
           </div>
 
-          <div class="grid-stack-item" gs-id="chart-cabinet" gs-x="6" gs-y="24" gs-w="6" gs-h="3">
+          <div class="grid-stack-item" gs-id="chart-cabinet" gs-x="0" gs-y="24" gs-w="6" gs-h="3">
             <div class="grid-stack-item-content">
               <canvas id="chartCabinet"></canvas>
             </div>
@@ -717,6 +711,188 @@
     }
 
     // ══════════════════════════════════════════════════════════════
+    //  CLOUD COVER STRIPS
+    //  One row per layer in the order of height (high on top), total cover
+    //  below a divider. Every forecast hour is a cell, shaded from dark
+    //  (clear) to light (overcast). The layers overlap in the sky, so they
+    //  are not stacked: 60 % low and 50 % mid can still be 70 % in total.
+    // ══════════════════════════════════════════════════════════════
+    const CLOUD_ROWS = [
+      { label: 'High',  key: 'cloud_high' },
+      { label: 'Mid',   key: 'cloud_mid' },
+      { label: 'Low',   key: 'cloud_low' },
+      { label: 'Total', key: 'cloud_cover' }
+    ];
+    const CLOUD_CLEAR = [0x1a, 0x20, 0x30];     // 0 %: just above the card
+    const CLOUD_OVERCAST = [0xe6, 0xe9, 0xf0];  // 100 %
+    const CLOUD_GAP = 2;                         // px between cells and rows
+    const CLOUD_DIVIDER = 6;                     // px above the total row
+    const CLOUD_KEY_W = 72;                      // width of the color key
+
+    function cloudColor(pct) {
+      const t = Math.min(1, Math.max(0, pct / 100));
+      const c = CLOUD_CLEAR.map((a, i) => Math.round(a + (CLOUD_OVERCAST[i] - a) * t));
+      return `rgb(${c[0]},${c[1]},${c[2]})`;
+    }
+
+    // Points of one row: y is the row label (category axis), v the cover
+    // (null = missing). Every row keeps every hour, so the tooltip index
+    // points to the same hour in all rows.
+    function cloudPoints(rows, row) {
+      return rows.map(d => ({ x: d.timestamp * 1000, y: row.label,
+                              v: isNum(d[row.key]) ? d[row.key] : null }));
+    }
+
+    // Typical spacing of the forecast steps (1 h for Open-Meteo)
+    function cloudStepMs(data) {
+      const steps = [];
+      for (let i = 1; i < data.length; i++) steps.push(data[i].x - data[i - 1].x);
+      if (!steps.length) return 3600 * 1000;
+      steps.sort((a, b) => a - b);
+      return steps[Math.floor(steps.length / 2)];
+    }
+
+    // Vertical band of a row; the total row is set off by the divider
+    function cloudBand(chart, i) {
+      const area = chart.chartArea;
+      const n = CLOUD_ROWS.length;
+      const h = (area.bottom - area.top - CLOUD_DIVIDER) / n;
+      const top = area.top + i * h + (i === n - 1 ? CLOUD_DIVIDER : 0);
+      return { top: top + CLOUD_GAP / 2, bottom: top + h - CLOUD_GAP / 2 };
+    }
+
+    const cloudStripPlugin = {
+      id: 'cloudStrips',
+      beforeDatasetsDraw(chart) {
+        const { ctx, chartArea: area, scales: { x } } = chart;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(area.left, area.top, area.right - area.left, area.bottom - area.top);
+        ctx.clip();
+        chart.data.datasets.forEach((ds, i) => {
+          const band = cloudBand(chart, i);
+          const half = cloudStepMs(ds.data) / 2;
+          ds.data.forEach(p => {
+            if (p.v === null) return;
+            const x0 = x.getPixelForValue(p.x - half) + CLOUD_GAP / 2;
+            const x1 = x.getPixelForValue(p.x + half) - CLOUD_GAP / 2;
+            if (x1 <= x0) return;
+            ctx.fillStyle = cloudColor(p.v);
+            ctx.fillRect(x0, band.top, x1 - x0, band.bottom - band.top);
+          });
+        });
+        ctx.restore();
+        // Row labels left of the bands
+        ctx.save();
+        ctx.font = `${AXIS_TICKS.font.size}px ${Chart.defaults.font.family}`;
+        ctx.fillStyle = AXIS_TICKS.color;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        CLOUD_ROWS.forEach((r, i) => {
+          const band = cloudBand(chart, i);
+          ctx.fillText(r.label, area.left - 6, (band.top + band.bottom) / 2);
+        });
+        ctx.restore();
+        ctx.save();
+        // Divider between the layers and the total
+        const n = CLOUD_ROWS.length;
+        const y = (cloudBand(chart, n - 2).bottom + cloudBand(chart, n - 1).top) / 2;
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(area.left, Math.round(y) + 0.5);
+        ctx.lineTo(area.right, Math.round(y) + 0.5);
+        ctx.stroke();
+        ctx.restore();
+      },
+      // Color key "0 [dark → light] 100 %" at the right end of the title line
+      afterDraw(chart) {
+        const t = chart.titleBlock;
+        if (!t || !t.height) return;
+        const { ctx } = chart;
+        ctx.save();
+        ctx.font = `${AXIS_TICKS.font.size}px ${Chart.defaults.font.family}`;
+        ctx.fillStyle = AXIS_TICKS.color;
+        ctx.textBaseline = 'middle';
+        const y = t.top + t.height / 2;
+        const right = chart.chartArea.right;
+        const maxText = '100 %';
+        const x1 = right - ctx.measureText(maxText).width - 4;
+        const x0 = x1 - CLOUD_KEY_W;
+        const grad = ctx.createLinearGradient(x0, 0, x1, 0);
+        grad.addColorStop(0, cloudColor(0));
+        grad.addColorStop(1, cloudColor(100));
+        ctx.textAlign = 'left';
+        ctx.fillText(maxText, x1 + 4, y);
+        ctx.textAlign = 'right';
+        ctx.fillText('0', x0 - 4, y);
+        ctx.fillStyle = grad;
+        ctx.fillRect(x0, y - 4, CLOUD_KEY_W, 8);
+        ctx.restore();
+      }
+    };
+
+    function createCloudChart(id) {
+      const datasets = CLOUD_ROWS.map(r => ({
+        label: r.label, data: [], showLine: false,
+        pointRadius: 0, pointHoverRadius: 0, pointHitRadius: 0,
+        borderColor: 'transparent', backgroundColor: 'transparent'
+      }));
+      return new Chart(document.getElementById(id), {
+        type: 'line',
+        data: { datasets },
+        plugins: [cloudStripPlugin],
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          // All rows come from the same forecast hours: one tooltip per hour
+          interaction: { mode: 'index', axis: 'x', intersect: false },
+          scales: {
+            x: {
+              type: 'time',
+              time: { unit: 'hour', tooltipFormat: 'HH:mm',
+                      displayFormats: { hour: 'HH:mm', minute: 'HH:mm' } },
+              ticks: chartTimeTicks({ ...AXIS_TICKS, maxTicksLimit: 8 }),
+              grid: { display: false }
+            },
+            y: {
+              type: 'category',
+              labels: CLOUD_ROWS.map(r => r.label),
+              // Rows and their labels are drawn by the plugin; the scale
+              // only reserves the space for the labels
+              afterFit: (scale) => { scale.width = 40; },
+              ticks: { display: false },
+              grid: { display: false },
+              border: { display: false }
+            }
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                title: chartTooltipTitle,
+                label: (item) => `${item.dataset.label}: ` +
+                  (item.raw.v === null ? '–' : `${Math.round(item.raw.v)} %`),
+                labelColor: (item) => ({ borderColor: 'rgba(255,255,255,0.3)',
+                                         backgroundColor: item.raw.v === null
+                                           ? 'transparent' : cloudColor(item.raw.v) })
+              }
+            },
+            title: {
+              display: true,
+              text: 'Cloud Cover',
+              align: 'start',
+              color: '#eef0f5',
+              font: { size: 12, weight: '600' },
+              padding: { top: 6, bottom: 4 }
+            },
+            legend: { display: false }
+          }
+        }
+      });
+    }
+
+    // ══════════════════════════════════════════════════════════════
     //  DATA UPDATE
     // ══════════════════════════════════════════════════════════════
     // Open-Meteo forecast (hourly) and station sensors (every 5 min) share
@@ -759,12 +935,7 @@
           xy(sensors, d => d.cabinet_temperature),
           xy(sensors, d => d.cabinet_dew_point),
           xy(sensors, d => d.cabinet_humidity));
-      set(charts.chartClouds,
-          xy(meteo, d => d.cloud_low),
-          xy(meteo, d => d.cloud_mid),
-          xy(meteo, d => d.cloud_high));
-      set(charts.chartGlobalCloud,
-          xy(meteo, d => d.cloud_cover));
+      set(charts.chartClouds, ...CLOUD_ROWS.map(r => cloudPoints(meteo, r)));
       set(charts.chartVisibility,
           xy(meteo, d => isNum(d.visibility) ? d.visibility / 1000 : null));
       set(charts.chartJetstream,
@@ -1146,15 +1317,7 @@
         station("Humidity", "#60a5fa", { yAxisID: "y1", borderDash: [5, 4], borderWidth: 1.25, sensor: "cabinet" })
       ], "line", true, {}, { title: "%", min: 0, max: 100 });
 
-      charts.chartClouds = createChart("chartClouds", "Cloud Cover by Layer (%)", [
-        line("Low", "#7a8296"),
-        line("Mid", "#a3a9b8"),
-        line("High", "#eef0f5")
-      ], "line", true);
-
-      charts.chartGlobalCloud = createChart("chartGlobalCloud", "Total Cloud Cover (%)", [
-        { label: "Cloud cover", data: [], backgroundColor: "rgba(125,211,252,0.55)", borderColor: "rgba(125,211,252,0.85)", pointRadius: 0 }
-      ], "bar");
+      charts.chartClouds = createCloudChart("chartClouds");
 
       charts.chartVisibility = createChart("chartVisibility", "Visibility (km)", [
         line("Visibility", "#fbbf24")
@@ -1224,10 +1387,9 @@
         { id: "chart-rain-light",   x: 6, y: 14, w:  6, h: 4 },
         { id: "chart-air",          x: 0, y: 18, w:  6, h: 3 },
         { id: "chart-clouds",       x: 6, y: 18, w:  6, h: 3 },
-        { id: "chart-global-cloud", x: 0, y: 21, w:  6, h: 3 },
-        { id: "chart-visibility",   x: 6, y: 21, w:  6, h: 3 },
-        { id: "chart-jetstream",    x: 0, y: 24, w:  6, h: 3 },
-        { id: "chart-cabinet",      x: 6, y: 24, w:  6, h: 3 }
+        { id: "chart-visibility",   x: 0, y: 21, w:  6, h: 3 },
+        { id: "chart-jetstream",    x: 6, y: 21, w:  6, h: 3 },
+        { id: "chart-cabinet",      x: 0, y: 24, w:  6, h: 3 }
       ];
 
       function applyLayout(layout) {
