@@ -413,6 +413,9 @@ in the table `sensors` of the daily database (`database_YYYYMMDD.db`, UTC day,
 same file as the camera data). The last reading is also written to
 `allsky-api/public/latest_sensor_data.json` (served as `/latest_sensor_data.json`);
 the history of a day comes from `GET /api/sensors?date=YYYY-MM-DD`.
+Besides the values the JSON file holds `configured` (`weather`, `anemometer`,
+`wind_vane`, `cabinet`: `true` if the sensor has an address in `config.ini`);
+`meteo.html` hides the tiles and chart series of the other sensors.
 
 The web page `meteo.html` (Weather) shows the latest reading as tiles (marked
 *stale* when it is older than 15 minutes, condensation warning for the control

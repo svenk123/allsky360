@@ -269,10 +269,18 @@ static void json_add(json_object *o, const char *key, double value) {
   json_object_object_add(o, key, isnan(value) ? NULL : json_object_new_double(value));
 }
 
-static char *reading_to_json(const sensors_reading_t *r) {
+static char *reading_to_json(const sensors_config_t *c, const sensors_reading_t *r) {
   json_object *o = json_object_new_object();
   json_object_object_add(o, "source", json_object_new_string("modbus"));
   json_object_object_add(o, "timestamp", json_object_new_int64((int64_t)r->timestamp));
+  /* Sensors with an address in config.ini: the web page hides the others
+   * instead of showing their values as missing */
+  json_object *cfg = json_object_new_object();
+  json_object_object_add(cfg, "weather", json_object_new_boolean(c->weather_address > 0));
+  json_object_object_add(cfg, "anemometer", json_object_new_boolean(c->wind_speed_address > 0));
+  json_object_object_add(cfg, "wind_vane", json_object_new_boolean(c->wind_direction_address > 0));
+  json_object_object_add(cfg, "cabinet", json_object_new_boolean(c->cabinet_address > 0));
+  json_object_object_add(o, "configured", cfg);
   json_add(o, "temperature", r->temperature);
   json_add(o, "humidity", r->humidity);
   json_add(o, "dew_point", r->dew_point);
@@ -299,7 +307,7 @@ static char *reading_to_json(const sensors_reading_t *r) {
 static int store_reading(const sensors_config_t *c, const sensors_reading_t *r,
                          const char *outfile, int dry_run) {
   int ret = 0;
-  char *json = reading_to_json(r);
+  char *json = reading_to_json(c, r);
   if (dry_run || verbose)
     printf("%s\n", json);
   if (outfile && write_text_file_atomic(outfile, json) != 0) {
