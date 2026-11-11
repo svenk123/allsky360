@@ -25,7 +25,6 @@
   <style>
     /* ── SIDEBAR WIDTHS ─────────────────────────────────────────── */
     #left-sidebar  { width: 288px; border-right: 1px solid rgba(255,255,255,0.06); }
-    #right-sidebar { width: 288px; border-left:  1px solid rgba(255,255,255,0.06); }
 
     /* ── OVERRIDES ──────────────────────────────────────────────── */
     .metadata-section h2 { margin-top: 2px; }
@@ -114,9 +113,14 @@
       gap: 8px;
     }
 
+    /* As high as the panorama at full width (aspect ratio of the image,
+       set by updatePanoZoom(); 3048 x 1090 by default), at most half the
+       panel, so "Sun & Moon" fits below */
     #panorama-container {
-      flex: 1;
-      min-height: 0;
+      flex: 0 1 auto;
+      aspect-ratio: 3048 / 1090;
+      max-height: 55%;
+      min-height: 120px;
       position: relative;
       overflow: hidden;
       border-radius: 12px;
@@ -150,7 +154,19 @@
       display: flex; gap: 4px; z-index: 3;
     }
 
-    /* ── CONDITIONS (right sidebar) ────────────────────────────── */
+    /* ── SUN & MOON (below the panorama) ───────────────────────── */
+    #sunmoon-card {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 8px 24px;
+      align-content: start;
+    }
+    #sunmoon-card .sm-chart { position: relative; height: 180px; }
+
+    /* ── CONDITIONS (left sidebar, below the image data) ────────── */
     .h2-sub { font-weight: 400; color: #7a8296; text-transform: none; letter-spacing: 0; }
     .metadata-section > div span.warn { color: #e0a33a; }
     .metadata-section > div span.bad  { color: #e5484d; }
@@ -207,10 +223,15 @@
       </div>
 
       <div class="card">
-        <div id="sunandmoon"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
-        <div style="position:relative;height:130px;margin-top:8px;">
-          <canvas id="chartSunMoonAltitude"></canvas>
-        </div>
+        <div id="weather"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
+      </div>
+
+      <div class="card">
+        <div id="tonight"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
+      </div>
+
+      <div class="card">
+        <div id="aurora"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
       </div>
 
       <div class="card" id="mount-card" style="display:none;">
@@ -296,28 +317,17 @@
             </div>
           </div>
 
+          <!-- Sun & Moon: times and the altitude over ±12 h -->
+          <div class="card" id="sunmoon-card">
+            <div id="sunandmoon"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
+            <div class="sm-chart"><canvas id="chartSunMoonAltitude"></canvas></div>
+          </div>
+
         </div><!-- #side-panel -->
 
       </div><!-- #allsky-panel -->
 
     </main><!-- #center-area -->
-
-    <!-- ── RIGHT SIDEBAR ─────────────────────────────────────────── -->
-    <aside id="right-sidebar" class="sidebar">
-
-      <div class="card">
-        <div id="weather"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
-      </div>
-
-      <div class="card">
-        <div id="tonight"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
-      </div>
-
-      <div class="card">
-        <div id="aurora"><div style="color:#7a8296;font-size:12px;">Loading…</div></div>
-      </div>
-
-    </aside>
 
   </div><!-- #main-layout -->
 
@@ -791,6 +801,10 @@
     }
 
     function updatePanoZoom() {
+      if (panoramaEl.naturalWidth && panoramaEl.naturalHeight) {
+        const ar = `${panoramaEl.naturalWidth} / ${panoramaEl.naturalHeight}`;
+        if (panoContainer.style.aspectRatio !== ar) panoContainer.style.aspectRatio = ar;
+      }
       const r = panoRect();
       if (!r) return;
       panoramaEl.style.left   = `${r.left}px`;
@@ -1220,20 +1234,22 @@
         // Set image-data immediately — independent of sun/moon calculations
         if (imageDataEl) imageDataEl.innerHTML = imageDataHtml;
 
-        // Sun/Moon HTML — requires astronomia library (loaded with defer); wrap so failures
-        // don't block the widgets above. On first load the library may not be ready yet.
+        // Sun/Moon needs the astronomia bundle (loaded with defer): wait for
+        // it, a cached image can be here before it. Failures must not block
+        // the widgets above.
         try {
+          await astronomiaReady();
           const moonTimes = getMoonRiseAndSet(imageTimestamp, latitude, longitude, timezoneOffset);
           const moonRiseStr = moonTimes.moonRise ? formatTimeString(moonTimes.moonRise, timezoneOffset) : "N/A";
           const moonSetStr  = moonTimes.moonSet  ? formatTimeString(moonTimes.moonSet,  timezoneOffset) : "N/A";
-          const moonTimeUntil = getTimeUntilMoonRiseSet(moonTimes.moonRise, moonTimes.moonSet, imageTimestamp, timezoneOffset);
+          const moonTimeUntil = getTimeUntilRiseSet('moon', imageTimestamp, latitude, longitude);
           const sunTimesObj   = getSunRiseAndSet(imageTimestamp, latitude, longitude, timezoneOffset);
           const sunRiseStr    = sunTimesObj.sunRise ? formatTimeString(sunTimesObj.sunRise, timezoneOffset) : "N/A";
           const sunSetStr     = sunTimesObj.sunSet  ? formatTimeString(sunTimesObj.sunSet,  timezoneOffset) : "N/A";
-          const sunTimeUntil  = getTimeUntilSunRiseSet(sunTimesObj.sunRise, sunTimesObj.sunSet, imageTimestamp, timezoneOffset);
+          const sunTimeUntil  = getTimeUntilRiseSet('sun', imageTimestamp, latitude, longitude);
 
           const sunandmoonHtml = `<div class="metadata-section">
-            <h2>Sun &amp; Moon <span style="font-weight:400;color:#7a8296">· times ${timeZoneLabel(imageTimestamp)}</span></h2>
+            <h2>Sun &amp; Moon</h2>
             <div>Sun altitude (°) <span>${imageMeta.sun_altitude != null ? imageMeta.sun_altitude.toFixed(1) : "N/A"}</span></div>
             <div>Sun rise <span>${sunRiseStr}</span></div>
             <div>Sun set  <span>${sunSetStr}</span></div>
@@ -1248,12 +1264,13 @@
           </div>`;
           if (sunandmoonEl) sunandmoonEl.innerHTML = sunandmoonHtml;
         } catch (e) {
-          console.warn("Sun/Moon calc error (astronomia may not be ready):", e);
+          console.warn("Sun/Moon calc error:", e);
           if (sunandmoonEl) sunandmoonEl.innerHTML =
             '<div class="metadata-section"><h2>Sun &amp; Moon</h2><p style="color:#888;margin:8px 0">Calculating...</p></div>';
         }
 
-        updateSunMoonAltitudeChart();
+        try { updateSunMoonAltitudeChart(); }
+        catch (e) { console.warn("Sun/Moon chart error:", e); }
 
       } catch (err) {
         console.error("Unexpected load error:", err);
@@ -1287,11 +1304,9 @@
       for (let offset = -12 * 3600; offset <= 12 * 3600; offset += 1800) {
         const t = imageTimestamp + offset;
         hours.push(offset / 3600);
-        const sun  = getSunRaDec(t);
-        const sunA = raDecToAzAlt(sun.ra, sun.dec, latitude, longitude, t);
+        const sunA  = getSunAzAlt(t, latitude, longitude);
         sunAlts.push(sunA.altitude > 0 ? sunA.altitude : null);
-        const moon  = getMoonRaDec(t);
-        const moonA = raDecToAzAlt(moon.ra, moon.dec, latitude, longitude, t);
+        const moonA = getMoonAzAlt(t, latitude, longitude);
         moonAlts.push(moonA.altitude > 0 ? moonA.altitude : null);
       }
       let maxAlt = 0;
@@ -1302,16 +1317,20 @@
       charts.chartSunMoonAltitude.data.datasets[0].data = sunAlts;
       charts.chartSunMoonAltitude.data.datasets[1].data = moonAlts;
 
-      const stObj = getSunRiseAndSet(imageTimestamp, latitude, longitude, timezoneOffset);
+      // Day and night shading over the whole ±12 h window, from the sun's
+      // altitude (the window spans parts of two or three calendar days)
       const bgPeriods = [];
-      if (stObj.sunRise && stObj.sunSet) {
-        const riseH = (stObj.sunRise + timezoneOffset - (imageTimestamp + timezoneOffset)) / 3600;
-        const setH  = (stObj.sunSet  + timezoneOffset - (imageTimestamp + timezoneOffset)) / 3600;
-        const w = [-12, 12];
-        if (riseH > w[0]) bgPeriods.push({ start: w[0], end: Math.max(w[0], riseH), color:'rgba(0,0,100,0.35)' });
-        if (riseH < w[1] && setH > w[0]) bgPeriods.push({ start: Math.max(w[0], riseH), end: Math.min(w[1], setH), color:'rgba(160,190,255,0.25)' });
-        if (setH < w[1]) bgPeriods.push({ start: Math.min(w[1], setH), end: w[1], color:'rgba(0,0,100,0.35)' });
+      const STEP_H = 1 / 6;   // 10 minutes
+      let runStart = -12, runDay = null;
+      for (let h = -12; h <= 12 + 1e-9; h += STEP_H) {
+        const day = getSunAzAlt(imageTimestamp + h * 3600, latitude, longitude).altitude >= RISE_SET_ALTITUDE;
+        if (runDay === null) runDay = day;
+        if (day !== runDay) {
+          bgPeriods.push({ start: runStart, end: h, color: runDay ? 'rgba(160,190,255,0.25)' : 'rgba(0,0,100,0.35)' });
+          runStart = h; runDay = day;
+        }
       }
+      bgPeriods.push({ start: runStart, end: 12, color: runDay ? 'rgba(160,190,255,0.25)' : 'rgba(0,0,100,0.35)' });
       if (charts.chartSunMoonAltitude.options.plugins.backgroundSun)
         charts.chartSunMoonAltitude.options.plugins.backgroundSun.periods = bgPeriods;
       charts.chartSunMoonAltitude.options.scales.y.max = Math.ceil(maxAlt + 5);
@@ -1504,11 +1523,14 @@
         ctx.restore();
       }
 
-      if (showSunMoon) {
-        const sun  = getSunRaDec(imageTimestamp);
-        const moon = getMoonRaDec(imageTimestamp);
-        drawEquatorialPOI(ctx, "Sun",  sun.ra,  sun.dec,  latitude, longitude, "gold",      12);
-        drawEquatorialPOI(ctx, "Moon", moon.ra, moon.dec, latitude, longitude, "lightgray", 12);
+      // Drawn again by the init code once the astronomia bundle is there
+      if (showSunMoon && astronomiaAvailable()) {
+        // Where the camera sees them: Moon topocentric (parallax), both
+        // lifted by the atmospheric refraction near the horizon
+        const sun  = getSunAzAlt(imageTimestamp, latitude, longitude);
+        const moon = getMoonAzAlt(imageTimestamp, latitude, longitude);
+        drawHorizontalPOI(ctx, "Sun",  sun.azimuth,  apparentAltitude(sun.altitude),  "gold",      12);
+        drawHorizontalPOI(ctx, "Moon", moon.azimuth, apparentAltitude(moon.altitude), "lightgray", 12);
       }
 
       if (showMountPosition && mountData && mountData.equatorial) {
@@ -1691,6 +1713,9 @@
     loadSpektrumData();
     restartTimer();
     initCharts();
+    astronomiaReady().then(() => {
+      try { updateAllskyOverlay(); } catch (e) { console.warn("overlay update error:", e); }
+    }).catch(e => console.warn(e.message));
 
     setInterval(loadMountData,    10000);
     setInterval(loadSpektrumData, 60000);

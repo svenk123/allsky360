@@ -598,7 +598,12 @@ function formatDecDMS(decDeg) {
 
 function drawEquatorialPOI(ctx, name, raDeg, decDeg, latitude, longitude, color, pxRadius = 10) {
   const { azimuth, altitude } = raDecToAzAlt(raDeg, decDeg, latitude, longitude, imageTimestamp);
-  if (altitude < 0) return; // unter Horizont → nicht zeichnen
+  drawHorizontalPOI(ctx, name, azimuth, altitude, color, pxRadius);
+}
+
+// Marker with label at azimuth/altitude (deg); nothing below the horizon
+function drawHorizontalPOI(ctx, name, azimuth, altitude, color, pxRadius = 10) {
+  if (altitude < 0) return;
 
   const { x, y } = azAltToImageXY(azimuth, altitude);
   ctx.save();
@@ -621,6 +626,30 @@ function Aroot() {
   if (window.Astronomia?.solar) return window.Astronomia;
   if (window.Astronomia?.default?.solar) return window.Astronomia.default;
   throw new Error("Astronomia bundle not available");
+}
+
+function astronomiaAvailable() {
+  return !!(window.Astronomia?.solar || window.Astronomia?.default?.solar);
+}
+
+// The bundle is loaded with "defer" (or from the CDN as fallback, inserted
+// later), so a page script that starts right away can run before it is
+// there. Resolves once it is available; rejects after timeoutMs.
+let astronomiaPromise = null;
+function astronomiaReady(timeoutMs = 15000) {
+  if (!astronomiaPromise) {
+    astronomiaPromise = new Promise((resolve, reject) => {
+      const t0 = Date.now();
+      (function poll() {
+        if (astronomiaAvailable()) resolve();
+        else if (Date.now() - t0 > timeoutMs) {
+          astronomiaPromise = null;
+          reject(new Error("Astronomia bundle not available"));
+        } else setTimeout(poll, 50);
+      })();
+    });
+  }
+  return astronomiaPromise;
 }
 
 
@@ -653,79 +682,108 @@ function getMoonRaDec(unixTime) {
   let ra = raRad * RAD2DEG;
   if (ra < 0) ra += 360;
 
-  return { ra, dec: decRad * RAD2DEG };
+  // distance Earth-Moon centres (km), for the parallax
+  return { ra, dec: decRad * RAD2DEG, distanceKm: m.range };
 }
 
-// Calculate moon rise and set times
-// Returns Unix times (UTC); the day searched is the calendar day of unixTime
-// in the display time zone. The offset argument is ignored (kept for callers).
+// ── Horizontal positions of Sun and Moon for the station ───────────────
+// Earth's equatorial radius (km), for the Moon's horizontal parallax
+const EARTH_RADIUS_KM = 6378.14;
+// Altitude of the centre at rise and set: upper limb on the horizon with
+// standard refraction (34' + 16' semi-diameter), as in almanacs; for the
+// Moon of its topocentric centre (its semi-diameter is about the Sun's)
+const RISE_SET_ALTITUDE = -0.833;
+
+// Sun: azimuth (deg from north over east) and geometric altitude (deg);
+// the solar parallax (9") is negligible
+function getSunAzAlt(unixTime, latDeg, lonDeg) {
+  const sun = getSunRaDec(unixTime);
+  return raDecToAzAlt(sun.ra, sun.dec, latDeg, lonDeg, unixTime);
+}
+
+// Moon: topocentric azimuth and geometric altitude. Seen from the Earth's
+// surface instead of its centre the Moon is lower by its parallax
+// P * cos(altitude), P = asin(R / distance), close to 1 deg (Meeus ch. 40)
+function getMoonAzAlt(unixTime, latDeg, lonDeg) {
+  const moon = getMoonRaDec(unixTime);
+  const pos = raDecToAzAlt(moon.ra, moon.dec, latDeg, lonDeg, unixTime);
+  const P = Math.asin(EARTH_RADIUS_KM / moon.distanceKm) * RAD2DEG;
+  pos.altitude -= P * Math.cos(pos.altitude / RAD2DEG);
+  return pos;
+}
+
+// Apparent altitude: geometric altitude plus atmospheric refraction
+// (Saemundsson's formula, standard pressure and temperature), what the
+// camera sees. Below -1 deg it no longer applies and is left out.
+function apparentAltitude(altDeg) {
+  if (altDeg < -1) return altDeg;
+  const R = 1.02 / Math.tan((altDeg + 10.3 / (altDeg + 5.11)) / RAD2DEG); // arcmin
+  return altDeg + R / 60;
+}
+
+// Altitude function of a body for the rise/set searches
+function bodyAltitudeFn(body, latDeg, lonDeg) {
+  const fn = body === 'moon' ? getMoonAzAlt : getSunAzAlt;
+  return (t) => fn(t, latDeg, lonDeg).altitude;
+}
+
+// First crossing of RISE_SET_ALTITUDE between startUnix and endUnix:
+// 5-minute steps, then bisection to well below a second. Unix time (UTC)
+// or null when the body does not rise (set) in that time.
+function findAltitudeCrossing(altFn, startUnix, endUnix, isRise) {
+  const step = 300;
+  let tPrev = startUnix, hPrev = altFn(startUnix) - RISE_SET_ALTITUDE;
+  for (let t = startUnix + step; t <= endUnix + step - 1; t += step) {
+    const tt = Math.min(t, endUnix);
+    const h = altFn(tt) - RISE_SET_ALTITUDE;
+    if (isRise ? (hPrev < 0 && h >= 0) : (hPrev > 0 && h <= 0)) {
+      let left = tPrev, right = tt;
+      for (let i = 0; i < 20; i++) {
+        const mid = (left + right) / 2;
+        const above = altFn(mid) - RISE_SET_ALTITUDE >= 0;
+        if (above === isRise) right = mid; else left = mid;
+      }
+      return (left + right) / 2;
+    }
+    tPrev = tt; hPrev = h;
+    if (tt >= endUnix) break;
+  }
+  return null;
+}
+
+// Rise and set on the calendar day of unixTime in the display time zone
+// (23 or 25 hours long on the days of the DST change). Unix times (UTC),
+// null when there is none that day. The offset argument is ignored.
+function riseAndSetOfDay(body, unixTime, latDeg, lonDeg) {
+  const dayStart = startOfDayInZone(unixTime);
+  const dayEnd = startOfDayInZone(dayStart + 30 * 3600);
+  const altFn = bodyAltitudeFn(body, latDeg, lonDeg);
+  return { rise: findAltitudeCrossing(altFn, dayStart, dayEnd, true),
+           set: findAltitudeCrossing(altFn, dayStart, dayEnd, false) };
+}
+
 function getMoonRiseAndSet(unixTime, latDeg, lonDeg, _timezoneOffsetSeconds = 0) {
-  const startOfDayUnix = startOfDayInZone(unixTime);
+  const r = riseAndSetOfDay('moon', unixTime, latDeg, lonDeg);
+  return { moonRise: r.rise, moonSet: r.set };
+}
 
-  // Search for moon rise and set during this day
-  const moonRise = findMoonRiseOrSet(startOfDayUnix, latDeg, lonDeg, 0, true);
-  const moonSet = findMoonRiseOrSet(startOfDayUnix, latDeg, lonDeg, 0, false);
-  
+function getSunRiseAndSet(unixTime, latDeg, lonDeg, _timezoneOffsetSeconds = 0) {
+  const r = riseAndSetOfDay('sun', unixTime, latDeg, lonDeg);
+  return { sunRise: r.rise, sunSet: r.set };
+}
+
+// Time from unixTime to the next rise and the next set (searched up to
+// 48 hours ahead: the Moon rises about 50 minutes later every day), as
+// "HH:MM", null if there is none in that time
+function getTimeUntilRiseSet(body, unixTime, latDeg, lonDeg) {
+  const altFn = bodyAltitudeFn(body, latDeg, lonDeg);
+  const end = unixTime + 48 * 3600;
+  const rise = findAltitudeCrossing(altFn, unixTime, end, true);
+  const set = findAltitudeCrossing(altFn, unixTime, end, false);
   return {
-    moonRise: moonRise,
-    moonSet: moonSet
+    timeUntilRise: rise !== null ? formatTimeDuration(rise - unixTime) : null,
+    timeUntilSet: set !== null ? formatTimeDuration(set - unixTime) : null
   };
-}
-
-function findMoonRiseOrSet(dayStartUnix, latDeg, lonDeg, timezoneOffsetSeconds, isRise) {
-  // Length of this local day: 23 or 25 hours on the days of the DST change
-  const searchWindow = startOfDayInZone(dayStartUnix + 30 * 3600) - dayStartUnix;
-  const stepSize = 300; // 5 minutes in seconds
-  let lastAltitude = null;
-  
-  for (let t = dayStartUnix; t < dayStartUnix + searchWindow; t += stepSize) {
-    const moon = getMoonRaDec(t);
-    const { altitude } = raDecToAzAlt(moon.ra, moon.dec, latDeg, lonDeg, t);
-    
-    // Look for transition from negative to positive altitude (rise) or positive to negative (set)
-    if (lastAltitude !== null) {
-      if (isRise && lastAltitude < 0 && altitude >= 0) {
-        // Found moon rise - refine with smaller steps
-        return findExactTime(t - stepSize, t, latDeg, lonDeg, timezoneOffsetSeconds, true);
-      } else if (!isRise && lastAltitude > 0 && altitude <= 0) {
-        // Found moon set - refine with smaller steps
-        return findExactTime(t - stepSize, t, latDeg, lonDeg, timezoneOffsetSeconds, false);
-      }
-    }
-    
-    lastAltitude = altitude;
-  }
-  
-  return null; // No rise/set found (polar day/night or moon never rises/sets)
-}
-
-function findExactTime(startUnix, endUnix, latDeg, lonDeg, timezoneOffsetSeconds, isRise) {
-  // Binary search for exact rise/set time
-  let left = startUnix;
-  let right = endUnix;
-  
-  for (let i = 0; i < 20; i++) { // 20 iterations should be enough
-    const mid = (left + right) / 2;
-    const moon = getMoonRaDec(mid);
-    const { altitude } = raDecToAzAlt(moon.ra, moon.dec, latDeg, lonDeg, mid);
-    
-    if (isRise) {
-      if (altitude >= 0) {
-        right = mid;
-      } else {
-        left = mid;
-      }
-    } else {
-      if (altitude <= 0) {
-        right = mid;
-      } else {
-        left = mid;
-      }
-    }
-  }
-  
-  // Unix time (UTC); formatting adds the zone
-  return (left + right) / 2;
 }
 
 // HH:MM in the display time zone (the offset argument is ignored)
@@ -733,154 +791,10 @@ function formatTimeString(unixTime, _timezoneOffsetSeconds = 0) {
   return formatClock(unixTime);
 }
 
-// Calculate time until moon rise or set
-function getTimeUntilMoonRiseSet(moonRiseUnix, moonSetUnix, currentUnix, timezoneOffsetSeconds = 0) {
-  if (!moonRiseUnix && !moonSetUnix) {
-    return { timeUntilRise: null, timeUntilSet: null };
-  }
-  
-  const localCurrent = currentUnix + timezoneOffsetSeconds;
-  let timeUntilRise = null;
-  let timeUntilSet = null;
-  
-  if (moonRiseUnix) {
-    const localRise = moonRiseUnix + timezoneOffsetSeconds;
-    if (localRise >= localCurrent) {
-      timeUntilRise = localRise - localCurrent;
-    } else {
-      // Moon already rose today, calculate time until next rise (next day)
-      timeUntilRise = (localRise + 24 * 3600) - localCurrent;
-    }
-  }
-  
-  if (moonSetUnix) {
-    const localSet = moonSetUnix + timezoneOffsetSeconds;
-    if (localSet >= localCurrent) {
-      timeUntilSet = localSet - localCurrent;
-    } else {
-      // Moon already set today, calculate time until next set (next day)
-      timeUntilSet = (localSet + 24 * 3600) - localCurrent;
-    }
-  }
-  
-  return {
-    timeUntilRise: timeUntilRise ? formatTimeDuration(timeUntilRise) : null,
-    timeUntilSet: timeUntilSet ? formatTimeDuration(timeUntilSet) : null
-  };
-}
-
 function formatTimeDuration(seconds) {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-}
-
-// Calculate sun rise and set times
-// Returns Unix times (UTC); the day searched is the calendar day of unixTime
-// in the display time zone. The offset argument is ignored (kept for callers).
-function getSunRiseAndSet(unixTime, latDeg, lonDeg, _timezoneOffsetSeconds = 0) {
-  const startOfDayUnix = startOfDayInZone(unixTime);
-
-  // Search for sun rise and set during this day
-  const sunRise = findSunRiseOrSet(startOfDayUnix, latDeg, lonDeg, 0, true);
-  const sunSet = findSunRiseOrSet(startOfDayUnix, latDeg, lonDeg, 0, false);
-  
-  return {
-    sunRise: sunRise,
-    sunSet: sunSet
-  };
-}
-
-function findSunRiseOrSet(dayStartUnix, latDeg, lonDeg, timezoneOffsetSeconds, isRise) {
-  // Length of this local day: 23 or 25 hours on the days of the DST change
-  const searchWindow = startOfDayInZone(dayStartUnix + 30 * 3600) - dayStartUnix;
-  const stepSize = 300; // 5 minutes in seconds
-  let lastAltitude = null;
-  
-  for (let t = dayStartUnix; t < dayStartUnix + searchWindow; t += stepSize) {
-    const sun = getSunRaDec(t);
-    const { altitude } = raDecToAzAlt(sun.ra, sun.dec, latDeg, lonDeg, t);
-    
-    // Look for transition from negative to positive altitude (rise) or positive to negative (set)
-    if (lastAltitude !== null) {
-      if (isRise && lastAltitude < 0 && altitude >= 0) {
-        // Found sun rise - refine with smaller steps
-        return findExactSunTime(t - stepSize, t, latDeg, lonDeg, timezoneOffsetSeconds, true);
-      } else if (!isRise && lastAltitude > 0 && altitude <= 0) {
-        // Found sun set - refine with smaller steps
-        return findExactSunTime(t - stepSize, t, latDeg, lonDeg, timezoneOffsetSeconds, false);
-      }
-    }
-    
-    lastAltitude = altitude;
-  }
-  
-  return null; // No rise/set found (polar day/night or sun never rises/sets)
-}
-
-function findExactSunTime(startUnix, endUnix, latDeg, lonDeg, timezoneOffsetSeconds, isRise) {
-  // Binary search for exact rise/set time
-  let left = startUnix;
-  let right = endUnix;
-  
-  for (let i = 0; i < 20; i++) { // 20 iterations should be enough
-    const mid = (left + right) / 2;
-    const sun = getSunRaDec(mid);
-    const { altitude } = raDecToAzAlt(sun.ra, sun.dec, latDeg, lonDeg, mid);
-    
-    if (isRise) {
-      if (altitude >= 0) {
-        right = mid;
-      } else {
-        left = mid;
-      }
-    } else {
-      if (altitude <= 0) {
-        right = mid;
-      } else {
-        left = mid;
-      }
-    }
-  }
-  
-  // Unix time (UTC); formatting adds the zone
-  return (left + right) / 2;
-}
-
-// Calculate time until sun rise or set
-function getTimeUntilSunRiseSet(sunRiseUnix, sunSetUnix, currentUnix, timezoneOffsetSeconds = 0) {
-  if (!sunRiseUnix && !sunSetUnix) {
-    return { timeUntilRise: null, timeUntilSet: null };
-  }
-  
-  const localCurrent = currentUnix + timezoneOffsetSeconds;
-  let timeUntilRise = null;
-  let timeUntilSet = null;
-  
-  if (sunRiseUnix) {
-    const localRise = sunRiseUnix + timezoneOffsetSeconds;
-    if (localRise >= localCurrent) {
-      timeUntilRise = localRise - localCurrent;
-    } else {
-      // Sun already rose today, calculate time until next rise (next day)
-      timeUntilRise = (localRise + 24 * 3600) - localCurrent;
-    }
-  }
-  
-  if (sunSetUnix) {
-    const localSet = sunSetUnix + timezoneOffsetSeconds;
-    if (localSet >= localCurrent) {
-      timeUntilSet = localSet - localCurrent;
-    } else {
-      // Sun already set today, calculate time until next set (next day)
-      timeUntilSet = (localSet + 24 * 3600) - localCurrent;
-    }
-  }
-  
-  return {
-    timeUntilRise: timeUntilRise ? formatTimeDuration(timeUntilRise) : null,
-    timeUntilSet: timeUntilSet ? formatTimeDuration(timeUntilSet) : null
-  };
 }
 
 // Hamburger Menu Funktion
