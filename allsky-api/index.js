@@ -524,6 +524,36 @@ const server = http.createServer((req, res) => {
 	    });
 	}
 
+    // API call: /api/nights — nights with keogram, star trails or timelapse
+    // videos in public/videos (written by scripts/endofnight.sh), newest first
+    } else if (pathname === '/api/nights') {
+        const videoDir = path.join(PUBLIC_PATH, 'videos');
+        fs.readdir(videoDir, (err, files) => {
+            if (err) {
+                // no video directory yet: no nights
+                res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+                return res.end('[]');
+            }
+            const nights = new Map();
+            const night = (d) => {
+                if (!nights.has(d)) nights.set(d, { date: d, keogram: false, startrails: false, videos: [] });
+                return nights.get(d);
+            };
+            for (const name of files) {
+                const m = /^(keogram|startrails|normal|max|motion)_(\d{8})\.(jpg|mp4)$/.exec(name);
+                if (!m) continue;
+                const [, kind, d, ext] = m;
+                if (ext === 'jpg' && (kind === 'keogram' || kind === 'startrails')) night(d)[kind] = true;
+                else if (ext === 'mp4' && kind !== 'keogram' && kind !== 'startrails') night(d).videos.push(kind);
+            }
+            const order = ['normal', 'max', 'motion'];
+            const result = [...nights.values()]
+                .map(n => ({ ...n, videos: n.videos.sort((a, b) => order.indexOf(a) - order.indexOf(b)) }))
+                .sort((a, b) => b.date.localeCompare(a.date));
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
+            res.end(JSON.stringify(result));
+        });
+
     // API call: /api/config
     } else if (pathname === '/api/config') {
         const configPath = path.join(PUBLIC_PATH, 'images', 'config.json');

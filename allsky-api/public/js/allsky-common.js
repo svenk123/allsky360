@@ -236,6 +236,7 @@ const NAV_ITEMS = [
   null,
   { href: 'archive.html', title: 'Archive', icon: '<polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line>' },
   { href: 'videos.html', title: 'Videos', icon: '<polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>' },
+  { href: 'night.html', title: 'Night', icon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>' },
   null,
   { href: 'meteo.html', title: 'Weather', icon: '<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>' },
   { href: 'aurora.html', title: 'Aurora', icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>' },

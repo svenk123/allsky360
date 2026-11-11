@@ -336,7 +336,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cu
 endif
 
 # Build for utils
-tools: timelapse meteo aurora mount-position cameras panorama sensors
+tools: timelapse meteo aurora mount-position cameras panorama sensors keogram startrails
 
 timelapse:
 	@echo "Building timelapse tool"
@@ -369,6 +369,14 @@ panorama:
 sensors:
 	@echo "Building RS485/Modbus sensors tool"
 	@$(MAKE) -C tools/sensors
+
+keogram:
+	@echo "Building keogram tool"
+	@$(MAKE) -C tools/keogram
+
+startrails:
+	@echo "Building startrails tool"
+	@$(MAKE) -C tools/startrails
 
 # Build for unit tests
 tests: $(TESTBINS)
@@ -549,6 +557,8 @@ binaries:
 	$(INSTALL) -o root -g root -m 755 tools/meteo/bin/allsky360-meteo $(APP_DIR)
 	$(INSTALL) -o root -g root -m 755 tools/aurora/bin/allsky360-aurora $(APP_DIR)
 	$(INSTALL) -o root -g root -m 755 tools/sensors/bin/allsky360-sensors $(APP_DIR)
+	$(INSTALL) -o root -g root -m 755 tools/keogram/bin/allsky360-keogram $(APP_DIR)
+	$(INSTALL) -o root -g root -m 755 tools/startrails/bin/allsky360-startrails $(APP_DIR)
 	$(INSTALL) -o root -g root -m 755 tools/indigo-mount-position/bin/indigo_mount_position $(APP_DIR)
 	$(INSTALL) -o root -g root -m 755 tools/indigo-cameras/bin/indigo_cameras $(APP_DIR)
 config:
@@ -888,5 +898,5 @@ help:
 	@echo "  make help            - Show this help"
 	@echo "  make log             - View live logs"
 
-.PHONY: all clean install uninstall tests help FORCE polkit sensors node-deps node-check node-build node-install yolo yolo-check yolov11
+.PHONY: all clean install uninstall tests help FORCE polkit sensors keogram startrails node-deps node-check node-build node-install yolo yolo-check yolov11
 

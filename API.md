@@ -297,6 +297,28 @@ GET /api/thumbnails?date=2025-07-22&type=image
 
 ---
 
+### Nights (keogram, star trails, timelapse)
+
+#### `GET /api/nights`
+
+The nights for which `scripts/endofnight.sh` wrote a keogram, star trails or timelapse videos
+into `public/videos`, newest first. `date` is the UTC day of the morning the night ended (the
+date stamp of the files). Used by `night.html`.
+
+```json
+[
+  { "date": "20261104", "keogram": true, "startrails": true, "videos": ["normal", "max", "motion"] },
+  { "date": "20261103", "keogram": true, "startrails": false, "videos": [] }
+]
+```
+
+The files themselves are static: `videos/keogram_YYYYMMDD.jpg`, `videos/keogram_YYYYMMDD.json`,
+`videos/startrails_YYYYMMDD.jpg`, `videos/startrails_YYYYMMDD.json`,
+`videos/{normal,max,motion}_YYYYMMDD.mp4` (format of the JSON files: see TOOLS.md). Without a
+video directory the answer is `[]`.
+
+---
+
 ### Configuration
 
 #### `GET /api/config`

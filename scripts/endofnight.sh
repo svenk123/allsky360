@@ -225,6 +225,38 @@ generate_timelapse() {
   done
 }
 
+# Keogram and star trails of the night that just ended, next to the videos
+# (same date stamp, the UTC day of the morning). The night images
+# (night_mode 1) of the last 20 hours: long enough for a winter night with
+# twilight, short enough not to reach the night before.
+generate_night_images() {
+  local DATESTAMP=$(date -u +%Y%m%d)
+  local END=$(date -u +%s)
+  local START=$((END - 20 * 3600))
+  mkdir -p "$VIDEODIR"
+
+  if [ -x "$BINDIR/allsky360-keogram" ]; then
+    echo "Generating keogram"
+    $BINDIR/allsky360-keogram -c "$CONFIG_FILE" -i "$IMAGEDIR" -s "$START" -e "$END" --night-only --trim \
+      -o "${VIDEODIR}/keogram_${DATESTAMP}.jpg" -j "${VIDEODIR}/keogram_${DATESTAMP}.json" \
+      || echo "WARNING: keogram failed (exit $?)"
+  else
+    echo "WARNING: $BINDIR/allsky360-keogram not found, no keogram."
+  fi
+
+  if [ -x "$BINDIR/allsky360-startrails" ]; then
+    echo "Generating star trails"
+    $BINDIR/allsky360-startrails -c "$CONFIG_FILE" -i "$IMAGEDIR" -s "$START" -e "$END" \
+      -o "${VIDEODIR}/startrails_${DATESTAMP}.jpg" -j "${VIDEODIR}/startrails_${DATESTAMP}.json" \
+      || echo "WARNING: star trails failed (exit $?)"
+  else
+    echo "WARNING: $BINDIR/allsky360-startrails not found, no star trails."
+  fi
+}
+
+# Keogram and star trails first: seconds, the timelapses take minutes
+generate_night_images
+
 # Generate the timelapse
 generate_timelapse $LATEST_IMAGE
 

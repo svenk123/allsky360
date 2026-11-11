@@ -13,6 +13,8 @@ Here's what's in the `tools/` directory:
 * **allsky360-meteo** – Fetches weather data from Open-Meteo
 * **timelapse-cuda-nv** – Creates timelapse videos from image sequences, with GPU acceleration
 * **allsky360-sensors** – Reads the local RS485/Modbus sensors (weather sensor, anemometer, wind vane, control cabinet) into the daily database
+* **allsky360-keogram** – Builds a keogram (the north-south meridian of every image over time) of a night or any time range
+* **allsky360-startrails** – Stacks the night images into star trails (brightest value of every pixel)
 
 Each tool has its own Makefile, so you can build them individually if you want.
 
@@ -361,6 +363,145 @@ You'll need:
 
 ---
 
+## 5. allsky360-keogram
+
+A keogram shows a whole night in one picture: every column is the north-south line
+through the zenith of one image, the columns run from left to right in time. Clouds,
+dawn and dusk, the moon and aurora (as bright bands in the north) are visible at a glance.
+
+### What it does
+
+* Reads the images `image_directory/YYYYMMDD/image-YYYYMMDDHHMMSS.jpg` of the time range
+  (UTC days, like everything stored).
+* Takes from each image the meridian from the northern horizon (top) through the zenith
+  to the southern horizon (bottom): bilinear, averaged over a few pixels across the line.
+  The geometry is the calibration from `config.ini`: `image_zenith_x`, `image_zenith_y`,
+  `image_horizon_radius` and `image_north_angle` (the same values as the azimuth grid of
+  the dashboard).
+* Places the columns by time, linearly from start to end: gaps in the capture stay black.
+* Decodes the JPEGs reduced (1/2, 1/4 or 1/8 while decoding) and in parallel on all cores:
+  a day of about 230 images of 4176x4176 pixels takes about 9 seconds on the Orin Nano.
+* Skips unreadable images (for example the one being written) and images of another size
+  than the newest image: the calibration fits only one image size (crop switched on or off).
+* Writes the keogram as JPEG (temporary file + rename) and optionally a JSON description
+  for the web page.
+
+`scripts/endofnight.sh` runs it when the camera switches from night to day (night images of
+the last 20 hours, `--night-only --trim`) and writes `keogram_YYYYMMDD.jpg/.json` next to the
+timelapse videos; the page **Night** (`night.html`) shows it with a time axis. The code shared
+with allsky360-startrails (config, time range, image list, JPEG) is in `tools/common/`.
+
+### Usage
+
+```bash
+allsky360-keogram [options]
+```
+
+### Parameters
+
+| Option | Description |
+|--------|-------------|
+| `-n`, `--night DATE` | The night after the evening of DATE (YYYYMMDD): from solar noon to the next solar noon at `location_longitude` |
+| `-s`, `--start TIME` | Start (UTC): Unix seconds, `YYYYMMDD`, `"YYYY-MM-DD HH:MM[:SS]"` or `YYYY-MM-DDTHH:MM` |
+| `-e`, `--end TIME` | End (default: start + 24 h); without `-n`/`-s` the last 24 hours |
+| `--trim` | Shorten the range to the first and last image used (no black margins) |
+| `-c`, `--config FILE` | config.ini (default `/home/allskyuser/config.ini`) |
+| `-i`, `--images DIR` | Image directory (overrides `image_directory`) |
+| `-o`, `--output FILE` | Keogram JPEG (default `keogram.jpg`) |
+| `-j`, `--json FILE` | Also write a JSON description (time range, size, number of images) |
+| `-W`, `--width N` | Width in pixels (default: one column per capture interval) |
+| `-H`, `--height N` | Height in pixels, horizon to horizon (default 720) |
+| `-w`, `--slice-width N` | Pixels averaged across the meridian (default 5) |
+| `--night-only` | Only images with `night_mode` 1 in their JSON |
+| `--zenith X,Y`, `--radius R`, `--north DEG` | Geometry instead of the values in config.ini (for testing a calibration) |
+| `-q`, `--quality N` | JPEG quality (default 90) |
+| `-v`, `--verbose` | Progress output |
+
+Exit codes: 0 written, 1 usage or configuration error, 2 no images in the range, 3 write error.
+
+### JSON description (`--json`)
+
+```json
+{"source":"allsky360-keogram","generated":1793718881,"start":1793689200,"end":1793721600,
+ "width":268,"height":720,"seconds_per_column":120.9,"images":223,"images_unreadable":0,
+ "images_other_size":11,"image_width":4176,"image_height":4176,"first_image":1793690196,
+ "last_image":1793718817,"interval":121.0,"night_only":false,"top":"N","bottom":"S"}
+```
+
+Times are Unix seconds (UTC). Column `x` covers the time `start + x * seconds_per_column`.
+
+### Example
+
+```bash
+# Last night (the evening of 3 November up to the next noon)
+allsky360-keogram -n 20261103 -o /tmp/keogram.jpg -j /tmp/keogram.json -v
+
+# Test a calibration without changing config.ini
+allsky360-keogram -s 20261103 --zenith 2088,2088 --radius 2000 --north -11 -o /tmp/k.jpg
+```
+
+---
+
+## 6. allsky360-startrails
+
+Star trails: every pixel of the result is the brightest value of that pixel over all images of
+the night ("lighten" stacking), so the stars draw their arcs around the celestial pole.
+
+### What it does
+
+* Uses the same image list, time range options and config keys as allsky360-keogram
+  (shared code in `tools/common/`).
+* Only night images (`night_mode` 1 in the image JSON) by default; `--all` also takes day images.
+* `--max-brightness` leaves out images that are brighter on average (0..1). Off by default:
+  the camera exposes night images to a target brightness, so their mean says little about
+  how dark the sky was (here 0.13–0.35 within one evening). `-v` prints the brightness of
+  every image to find a useful value.
+* Skips unreadable images and images of another size than the newest one.
+* Decodes reduced (`--scale`, default 1/2: 2088x2088 from 4176x4176) and in parallel, with one
+  maximum buffer per thread.
+* Writes the JPEG (temporary file + rename) and optionally a JSON description.
+
+`scripts/endofnight.sh` writes `startrails_YYYYMMDD.jpg/.json` next to the timelapse videos;
+the page **Night** shows it.
+
+Known limit: the text printed into the images (date and time at the top left) is stacked as
+well and becomes unreadable.
+
+### Parameters
+
+| Option | Description |
+|--------|-------------|
+| `-n`, `--night DATE` | The night after the evening of DATE (YYYYMMDD), solar noon to solar noon |
+| `-s`, `--start TIME` / `-e`, `--end TIME` | Time range (UTC), as for allsky360-keogram |
+| `-c`, `--config FILE` | config.ini (default `/home/allskyuser/config.ini`) |
+| `-i`, `--images DIR` | Image directory (overrides `image_directory`) |
+| `-o`, `--output FILE` | Star trails JPEG (default `startrails.jpg`) |
+| `-j`, `--json FILE` | Also write a JSON description |
+| `-b`, `--max-brightness F` | Leave out images brighter than F on average (default 1.0 = keep all) |
+| `-S`, `--scale N` | Output at 1/N of the image size: 1, 2, 4 or 8 (default 2) |
+| `--all` | Also day images |
+| `-q`, `--quality N` | JPEG quality (default 92) |
+| `-v`, `--verbose` | Progress and the brightness of every image |
+
+Exit codes: 0 written, 1 usage or configuration error, 2 no (usable) images, 3 write error.
+
+### JSON description (`--json`)
+
+```json
+{"source":"allsky360-startrails","generated":1793726141,"start":1793664000,"end":1793750400,
+ "first_image":1793723899,"last_image":1793725956,"width":2088,"height":2088,"scale":2,
+ "images":19,"images_too_bright":0,"images_unreadable":0,"images_other_size":0,
+ "max_brightness":1.0,"night_only":true}
+```
+
+### Example
+
+```bash
+allsky360-startrails -n 20261103 -o /tmp/startrails.jpg -j /tmp/startrails.json -v
+```
+
+---
+
 ## Building the tools
 
 You can build each tool individually from its directory:
@@ -370,6 +511,8 @@ cd tools/aurora && make
 cd tools/meteo && make
 cd tools/timelapse && make
 cd tools/indigo-cameras && make
+cd tools/keogram && make
+cd tools/startrails && make
 ```
 
 Or build all of them at once from the main directory:
