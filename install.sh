@@ -217,24 +217,22 @@ configure() {
     # Devices are reported as "<device> @ <server name>"; the listing tools
     # connect as "indigo_server", so swap the suffix if another name is used.
     local lister="$REPO_DIR/tools/indigo-cameras/bin/indigo_cameras"
-    local mountlister="$REPO_DIR/tools/indigo-mount-position/bin/indigo_mount_position"
     local -a cams=() mounts=()
     if [ -x "$lister" ]; then
-        echo "  Asking $host:$port for cameras..."
-        mapfile -t cams < <(timeout 30 "$lister" -h "$host" -p "$port" -t 10 -l -j 2>/dev/null \
+        # One query for both: cameras (-l) and mounts (-M)
+        echo "  Asking $host:$port for cameras and mounts..."
+        local devjson
+        devjson="$(timeout 30 "$lister" -h "$host" -p "$port" -t 10 -l -M -j 2>/dev/null || true)"
+        mapfile -t cams < <(printf '%s' "$devjson" \
             | python3 -c 'import json,sys; [print(c if isinstance(c, str) else c["name"]) for c in json.load(sys.stdin).get("cameras", [])]' 2>/dev/null \
+            | sed "s/ @ indigo_server\$/ @ $name/" || true)
+        mapfile -t mounts < <(printf '%s' "$devjson" \
+            | python3 -c 'import json,sys; [print(m) for m in json.load(sys.stdin).get("mounts", [])]' 2>/dev/null \
             | sed "s/ @ indigo_server\$/ @ $name/" || true)
     fi
     choose_device v "Camera" "$(cfg_get indigo_camera)" "${cams[@]+"${cams[@]}"}"
     cfg_set indigo_camera "$v"
 
-    if [ -x "$mountlister" ]; then
-        local tmpcfg; tmpcfg="$(mktemp)"
-        printf 'indigo_server=%s\nindigo_port=%s\nindigo_servername=%s\n' "$host" "$port" "$name" > "$tmpcfg"
-        echo "  Asking $host:$port for mounts..."
-        mapfile -t mounts < <(timeout 30 "$mountlister" -c "$tmpcfg" -t 5 -l 2>/dev/null | sed -n 's/^  //p' || true)
-        rm -f "$tmpcfg"
-    fi
     choose_device v "Mount (empty = no mount)" "$(cfg_get indigo_mount)" "${mounts[@]+"${mounts[@]}"}"
     cfg_set indigo_mount "$v"
 

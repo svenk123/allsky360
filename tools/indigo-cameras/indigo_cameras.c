@@ -17,20 +17,28 @@
  *****************************************************************************/
 
 // Reads camera information from a running INDIGO server and prints
-// CCD_INFO and CCD_TEMPERATURE to stdout.
+// CCD_INFO and CCD_TEMPERATURE to stdout, or lists the cameras and mounts
+// with the names to use for indigo_camera / indigo_mount in config.ini.
 //
-// Usage: indigo_cameras -h <server> [-p <port>] [-c <camera_name>] [-t <secs>] [-l] [-j]
+// Usage: indigo_cameras -h <server> [-p <port>] [-c <camera_name>] [-t <secs>] [-l] [-M] [-j]
 //   -h / --host        <server>      hostname or IP of the INDIGO server
 //   -p / --port        <port>        TCP port (default: 7624)
 //   -c / --camera      <camera_name> device name as reported by the server
 //                                    (default: "CCD Imager Simulator")
 //   -t / --timeout     <secs>        timeout waiting for camera response (default: 10)
 //   -l / --list-cameras              list available camera device names and exit
+//   -M / --list-mounts               list available mount device names and exit
+//                                    (with -l: list both)
 //   -j / --json                      output as JSON
+//
+// The names end with " @ indigo_server" (the name this tool connects with);
+// replace the suffix if indigo_servername in config.ini is different.
 //
 // Example:
 //   indigo_cameras -h indigosky.local -l
 //   indigo_cameras -h indigosky.local -l -j
+//   indigo_cameras -h indigosky.local -M
+//   indigo_cameras -h indigosky.local -l -M -j
 //   indigo_cameras -h indigosky.local -p 7624 -c "QHY CCD QHY268M-XXXXXXXX"
 //   indigo_cameras -h indigosky.local -p 7624 -c "QHY CCD QHY268M-XXXXXXXX" -j
 
@@ -70,11 +78,17 @@ static double g_bits_per_pixel    = 0.0;
 static bool   g_got_temperature   = false;
 static double g_temperature       = 0.0;
 
-/* List-mode: collect camera device names */
-static bool g_list_mode = false;
-#define MAX_FOUND_CAMERAS 64
-static char g_found_cameras[MAX_FOUND_CAMERAS][256];
-static int  g_found_count = 0;
+/* List-mode: collect camera and/or mount device names */
+static bool g_list_mode   = false; /* -l and/or -M given */
+static bool g_list_cams   = false;
+static bool g_list_mounts = false;
+#define MAX_FOUND_DEVICES 64
+typedef struct {
+	char names[MAX_FOUND_DEVICES][256];
+	int  count;
+} device_list;
+static device_list g_cameras;
+static device_list g_mounts;
 /* Number of INFO properties seen so far (list mode stops when it is quiet) */
 static volatile int g_info_seen = 0;
 
@@ -101,15 +115,35 @@ static indigo_result client_attach(indigo_client *client) {
 	return INDIGO_OK;
 }
 
-static void collect_camera(const char *device_name) {
-	for (int i = 0; i < g_found_count; i++) {
-		if (strcmp(g_found_cameras[i], device_name) == 0)
+static void collect_device(device_list *list, const char *device_name) {
+	for (int i = 0; i < list->count; i++) {
+		if (strcmp(list->names[i], device_name) == 0)
 			return;
 	}
-	if (g_found_count < MAX_FOUND_CAMERAS) {
-		strncpy(g_found_cameras[g_found_count], device_name, 255);
-		g_found_cameras[g_found_count][255] = '\0';
-		g_found_count++;
+	if (list->count < MAX_FOUND_DEVICES) {
+		strncpy(list->names[list->count], device_name, 255);
+		list->names[list->count][255] = '\0';
+		list->count++;
+	}
+}
+
+/* Prints one list: JSON array, or a text block */
+static void print_device_list(const char *what, const device_list *list,
+                              const char *server, int port) {
+	if (g_json_mode) {
+		char esc[512];
+		printf("\"%s\":[", what);
+		for (int i = 0; i < list->count; i++) {
+			json_escape(list->names[i], esc, sizeof(esc));
+			printf("%s\"%s\"", i > 0 ? "," : "", esc);
+		}
+		printf("]");
+	} else if (list->count == 0) {
+		printf("No %s found on %s:%d\n", what, server, port);
+	} else {
+		printf("Available %s on %s:%d:\n", what, server, port);
+		for (int i = 0; i < list->count; i++)
+			printf("  %s\n", list->names[i]);
 	}
 }
 
@@ -143,10 +177,14 @@ static indigo_result client_define_property(indigo_client *client, indigo_device
 		if (strcmp(property->name, INFO_PROPERTY_NAME) == 0) {
 			indigo_item *iface = indigo_get_item(property, INFO_DEVICE_INTERFACE_ITEM_NAME);
 			long flags = iface ? atol(iface->text.value) : 0;
-			/* Agents (e.g. "Imager Agent") also report the CCD interface,
-			 * but they are not cameras */
-			if ((flags & INDIGO_INTERFACE_CCD) && !(flags & INDIGO_INTERFACE_AGENT))
-				collect_camera(property->device);
+			/* Agents (e.g. "Imager Agent", "Mount Agent") also report
+			 * the CCD or mount interface, but they are not devices */
+			if (!(flags & INDIGO_INTERFACE_AGENT)) {
+				if (g_list_cams && (flags & INDIGO_INTERFACE_CCD))
+					collect_device(&g_cameras, property->device);
+				if (g_list_mounts && (flags & INDIGO_INTERFACE_MOUNT))
+					collect_device(&g_mounts, property->device);
+			}
 			g_info_seen++;
 		}
 
@@ -232,12 +270,13 @@ static indigo_client g_client = {
 };
 
 static void print_usage(const char *prog) {
-	fprintf(stderr, "Usage: %s -h <server> [-p <port>] [-c <camera_name>] [-t <secs>] [-l] [-j]\n", prog);
+	fprintf(stderr, "Usage: %s -h <server> [-p <port>] [-c <camera_name>] [-t <secs>] [-l] [-M] [-j]\n", prog);
 	fprintf(stderr, "  -h / --host          <server>      hostname or IP of the INDIGO server\n");
 	fprintf(stderr, "  -p / --port          <port>        TCP port (default: 7624)\n");
 	fprintf(stderr, "  -c / --camera        <camera_name> device name (default: \"CCD Imager Simulator\")\n");
 	fprintf(stderr, "  -t / --timeout       <secs>        timeout in seconds (default: 10)\n");
 	fprintf(stderr, "  -l / --list-cameras               list available cameras and exit\n");
+	fprintf(stderr, "  -M / --list-mounts                list available mounts and exit (with -l: both)\n");
 	fprintf(stderr, "  -j / --json                        output as JSON\n");
 }
 
@@ -255,12 +294,13 @@ int main(int argc, const char *argv[]) {
 		{ "camera",        required_argument, NULL, 'c' },
 		{ "timeout",       required_argument, NULL, 't' },
 		{ "list-cameras",  no_argument,       NULL, 'l' },
+		{ "list-mounts",   no_argument,       NULL, 'M' },
 		{ "json",          no_argument,       NULL, 'j' },
 		{ NULL, 0, NULL, 0 }
 	};
 
 	int opt;
-	while ((opt = getopt_long(argc, (char *const *)argv, "h:p:c:t:lj", long_opts, NULL)) != -1) {
+	while ((opt = getopt_long(argc, (char *const *)argv, "h:p:c:t:lMj", long_opts, NULL)) != -1) {
 		switch (opt) {
 			case 'h':
 				server = optarg;
@@ -285,6 +325,11 @@ int main(int argc, const char *argv[]) {
 				break;
 			case 'l':
 				g_list_mode = true;
+				g_list_cams = true;
+				break;
+			case 'M':
+				g_list_mode   = true;
+				g_list_mounts = true;
 				break;
 			case 'j':
 				g_json_mode = true;
@@ -323,7 +368,8 @@ int main(int argc, const char *argv[]) {
 		 * in a burst after the connect, but a busy server can take a while:
 		 * wait up to the timeout, and stop once a camera was found and no
 		 * further device has shown up for 1 s (a fixed 3 s wait missed the
-		 * camera at times, BUG-15). */
+		 * camera at times, BUG-15). The mounts are announced in the same
+		 * burst. */
 		int waited_ms = 0, quiet_ms = 0, last_seen = 0;
 		while (waited_ms < timeout * 1000) {
 			indigo_usleep(100000);
@@ -334,7 +380,7 @@ int main(int argc, const char *argv[]) {
 			} else {
 				quiet_ms += 100;
 			}
-			if (g_found_count > 0 && quiet_ms >= 1000)
+			if (g_cameras.count + g_mounts.count > 0 && quiet_ms >= 1000)
 				break;
 		}
 	} else {
@@ -373,27 +419,29 @@ int main(int argc, const char *argv[]) {
 	/* ---------------------------------------------------------------- */
 
 	if (g_list_mode) {
-		if (g_found_count == 0) {
-			if (g_json_mode)
-				printf("{\"server\":\"%s\",\"port\":%d,\"cameras\":[]}\n", server, port);
-			else
-				fprintf(stderr, "No cameras found on %s:%d\n", server, port);
+		bool found = g_cameras.count + g_mounts.count > 0;
+		if (!found && !g_json_mode) {
+			/* stderr as before: stdout stays empty for scripts */
+			fprintf(stderr, "No %s found on %s:%d\n",
+			        g_list_cams && g_list_mounts ? "cameras or mounts" : g_list_cams ? "cameras" : "mounts",
+			        server, port);
 			return 2;
 		}
-		if (g_json_mode) {
-			char esc[512];
-			printf("{\"server\":\"%s\",\"port\":%d,\"cameras\":[", server, port);
-			for (int i = 0; i < g_found_count; i++) {
-				json_escape(g_found_cameras[i], esc, sizeof(esc));
-				printf("%s\"%s\"", i > 0 ? "," : "", esc);
-			}
-			printf("]}\n");
-		} else {
-			printf("Available cameras on %s:%d:\n", server, port);
-			for (int i = 0; i < g_found_count; i++)
-				printf("  %s\n", g_found_cameras[i]);
+		if (g_json_mode)
+			printf("{\"server\":\"%s\",\"port\":%d", server, port);
+		if (g_list_cams) {
+			if (g_json_mode) printf(",");
+			print_device_list("cameras", &g_cameras, server, port);
 		}
-		return 0;
+		if (g_list_mounts) {
+			if (g_json_mode) printf(",");
+			else if (g_list_cams) printf("\n");
+			print_device_list("mounts", &g_mounts, server, port);
+		}
+		if (g_json_mode)
+			printf("}\n");
+		/* 2 = nothing found at all (a missing mount is normal) */
+		return found ? 0 : 2;
 	}
 
 	if (!g_got_info) {

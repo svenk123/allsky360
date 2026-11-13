@@ -20,6 +20,24 @@
 // prints MOUNT_EQUATORIAL_COORDINATES and MOUNT_HORIZONTAL_COORDINATES
 // to stdout.
 //
+// The tool only reads: it never connects, disconnects or moves the mount, so
+// it does not disturb a client that uses it (and works on a device locked
+// with an access token, which only blocks change requests). The driver
+// defines the MOUNT_* properties only while the device is connected, so some
+// client (or the server) must have connected the mount.
+//
+// With -o the file is always written, also when there is no position, so the
+// web page never shows an old position as current:
+//   "timestamp": Unix time (UTC) of this run
+//   "status":    "ok"                 position read
+//                "not_configured"     -c given, indigo_mount empty, no -m
+//                "disconnected"       mount known to the server, not connected
+//                "no_response"        mount not found / no coordinates
+//                "server_unreachable" no connection to the INDIGO server
+// Exit status: 0 ok or not configured, 2 mount not available (disconnected,
+// no response; the systemd service counts this as success), 1 other errors
+// (server unreachable, bad arguments, output file).
+//
 // Usage: indigo_mount_position [-c <config>] [-h <server>] [-p <port>] [-m <mount_name>] [-t <secs>] [-l] [-j] [-o <file>]
 //   -c / --config      <file>        allsky360 config.ini (sets indigo_server, indigo_port, indigo_mount)
 //   -h / --host        <server>     - hostname or IP of the INDIGO server
@@ -45,6 +63,7 @@
 #include <string.h>
 #include <math.h>
 #include <limits.h>
+#include <time.h>
 #if defined(INDIGO_LINUX) || defined(INDIGO_MACOS)
 #include <unistd.h>
 #include <getopt.h>
@@ -81,6 +100,10 @@ static bool g_pier_east        = false; /* true = EAST, false = WEST */
 
 static bool g_got_tracking     = false;
 static bool g_tracking_on      = false; /* true = ON, false = OFF */
+
+/* CONNECTION property of the mount: without a connection the driver does not
+ * define the coordinate properties, so there is nothing to wait for */
+static bool g_mount_disconnected = false;
 
 /* List-mode: collect mount device names */
 static bool g_list_mode = false;
@@ -153,7 +176,9 @@ static void process_property(indigo_property *property) {
 			indigo_item *iface = indigo_get_item(property, INFO_DEVICE_INTERFACE_ITEM_NAME);
 			if (iface) {
 				long bits = atol(iface->text.value);
-				if (bits & INDIGO_INTERFACE_MOUNT)
+				/* Agents (e.g. "Mount Agent") report the mount interface
+				 * too, but they are not mounts */
+				if ((bits & INDIGO_INTERFACE_MOUNT) && !(bits & INDIGO_INTERFACE_AGENT))
 					collect_mount(property->device);
 			}
 		}
@@ -163,7 +188,14 @@ static void process_property(indigo_property *property) {
 	if (strcmp(property->device, g_mount_name) != 0)
 		return;
 
-	if (strcmp(property->name, MOUNT_EQUATORIAL_COORDINATES_PROPERTY_NAME) == 0) {
+	if (strcmp(property->name, CONNECTION_PROPERTY_NAME) == 0) {
+		/* BUSY = another client is just connecting: keep waiting */
+		g_mount_disconnected = property->state != INDIGO_BUSY_STATE &&
+		                       !indigo_get_switch(property, CONNECTION_CONNECTED_ITEM_NAME);
+		if (g_mount_disconnected)
+			g_finished = true;
+		return;
+	} else if (strcmp(property->name, MOUNT_EQUATORIAL_COORDINATES_PROPERTY_NAME) == 0) {
 		indigo_item *ra_item  = indigo_get_item(property, MOUNT_EQUATORIAL_COORDINATES_RA_ITEM_NAME);
 		indigo_item *dec_item = indigo_get_item(property, MOUNT_EQUATORIAL_COORDINATES_DEC_ITEM_NAME);
 		if (ra_item && dec_item) {
@@ -235,7 +267,8 @@ static indigo_client g_client = {
 static void parse_config_file(const char *path,
                                char *srv_buf, int srv_size,
                                int  *port_out,
-                               char *mnt_buf, int mnt_size) {
+                               char *mnt_buf, int mnt_size,
+                               bool *mnt_set) {
 	FILE *f = fopen(path, "r");
 	if (!f) {
 		fprintf(stderr, "Warning: cannot open config file: %s\n", path);
@@ -269,12 +302,50 @@ static void parse_config_file(const char *path,
 			snprintf(srv_buf, srv_size, "%s", val);
 		else if (strcmp(key, "indigo_port") == 0 && atoi(val) > 0)
 			*port_out = atoi(val);
-		else if (strcmp(key, "indigo_mount") == 0 && *val)
+		else if (strcmp(key, "indigo_mount") == 0 && *val) {
 			snprintf(mnt_buf, mnt_size, "%s", val);
+			*mnt_set = true;
+		}
 		else if (strcmp(key, "indigo_servername") == 0 && *val)
 			snprintf(g_server_name, sizeof(g_server_name), "%s", val);
 	}
 	fclose(f);
+}
+
+/* ------------------------------------------------------------------ */
+/* Status file without a position (-o only)                            */
+/* ------------------------------------------------------------------ */
+
+/* Writes {"timestamp","status","mount",...: null} atomically to path, so the
+ * web page replaces the last position instead of showing it as current */
+static int write_status_file(const char *path, const char *status, time_t now) {
+	char tmp[PATH_MAX];
+	snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+	FILE *f = fopen(tmp, "w");
+	if (!f) {
+		fprintf(stderr, "Error: cannot open output file: %s\n", tmp);
+		return -1;
+	}
+	char esc_mount[512];
+	json_escape(g_mount_name, esc_mount, sizeof(esc_mount));
+	fprintf(f, "{\n");
+	fprintf(f, "  \"timestamp\": %lld,\n", (long long)now);
+	fprintf(f, "  \"status\": \"%s\",\n", status);
+	if (strcmp(status, "not_configured") == 0)
+		fprintf(f, "  \"mount\": null,\n");
+	else
+		fprintf(f, "  \"mount\": \"%s\",\n", esc_mount);
+	fprintf(f, "  \"equatorial\": null,\n");
+	fprintf(f, "  \"horizontal\": null,\n");
+	fprintf(f, "  \"side_of_pier\": null,\n");
+	fprintf(f, "  \"tracking\": null\n");
+	fprintf(f, "}\n");
+	if (fclose(f) != 0 || rename(tmp, path) != 0) {
+		fprintf(stderr, "Error: cannot write %s\n", path);
+		remove(tmp);
+		return -1;
+	}
+	return 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -364,8 +435,9 @@ int main(int argc, const char *argv[]) {
 	int port = 7624;
 
 	/* Apply config file values as defaults (CLI args override below) */
+	bool mount_configured = false;
 	if (config_path) {
-		parse_config_file(config_path, srv_buf, sizeof(srv_buf), &port, g_mount_name, sizeof(g_mount_name));
+		parse_config_file(config_path, srv_buf, sizeof(srv_buf), &port, g_mount_name, sizeof(g_mount_name), &mount_configured);
 	}
 
 	/* CLI args override config file */
@@ -382,6 +454,17 @@ int main(int argc, const char *argv[]) {
 		return 1;
 	}
 
+	time_t now = time(NULL);
+
+	/* indigo_mount empty in config.ini = no mount: nothing to ask, and no
+	 * failed service run every minute */
+	if (config_path && !mount_configured && !cli_mount && !g_list_mode) {
+		fprintf(stderr, "No mount configured (indigo_mount is empty in %s)\n", config_path);
+		if (output_path && write_status_file(output_path, "not_configured", now) != 0)
+			return 1;
+		return 0;
+	}
+
 	indigo_set_log_level(INDIGO_LOG_DEBUG);
 	if (indigo_start() != INDIGO_OK) {
 		fprintf(stderr, "Failed to start INDIGO.\n");
@@ -396,8 +479,15 @@ int main(int argc, const char *argv[]) {
 		fprintf(stderr, "Failed to connect to %s:%d (rc=%d)\n", server, port, rc);
 		indigo_detach_client(&g_client);
 		indigo_stop();
+		if (output_path && !g_list_mode)
+			write_status_file(output_path, "server_unreachable", now);
 		return 1;
 	}
+
+	/* indigo_connect_server() returns before the TCP connection is up and
+	 * does not report a refused connection: the server was reachable if
+	 * connection_state was true at some point while waiting */
+	bool server_answered = false;
 
 	if (g_list_mode) {
 		/* Collect INFO properties from all devices for 3 seconds */
@@ -409,7 +499,11 @@ int main(int argc, const char *argv[]) {
 		while (!g_finished && timeout_ms > 0) {
 			indigo_usleep(100000); /* 100 ms */
 			timeout_ms -= 100;
+			if (connection_state)
+				server_answered = true;
 		}
+		if (connection_state || g_finished)
+			server_answered = true;
 
 		/* Once equatorial coords are in, wait briefly for the optional
 		   properties: horizontal, side-of-pier, tracking (max 1 s) */
@@ -424,6 +518,11 @@ int main(int argc, const char *argv[]) {
 	}
 
 	indigo_disconnect_server(server_entry);
+	/* The disconnect is asynchronous: wait (max. 2 s) until the server
+	 * device is gone, otherwise indigo_stop() complains that it is still
+	 * attached */
+	for (int i = 0; i < 20 && connection_state; i++)
+		indigo_usleep(100000);
 	indigo_detach_client(&g_client);
 	indigo_stop();
 
@@ -472,14 +571,29 @@ int main(int argc, const char *argv[]) {
 	}
 
 	if (!g_got_equatorial) {
-		fprintf(stderr, "Error: no response from mount \"%s\" on %s:%d\n",
-		        g_mount_name, server, port);
-		fprintf(stderr, "Tip: use -l / --list-mounts to see available mount names.\n");
+		const char *status;
+		int ret = 2;
+		if (g_mount_disconnected) {
+			status = "disconnected";
+			fprintf(stderr, "Mount \"%s\" on %s:%d is not connected (no client has connected it)\n",
+			        g_mount_name, server, port);
+		} else if (!server_answered) {
+			status = "server_unreachable";
+			ret = 1;
+			fprintf(stderr, "Error: INDIGO server %s:%d not reachable\n", server, port);
+		} else {
+			status = "no_response";
+			fprintf(stderr, "Error: no response from mount \"%s\" on %s:%d\n",
+			        g_mount_name, server, port);
+			fprintf(stderr, "Tip: list the mount names with indigo_cameras -h %s -p %d -M\n", server, port);
+		}
 		if (out_fp != stdout) {
 			fclose(out_fp);
-			remove(output_tmp); /* no stale .tmp files from periodic runs */
+			remove(output_tmp);
+			if (write_status_file(output_path, status, now) != 0)
+				return 1;
 		}
-		return 2;
+		return ret;
 	}
 
 	char ra_str[32], dec_str[32];
@@ -491,6 +605,8 @@ int main(int argc, const char *argv[]) {
 		json_escape(g_mount_name, esc_mount, sizeof(esc_mount));
 		json_escape(dec_str, esc_dec, sizeof(esc_dec));
 		OUTF("{\n");
+		OUTF("  \"timestamp\": %lld,\n", (long long)now);
+		OUTF("  \"status\": \"ok\",\n");
 		OUTF("  \"mount\": \"%s\",\n", esc_mount);
 		OUTF("  \"equatorial\": {\n");
 		OUTF("    \"ra_h\": %.8f,\n", g_ra);

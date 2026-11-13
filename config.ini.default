@@ -116,8 +116,12 @@ indigo_servername=indigo_server
 #   /opt/allsky360/bin/indigo_cameras -h <indigo_server> -l
 # or let ./install.sh pick it.
 indigo_camera="Uranus-C @ indigo_server"
-# Name of the Indigo mount device (leave empty if no mount is connected)
-#   /opt/allsky360/bin/indigo_mount_position -c /home/allskyuser/config.ini -l
+# Name of the Indigo mount device (leave empty if no mount is connected).
+# List the mounts with
+#   /opt/allsky360/bin/indigo_cameras -h <indigo_server> -M
+# The mount position is only read, never changed: another client (e.g. AIN,
+# KStars) can use the mount at the same time, but some client must have
+# connected it, otherwise mount.json reports "disconnected".
 indigo_mount=
 indigo_capture_timeout=30
 

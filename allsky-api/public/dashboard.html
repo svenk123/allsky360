@@ -859,25 +859,69 @@
     }
     // mount.json is only fetched while the "Mount" checkbox is on: without a
     // configured mount the file does not exist and every request is a 404.
+    // allsky360-mount-position.timer rewrites it every minute, also without a
+    // position ("status" != "ok"); older than this = the timer has stopped.
+    const MOUNT_MAX_AGE_S = 180;
+    const MOUNT_STATUS_TEXT = {
+      disconnected:       'Not connected',
+      no_response:        'No response',
+      server_unreachable: 'INDIGO server unreachable',
+    };
+    let mountAgeS = null;   // age of mount.json when it was fetched
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    }
+
     async function loadMountData() {
       if (!showMountPosition) return;
-      let data = null;
+      let data = null, age = null;
       try {
         const resp = await fetch('mount.json', { cache: "no-cache" });
         data = resp.ok ? await resp.json() : null;
+        // Age against the server clock (Date header): the browser clock
+        // can be off
+        const serverMs = Date.parse(resp.headers.get('Date'));
+        const nowS = (Number.isFinite(serverMs) ? serverMs : Date.now()) / 1000;
+        if (data && Number.isFinite(data.timestamp)) age = nowS - data.timestamp;
       } catch { data = null; }
       if (!showMountPosition) return;   // switched off while the request was running
       mountData = data;
+      mountAgeS = age;
       updateMountWidget();
       updateAllskyOverlay();
+    }
+
+    // null = position usable, otherwise the reason why not. A file without
+    // timestamp is from before the status field and counts as stale.
+    function mountProblem() {
+      if (!mountData) return 'No data';
+      if (mountAgeS == null || mountAgeS > MOUNT_MAX_AGE_S) {
+        return Number.isFinite(mountData.timestamp)
+          ? `No data since ${formatClock(mountData.timestamp)}`
+          : 'No current data';
+      }
+      if (mountData.status !== 'ok' || !mountData.equatorial)
+        return MOUNT_STATUS_TEXT[mountData.status] || 'Not available';
+      return null;
     }
 
     function updateMountWidget() {
       const card = document.getElementById('mount-card');
       const el   = document.getElementById('mount-widget');
       if (!el) return;
-      if (!mountData) {
+      if (!mountData || mountData.status === 'not_configured') {
         if (card) card.style.display = 'none';
+        return;
+      }
+      const problem = mountProblem();
+      if (problem) {
+        el.innerHTML = `<div class="metadata-section">
+          <h2>Mount</h2>
+          ${mountData.mount ? `<div>Name <span>${escapeHtml(mountData.mount)}</span></div>` : ''}
+          <div>Status <span style="color:#f87171">${escapeHtml(problem)}</span></div>
+        </div>`;
+        if (card) card.style.display = '';
         return;
       }
       const eq = mountData.equatorial || {};
@@ -905,7 +949,7 @@
       const pierLabel     = mountData.side_of_pier || '—';
       el.innerHTML = `<div class="metadata-section">
         <h2>Mount</h2>
-        ${mountData.mount ? `<div>Name <span>${mountData.mount}</span></div>` : ''}
+        ${mountData.mount ? `<div>Name <span>${escapeHtml(mountData.mount)}</span></div>` : ''}
         ${raH  != null ? `<div>RA  <span>${raToHMS(raH)}</span></div>` : ''}
         ${decD != null ? `<div>Dec <span>${decToDMS(decD)}</span></div>` : ''}
         ${altD != null ? `<div>Alt <span>${altD.toFixed(2)}°</span></div>` : ''}
@@ -1533,7 +1577,7 @@
         drawHorizontalPOI(ctx, "Moon", moon.azimuth, apparentAltitude(moon.altitude), "lightgray", 12);
       }
 
-      if (showMountPosition && mountData && mountData.equatorial) {
+      if (showMountPosition && mountData && !mountProblem()) {
         const raDeg  = mountData.equatorial.ra_h * 15;
         const decDeg = mountData.equatorial.dec_deg;
         const { azimuth, altitude } = raDecToAzAlt(raDeg, decDeg, latitude, longitude, imageTimestamp);

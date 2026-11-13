@@ -11,6 +11,10 @@ ExecStart=/opt/allsky360/bin/indigo_mount_position \
     -c /home/allskyuser/config.ini \
     -j \
     -o /opt/allsky360/allsky-api/public/mount.json
+# 2 = mount switched off / not connected: mount.json then says so ("status"),
+# not a failure of the service every minute. 1 (INDIGO server unreachable,
+# bad config) still fails.
+SuccessExitStatus=2
 
 # --- Sandbox (review.md, SEC-09) ------------------------------------------
 # Fetch tool: needs network, reads config.ini, writes only the paths below.
