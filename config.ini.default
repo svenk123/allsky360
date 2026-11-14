@@ -424,8 +424,6 @@ saturation=2.0
 # default = 0.8, 0.0 = disabled
 dehaze_amount=0.0
 dehaze_estimate=0.01
-dehaze_gamma=0.6
-dehaze_saturation=1.2
 
 # Clarity Filter
 ################
@@ -435,11 +433,6 @@ clarity_filter_radius=24
 clarity_filter_midtone_width=0.25
 clarity_filter_preserve_highlights=1
 clarity_filter_mask_mode=1
-
-# Automatic color calibration and background neutralization
-###########################################################
-# Set auto_color_calibration_area=0.0 to disable
-auto_color_calibration_area=80.0
 
 # Wavelet Sharpening
 ####################

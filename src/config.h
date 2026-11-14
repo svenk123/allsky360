@@ -112,8 +112,6 @@ typedef struct {
 
     double dehaze_amount;
     double dehaze_estimate;
-    double dehaze_gamma;
-    double dehaze_saturation;
 
     int clarity_filter;
     double clarity_filter_strength;
@@ -122,7 +120,6 @@ typedef struct {
     int clarity_filter_preserve_highlights;
     int clarity_filter_mask_mode;
 
-    double auto_color_calibration_area;
 
     int scnr_filter;
     double scnr_filter_amount;

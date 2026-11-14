@@ -168,8 +168,6 @@ int load_config(const char *filename, config_t *config) {
 
   config->dehaze_amount = 0.8;
   config->dehaze_estimate = 0.01;
-  config->dehaze_gamma = 1.0;
-  config->dehaze_saturation = 1.2;
 
   config->clarity_filter = 1;
   config->clarity_filter_strength = 0.5;
@@ -178,7 +176,6 @@ int load_config(const char *filename, config_t *config) {
   config->clarity_filter_preserve_highlights = 1;
   config->clarity_filter_mask_mode = 0;
 
-  config->auto_color_calibration_area = 80.0;
 
 
   config->scnr_filter = 1;
@@ -505,10 +502,6 @@ int load_config(const char *filename, config_t *config) {
         config->dehaze_amount = atof(value);
       else if (strcmp(key, "dehaze_estimate") == 0)
         config->dehaze_estimate = atof(value);
-      else if (strcmp(key, "dehaze_gamma") == 0)
-        config->dehaze_gamma = atof(value);
-      else if (strcmp(key, "dehaze_saturation") == 0)
-        config->dehaze_saturation = atof(value);
 
       else if (strcmp(key, "clarity_filter") == 0)
         config->clarity_filter = atoi(value);
@@ -523,8 +516,6 @@ int load_config(const char *filename, config_t *config) {
       else if (strcmp(key, "clarity_filter_mask_mode") == 0)
         config->clarity_filter_mask_mode = atoi(value);
 
-      else if (strcmp(key, "auto_color_calibration_area") == 0)
-        config->auto_color_calibration_area = atof(value);
 
 
       else if (strcmp(key, "scnr_filter") == 0)
@@ -554,6 +545,16 @@ int load_config(const char *filename, config_t *config) {
         config->sqm_center_x = atoi(value);
       else if (strcmp(key, "sqm_center_y") == 0)
         config->sqm_center_y = atoi(value);
+      /* Read but never used by the pipeline */
+      else if (strcmp(key, "dehaze_gamma") == 0 ||
+               strcmp(key, "dehaze_saturation") == 0 ||
+               strcmp(key, "auto_color_calibration_area") == 0) {
+        if (warn_unknown_keys)
+          fprintf(stderr,
+                  "NOTE: %s: '%s' is no longer used (it never had an effect "
+                  "on the image), remove it\n",
+                  filename, key);
+      }
       /* Never implemented (local histogram normalization / CLAHE) */
       else if (strncmp(key, "local_histogram_normalization", 29) == 0) {
         if (warn_unknown_keys)
@@ -972,8 +973,6 @@ int show_config(config_t *config) {
 
   printf("dehaze_amount: %.1f\n", config->dehaze_amount);
   printf("dehaze_estimate: %.2f\n", config->dehaze_estimate);
-  printf("dehaze_gamma: %.1f\n", config->dehaze_gamma);
-  printf("dehaze_saturation: %.1f\n", config->dehaze_saturation);
 
   printf("clarity_filter: %d (%s)\n", config->clarity_filter,
          config->clarity_filter == 1 ? "yes" : "no");
@@ -986,9 +985,6 @@ int show_config(config_t *config) {
          config->clarity_filter_preserve_highlights == 1 ? "yes" : "no");
   printf("clarity_filter_mask_mode: %d\n", config->clarity_filter_mask_mode);
 
-  printf("auto_color_calibration_area: %.1f%s\n",
-         config->auto_color_calibration_area,
-         config->auto_color_calibration_area == 0.0 ? " (off)" : " ");
 
 
   printf("scnr_filter: %d (%s)\n", config->scnr_filter,
@@ -1309,10 +1305,6 @@ int config_to_json(const char *filename, const config_t *config) {
                          json_object_new_double(config->dehaze_amount));
   json_object_object_add(jroot, "dehaze_estimate",
                          json_object_new_double(config->dehaze_estimate));
-  json_object_object_add(jroot, "dehaze_gamma",
-                         json_object_new_double(config->dehaze_gamma));
-  json_object_object_add(jroot, "dehaze_saturation",
-                         json_object_new_double(config->dehaze_saturation));
   json_object_object_add(jroot, "clarity_filter",
                          json_object_new_int(config->clarity_filter));
   json_object_object_add(
@@ -1328,9 +1320,6 @@ int config_to_json(const char *filename, const config_t *config) {
       json_object_new_int(config->clarity_filter_preserve_highlights));
   json_object_object_add(jroot, "clarity_filter_mask_mode",
                          json_object_new_int(config->clarity_filter_mask_mode));
-  json_object_object_add(
-      jroot, "auto_color_calibration_area",
-      json_object_new_double(config->auto_color_calibration_area));
   json_object_object_add(jroot, "scnr_filter",
                          json_object_new_int(config->scnr_filter));
   json_object_object_add(jroot, "scnr_filter_amount",
