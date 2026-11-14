@@ -4,7 +4,7 @@ Description=Allsky360 RS485/Modbus sensors (wind every 10 s, a reading every 5 m
 [Service]
 # Runs continuously: anemometer and wind vane are sampled every
 # modbus_wind_sample_interval seconds into a ring buffer in RAM, one row per modbus_interval goes to the database (see
-# TOOLS.md). Replaces the former allsky360-sensors.timer.
+# docs/TOOLS.md). Replaces the former allsky360-sensors.timer.
 Type=simple
 User=allskyuser
 Group=allskygroup

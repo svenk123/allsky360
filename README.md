@@ -70,7 +70,7 @@ an RS485 adapter, a mount with INDIGO driver, an ADS-B receiver.
 ## Quick start
 
 1. **Install and start the INDIGO server** – see
-   [INSTALL.md](INSTALL.md#installing-the-indigo-server). Clone INDIGO
+   [INSTALL.md](docs/INSTALL.md#installing-the-indigo-server). Clone INDIGO
    next to allsky360 (`~/indigo` and `~/allsky360`).
 2. **Install Allsky360:**
 
@@ -87,14 +87,14 @@ an RS485 adapter, a mount with INDIGO driver, an ADS-B receiver.
 4. **Check that everything runs:** the *System Status* page shows all services;
    `journalctl -u allsky360-camera -f` shows the live log of the camera.
 
-Details, options and the manual installation: [INSTALL.md](INSTALL.md).
+Details, options and the manual installation: [INSTALL.md](docs/INSTALL.md).
 
 ---
 
 ## After the installation
 
 The first image usually looks right with the defaults. To get the most out of
-your station, follow **[GETTING_STARTED.md](GETTING_STARTED.md)** – step by
+your station, follow **[GETTING_STARTED.md](docs/GETTING_STARTED.md)** – step by
 step, with a check after every step:
 
 1. Check the services and the first image
@@ -107,7 +107,7 @@ step, with a check after every step:
 7. Optional modules: sensors, mount, AI
 
 All settings are in `/home/allskyuser/config.ini`; changes take effect with
-the next image. Every key is listed in [CONFIGURATION.md](CONFIGURATION.md).
+the next image. Every key is listed in [CONFIGURATION.md](docs/CONFIGURATION.md).
 
 ---
 
@@ -117,36 +117,36 @@ the next image. Every key is listed in [CONFIGURATION.md](CONFIGURATION.md).
 
 | Document | Content |
 |---|---|
-| [INSTALL.md](INSTALL.md) | Installation: INDIGO, `install.sh`, manual build, API token, AI |
-| [GETTING_STARTED.md](GETTING_STARTED.md) | From the first image to a calibrated station |
-| [WEB_INTERFACE.md](WEB_INTERFACE.md) | All pages of the web interface |
+| [INSTALL.md](docs/INSTALL.md) | Installation: INDIGO, `install.sh`, manual build, API token, AI |
+| [GETTING_STARTED.md](docs/GETTING_STARTED.md) | From the first image to a calibrated station |
+| [WEB_INTERFACE.md](docs/WEB_INTERFACE.md) | All pages of the web interface |
 
 **Configuration**
 
 | Document | Content |
 |---|---|
-| [CONFIGURATION.md](CONFIGURATION.md) | Every `config.ini` key at a glance |
-| [GENERAL_SETTINGS.md](GENERAL_SETTINGS.md) | Location, time zone, capture interval |
-| [INDIGO_SETTINGS.md](INDIGO_SETTINGS.md) | INDIGO server, camera and mount selection |
-| [CAMERA_SETTINGS.md](CAMERA_SETTINGS.md) | Exposure, gain, debayering, binning |
-| [DAYTIME_NIGHTTIME_SETTINGS.md](DAYTIME_NIGHTTIME_SETTINGS.md) | Day and night mode, auto-exposure, white balance |
-| [HDR-FUSION.md](HDR-FUSION.md) | How the HDR exposures are captured and fused |
-| [POSTPROCESSING.md](POSTPROCESSING.md) | The image processing pipeline and its settings |
+| [CONFIGURATION.md](docs/CONFIGURATION.md) | Every `config.ini` key at a glance |
+| [GENERAL_SETTINGS.md](docs/GENERAL_SETTINGS.md) | Location, time zone, capture interval |
+| [INDIGO_SETTINGS.md](docs/INDIGO_SETTINGS.md) | INDIGO server, camera and mount selection |
+| [CAMERA_SETTINGS.md](docs/CAMERA_SETTINGS.md) | Exposure, gain, debayering, binning |
+| [DAYTIME_NIGHTTIME_SETTINGS.md](docs/DAYTIME_NIGHTTIME_SETTINGS.md) | Day and night mode, auto-exposure, white balance |
+| [HDR-FUSION.md](docs/HDR-FUSION.md) | How the HDR exposures are captured and fused |
+| [POSTPROCESSING.md](docs/POSTPROCESSING.md) | The image processing pipeline and its settings |
 
 **Optional hardware**
 
 | Document | Content |
 |---|---|
-| [SENSORS.md](SENSORS.md) | RS485 weather sensors: wiring, addresses, setup |
+| [SENSORS.md](docs/SENSORS.md) | RS485 weather sensors: wiring, addresses, setup |
 
 **Reference**
 
 | Document | Content |
 |---|---|
-| [TOOLS.md](TOOLS.md) | Companion tools: meteo, aurora, timelapse, keogram, star trails, mount position, sensors |
-| [API.md](API.md) | REST API of the web server |
-| [CHANGELOG.md](CHANGELOG.md) | What has changed |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
+| [TOOLS.md](docs/TOOLS.md) | Companion tools: meteo, aurora, timelapse, keogram, star trails, mount position, sensors |
+| [API.md](docs/API.md) | REST API of the web server |
+| [CHANGELOG.md](docs/CHANGELOG.md) | What has changed |
+| [CONTRIBUTING.md](docs/CONTRIBUTING.md) | How to contribute |
 
 ---
 

@@ -9,7 +9,7 @@
 #   ./install.sh --help            all options
 #
 # The script only orchestrates the Makefile targets; everything it does can
-# also be done by hand, see INSTALL.md.
+# also be done by hand, see docs/INSTALL.md.
 #
 # Copyright (c) 2025 Sven Kreiensen
 #
@@ -332,7 +332,7 @@ preflight() {
         echo
         echo "  The INDIGO source tree with a finished build is needed (headers,"
         echo "  libindigo and the bundled libjpeg.a). Not found in: $INDIGO_ROOT"
-        echo "  Build INDIGO first (INSTALL.md, Part 1), then run:"
+        echo "  Build INDIGO first (docs/INSTALL.md, Part 1), then run:"
         echo "    sudo ./install.sh --indigo-root /path/to/indigo"
         die "INDIGO not found"
     fi

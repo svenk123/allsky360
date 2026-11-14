@@ -6,7 +6,7 @@ All settings of Allsky360 are in one file:
 /home/allskyuser/config.ini
 ```
 
-`make install` creates it from [`config.ini.default`](config.ini.default) and
+`make install` creates it from [`config.ini.default`](../config.ini.default) and
 never overwrites it later. `sudo ./install.sh --configure` sets the most
 important keys (location, INDIGO, camera, mount, sensors, API token)
 interactively.

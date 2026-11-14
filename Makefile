@@ -776,7 +776,7 @@ install:
 	    echo ""; \
 	    echo "NOTE: api-token in $(CONFIG_DIR)/config.ini is empty."; \
 	    echo "      The Start/Stop/Restart buttons of the web UI stay disabled until you set one."; \
-	    echo "      See INSTALL.md, 'Step 4: Set the API token'."; \
+	    echo "      See docs/INSTALL.md, 'Step 4: Set the API token'."; \
 	fi
 	@disabled=""; \
 	for unit in $(START_MANUALLY_UNITS); do \

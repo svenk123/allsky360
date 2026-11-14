@@ -99,7 +99,7 @@ api-bind=0.0.0.0
 # - The token is only read by the API; it is never written to config.json.
 # - Without TLS the token travels in clear text through the LAN - see
 #   api-bind above for running the API behind an HTTPS reverse proxy.
-# Details: INSTALL.md ("Step 4: Set the API token") and API.md.
+# Details: docs/INSTALL.md ("Step 4: Set the API token") and docs/API.md.
 api-token=
 
 # Indigo Server settings - EDIT BEFORE STARTING THE SERVICES

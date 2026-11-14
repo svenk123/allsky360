@@ -73,7 +73,7 @@ Thank you for helping us keep everything clean and focused!
 
 ## License
 
-By submitting a contribution, you agree that your code will be licensed under the same license as this project (see [LICENSE.md](LICENSE.md)).
+By submitting a contribution, you agree that your code will be licensed under the same license as this project (see [LICENSE.md](../LICENSE.md)).
 
 ---
 
