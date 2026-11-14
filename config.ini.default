@@ -132,7 +132,9 @@ indigo_capture_timeout=30
 # A sensor address of 0 disables that sensor; with all addresses 0 the tool
 # does nothing. Example addresses of the reference station:
 #   weather sensor 5, anemometer 11, wind vane 12, control cabinet 13
-# Find the addresses on the bus with examples/modbus-scan.
+# The address is set in the sensor (see its manual; many ship with address 1,
+# so give every sensor on the bus its own address first). Check the result
+# with: allsky360-sensors -c config.ini -n -v
 ######################
 # Serial port and RS485 transceiver
 modbus_device=/dev/ttyTHS1

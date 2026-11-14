@@ -691,6 +691,7 @@ configured sensor answered, `1` configuration, bus or database error.
 | `wind_speed`, `wind_direction` | m/s, ° | anemometer, wind vane |
 | `cabinet_temperature`, `cabinet_humidity`, `cabinet_dew_point` | °C, %RH, °C | control cabinet sensor |
 
-The register maps are taken from the stand-alone test programs in
-`examples/` (weather-sensor, wind-speed, wind-direction, temp-humidity-sensor).
+The register maps follow the manuals of the sensors listed above. Other
+sensors with a different register layout need a change in
+`tools/sensors/src/main.c`.
 

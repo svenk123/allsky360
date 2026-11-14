@@ -65,7 +65,7 @@
 #define MIN_DIRECTION_SECONDS 30
 
 /* Register layout of the weather sensor, offsets from modbus_weather_register
- * (DFRobot SEN0658 / HLS-UWS-SDTHA, see examples/weather-sensor) */
+ * (DFRobot SEN0658 / HLS-UWS-SDTHA, register map from its manual) */
 #define WS_WIND_SPEED 0    /* / 10 = m/s */
 #define WS_WIND_DIR_DEG 3  /* 0..360 deg */
 #define WS_HUMIDITY 4      /* / 10 = %RH */
