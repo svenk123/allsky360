@@ -659,6 +659,14 @@ with HTTP 403.
 | `/images/{YYYYMMDD}/panorama-{datetime}.jpg`           | Horizon panorama image             |
 | `/images/{YYYYMMDD}/thumbnails/image-{datetime}.jpg`   | Reduced-size thumbnail             |
 | `/videos/{name}_{YYYYMMDD}.mp4`                        | Timelapse video                    |
+| `/latest_meteo_data.json`                              | Latest Open-Meteo values (`allsky360-meteo`) |
+| `/forecast_meteo.json`                                 | 24 h Open-Meteo forecast (`allsky360-meteo`) |
+| `/latest_aurora_data.json`                             | Latest aurora and solar wind values (`allsky360-aurora`) |
+| `/latest_sensor_data.json`                             | Latest RS485 sensor reading and the configured sensors (`allsky360-sensors`) |
+| `/mount.json`                                          | Mount position with `status` and `timestamp` (`allsky360-mount-position`) |
+
+These JSON files are written into `public/` by the tools named in brackets;
+they do not exist until the tool has run once.
 
 ---
 

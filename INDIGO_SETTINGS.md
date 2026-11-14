@@ -1,63 +1,113 @@
 # INDIGO Server Settings
 
-These parameters tell allsky360 how to connect to your INDIGO server and which camera to use. INDIGO is the astronomy device framework that handles communication with your camera hardware.
+Allsky360 does not talk to the camera directly. It connects to an
+[INDIGO](https://github.com/indigo-astronomy/indigo) server, which runs the
+camera driver. These keys tell Allsky360 where the server is and which camera
+(and optionally which mount) to use.
 
-If you're running the INDIGO server on the same machine as allsky360, you can usually leave most of these at their defaults. If your camera is connected to a different computer, you'll need to adjust the server address.
+The server can run on the same computer (`127.0.0.1`) or on another computer
+in the network. `sudo ./install.sh --configure` asks for the server and lets
+you pick camera and mount from the list the server reports.
 
-## Server Connection
+| Key | Example | Meaning |
+|---|---|---|
+| `indigo_server` | `127.0.0.1` | IP address or host name of the INDIGO server |
+| `indigo_port` | `7624` | TCP port of the server |
+| `indigo_servername` | `indigo_server` | Name under which Allsky360 connects; part of every device name |
+| `indigo_camera` | `"Uranus-C @ indigo_server"` | Camera device |
+| `indigo_mount` | empty | Mount device (optional) |
+| `indigo_capture_timeout` | `30` | Extra seconds to wait for an image after the exposure time |
+
+---
+
+## Server connection
 
 ### indigo_server
 
-The IP address or hostname where your INDIGO server is running. This can be either a local address (like `127.0.0.1` or `localhost`) or a remote address on your network (like `192.168.1.100`).
-
-The default is `127.0.0.1`, which means the server is running on the same machine. If your camera is connected to a different computer, you'll need to change this to that computer's IP address.
-
-For example, if your INDIGO server is running on a Raspberry Pi at IP address `192.168.3.61`, you'd set this to `192.168.3.61`. You can also use a hostname if your network supports it, like `raspberry-pi.local` – but IP addresses are usually more reliable.
+IP address or host name of the INDIGO server. Default `127.0.0.1` (same
+computer). For a server elsewhere in the network use its address, e.g.
+`192.168.3.61`. A fixed IP address is more reliable than a `.local` name.
 
 ### indigo_port
 
-The network port number that your INDIGO server is listening on. The default is `7624`, which is the standard INDIGO port. You probably won't need to change this unless you've configured your INDIGO server to use a different port.
+TCP port of the server. INDIGO uses `7624` unless you changed it. If the
+server runs on another computer, its firewall must allow this port.
 
-If you're not sure what port to use, check your INDIGO server configuration. Most installations use 7624, so unless you've changed it, stick with the default.
+### indigo_servername
 
-## Camera Selection
+INDIGO reports every device of a remote server as
+`<device name> @ <server name>`, and the server name is the name Allsky360
+uses for the connection. That is this key. `indigo_camera` and
+`indigo_mount` must therefore end with ` @ ` plus exactly this value.
+
+Default `indigo_server`. You only need to change it if you have several
+INDIGO servers; then change the device names accordingly.
+
+---
+
+## Devices
 
 ### indigo_camera
 
-The exact name of the camera device as it appears in INDIGO. This needs to match exactly what INDIGO reports, including any network location information.
+The camera device, exactly as INDIGO reports it, including the
+` @ <indigo_servername>` suffix. The name is case-sensitive; put it in quotes.
 
-The default is `"Uranus-C @ localhost"`, but your camera name will be different. To find the correct name, run `/opt/allsky360/bin/indigo_cameras -h localhost -l` (tool `tools/indigo-cameras`), or check the INDIGO control panel.
+List the cameras of the server:
 
-Camera names in INDIGO typically include the camera model and where it's connected. For example:
-- `"Uranus-C @ 192.168.3.61"` – a Player-One Uranus-C connected via network
-- `"ASI294MC Pro @ localhost"` – a ZWO camera connected locally
-- `"QHY268M @ indigoserver.net"` – a QHY camera connected via network
+```bash
+/opt/allsky360/bin/indigo_cameras -h 127.0.0.1 -l
+```
 
-The name is case-sensitive and must be in quotes if it contains spaces or special characters. If you get connection errors, double-check that the name matches exactly what INDIGO shows – even small differences like extra spaces will cause problems.
+The list shows the names with ` @ indigo_server`; if you changed
+`indigo_servername`, replace that part.
 
-## Capture Timeout
+Examples:
+
+```ini
+indigo_camera="Uranus-C @ indigo_server"
+indigo_camera="ZWO ASI294MC Pro @ indigo_server"
+```
+
+### indigo_mount
+
+The mount device, if a telescope mount is connected to the same INDIGO server
+(empty = no mount). List the mounts with:
+
+```bash
+/opt/allsky360/bin/indigo_cameras -h 127.0.0.1 -M
+```
+
+The mount is **only read, never moved or connected**: the tool
+`allsky360-mount-position` reads its position once a minute into `mount.json`,
+and the dashboard shows it as an overlay (checkbox *Mount*). Another program
+(AIN, KStars, …) must have connected the mount; otherwise `mount.json` reports
+the status `disconnected`. Possible status values: `ok`, `not_configured`,
+`disconnected`, `no_response`, `server_unreachable`.
 
 ### indigo_capture_timeout
 
-The maximum time in seconds to wait for a single image capture to complete. If the camera doesn't finish capturing within this time, the capture is considered failed and the system will move on.
+How many seconds to wait **in addition to the exposure time** for an image to
+arrive. With a 60 s exposure and the value 30, the capture fails after 90 s.
+Default in `config.ini.default`: 30.
 
-The default is 20 seconds, which works well for most cameras and exposure times. For very long exposures (like 60 seconds or more), you'll want to increase this value. A good rule of thumb is to set it to at least 1.5 times your longest expected exposure time, plus a few seconds for overhead.
+The extra time covers the download from the camera and, for a remote server,
+the network transfer. 20 – 30 s is enough for USB cameras on the same
+computer; raise it for large sensors over a slow network.
 
-For example, if your maximum exposure is 60 seconds, setting `indigo_capture_timeout` to 90 or 100 seconds gives the system enough time to complete the capture and transfer the data.
+---
 
-On the other hand, if you're only doing short exposures (a few seconds), you can reduce this value to fail faster if something goes wrong. But honestly, leaving it at 20 or 30 seconds is usually fine – the timeout only matters if something actually goes wrong.
+## Troubleshooting
 
-## Practical Tips
+If the camera does not start, its log (`journalctl -u allsky360-camera -f`) shows what failed:
 
-When setting up a new camera, start by finding the correct camera name. Run `indigo_cameras -h <server> -l` or check your INDIGO control panel to see what cameras are available. Copy the exact name, including any network location information.
+1. **Server not reachable** – is the INDIGO server running
+   (`systemctl status indigo-server`)? Can you reach the address and port
+   (`nc -zv <server> 7624`)?
+2. **Camera not found** – compare `indigo_camera` with the output of
+   `indigo_cameras -l` character by character, including the ` @ …` suffix.
+3. **Capture timeouts** – raise `indigo_capture_timeout`. If timeouts keep
+   happening, check the USB cable and power supply of the camera and the
+   INDIGO server log.
 
-If you're having connection issues, check:
-1. Is the INDIGO server running? You can test this by trying to connect with the INDIGO control panel.
-2. Is the IP address correct? Try pinging the server address to make sure it's reachable.
-3. Is the camera name exactly right? Even small typos will prevent connection.
-4. Is the port correct? Most installations use 7624, but check your server config if you're not sure.
-
-For network-connected cameras, make sure the firewall allows connections on port 7624. Some Linux distributions block this by default.
-
-If captures are timing out, increase `indigo_capture_timeout`. But if you're consistently hitting timeouts, there might be a deeper issue – like network problems or the camera not responding properly. In that case, check your INDIGO server logs for more details.
-
+At start the camera service waits until the INDIGO server answers, so after
+a reboot the start order of the services does not matter.

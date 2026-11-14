@@ -34,15 +34,13 @@ Both the meteo and aurora tools use this value along with latitude to fetch loca
 
 ### location_altitude
 
-Your observing site's altitude above sea level in meters. This is used for atmospheric calculations and can affect how the system interprets sky brightness measurements.
-
-Most locations are between 0 and 2000 meters. If you're at a high-altitude site (above 2000m), you might notice slightly different behavior in the auto-exposure algorithm, since atmospheric extinction is reduced.
+Your observing site's altitude above sea level in meters. The meteo tool passes it to Open-Meteo as `elevation`, which corrects the air pressure, temperature and dew point for the height of your station. Without it Open-Meteo uses its own terrain model, which can be off by a few hundred meters (e.g. in valleys or on roofs).
 
 This is a simple integer value – just enter the altitude in meters. You can find your altitude using GPS, topographic maps, or online tools like Google Earth.
 
 ### location_city
 
-A descriptive name for your location. This is purely informational and appears in metadata and logs. It doesn't affect any calculations, but it's useful for keeping track of multiple installations or when reviewing logs later.
+A descriptive name for your location. This is purely informational and appears in the log at start. It doesn't affect any calculations, but it's useful for keeping track of multiple installations or when reviewing logs later.
 
 You can use any format you like – city name, city/country, or even a custom identifier. The value should be in quotes if it contains spaces or special characters.
 
@@ -50,7 +48,20 @@ Example: `"Musterstadt/Germany"` or `"My Observatory"`
 
 ### location_owner
 
-Your name or the name of the person/organization operating the camera. Like location_city, this is metadata only and doesn't affect functionality.
+Your name or the name of the person/organization operating the camera. Like location_city, this is informational only. It is never published through the web interface.
+
+### location_timezone
+
+The time zone of the station as an IANA name, e.g. `Europe/Berlin` or `America/New_York` (list: `timedatectl list-timezones`). Empty = the system time zone.
+
+It is only used for **display**: the time printed into the image (with the zone abbreviation, e.g. CET/CEST) and the local time on the web pages. Summer and winter time follow automatically. Everything that is stored – database timestamps, the daily folders `images/YYYYMMDD`, `database_YYYYMMDD.db`, file names – is always in **UTC**, so a wrong or changed time zone never mixes up the archive. The web pages can switch between station time and UTC (toggle in the header).
+
+### publish_exact_location
+
+The web interface publishes `config.json` without a login (`/api/config`), because the dashboard needs the coordinates for the sun, moon and star overlays. `location_owner`, the INDIGO server address and the API token are never included.
+
+- `1` (default): the exact coordinates are published.
+- `0`: the coordinates are rounded to about 1 km. Use this if the station is reachable from the internet and you don't want to show its exact position.
 
 Use quotes if the name contains spaces.
 

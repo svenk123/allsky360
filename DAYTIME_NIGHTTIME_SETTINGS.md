@@ -58,7 +58,7 @@ If you find your daytime images are too red, you can reduce this value (e.g., 0.
 
 ### daytime_move_blackpoint
 
-Enable or disable black point adjustment during daytime processing. Set to `1` to enable, `0` to disable.
+Black point adjustment during daytime processing. Any value above `0` enables it, `0` disables it.
 
 When enabled, the system automatically adjusts the black point (the darkest value in the image) to improve contrast and make the image look better. This is particularly useful for daytime images where you want good contrast in clouds and sky.
 
@@ -92,13 +92,11 @@ You typically don't need to change this unless you're working in very specific l
 
 ### daytime_hdr_exposure_factor
 
-The exposure factor used for HDR (High Dynamic Range) processing during daytime. The default is 2.0.
+The step between two HDR exposures by day, in **EV steps** (one EV halves the exposure time). The default is 2.0.
 
-HDR processing captures multiple exposures and combines them to capture a wider range of brightness levels. This is particularly useful for daytime images where you have both bright sky and darker foreground elements.
+When an exposure is over-exposed, the next one is shorter: frame *i* is exposed `t(0) / 2^(i × factor)`. With 2.0 every frame is four times shorter than the one before (e.g. 4 ms, 1 ms, 0.25 ms). By day the sun and bright clouds are the reason for the short frames.
 
-The exposure factor determines how much longer the second exposure should be compared to the base exposure. A factor of 2.0 means the second exposure is twice as long, which captures more detail in shadows while the first exposure captures highlights.
-
-Valid values are typically 1.0 (no HDR, just use the base exposure) or 2.0 (double the exposure for the second frame). Higher values like 3.0 or 4.0 are possible but usually create too much difference between exposures, making fusion difficult.
+1.0 – 2.0 gives the best results; larger values cover more brightness range with fewer frames, but the fusion has to bridge bigger steps. See [HDR-FUSION.md](HDR-FUSION.md).
 
 If HDR is disabled (`hdr=0`), this parameter has no effect.
 
@@ -108,17 +106,17 @@ If HDR is disabled (`hdr=0`), this parameter has no effect.
 
 The sun's altitude in degrees below the horizon at which the system switches from daytime to nighttime mode. The default is -6 degrees.
 
-This is the "astronomical twilight" threshold. When the sun is 6 degrees or more below the horizon, the system considers it nighttime and switches to nighttime capture settings.
+When the sun is lower than this altitude, the system uses the nighttime settings; when it rises above it, the daytime settings. -6 degrees is the end of civil twilight.
 
 You can adjust this to change when the day/night transition occurs:
 
-- **-6 degrees** (default): Astronomical twilight. The sky is quite dark, suitable for most astronomical imaging.
+- **-6 degrees** (default): End of civil twilight. The brightest stars are visible; the night settings (longer exposures, gain) are needed from here on.
 
-- **-12 degrees**: Very dark conditions. The system will wait longer before switching to night mode, ensuring the sky is fully dark.
+- **-12 degrees** (nautical twilight): The system stays longer in day mode. Only useful if the night settings over-expose the late twilight.
 
-- **-3 degrees**: Earlier transition. The system switches to night mode sooner, which might be useful if you want to start capturing earlier, but the sky will still have some twilight glow.
+- **-3 degrees**: Earlier transition, while the sky is still bright.
 
-The -6 degree default is a good compromise for most users. It's dark enough for good nighttime images while not waiting unnecessarily long after sunset.
+The -6 degree default is a good compromise for most users. The switch from night to day also starts the `endofnight_script` (timelapse, keogram, star trails of the past night). The SQM estimate does not depend on this setting: it is only computed when the first exposure is longer than 1 s and the image is dark.
 
 ### nighttime_startexposure
 
@@ -192,29 +190,30 @@ This parameter works the same way as the daytime version.
 
 ### nighttime_hdr_exposure_factor
 
-The exposure factor for HDR processing during nighttime. The default is 2.0, same as daytime.
+The step between two HDR exposures by night, in EV steps, like `daytime_hdr_exposure_factor`. The default is 2.0: with a 60 s first frame the next ones are 15 s, 3.75 s, 0.94 s and 0.23 s – short enough for the moon and lit clouds.
 
-HDR can be useful for nighttime images when you have both bright stars/planets and faint deep-sky objects or aurora. The 2.0 factor works well for most cases.
+At a dark, moonless night the first frame is usually not over-exposed, so only one frame is taken. See [HDR-FUSION.md](HDR-FUSION.md).
 
 If HDR is disabled (`hdr=0`), this parameter has no effect.
 
-### nighttime_measure_noise
-
-Enable or disable noise measurement during nighttime captures. Set to `1` to enable, `0` to disable. The default is `1` (enabled).
-
-When enabled, the system measures the noise level in a specific region of the image. This information is used by noise reduction algorithms and can help the system make better decisions about exposure and gain.
-
-Noise measurement is particularly useful at high gain settings where noise becomes significant. The measurement helps the system understand how much noise reduction is needed.
-
 ### nighttime_measure_noise_radius
 
-The radius in pixels of the region used for noise measurement. The default is 250 pixels.
+At night (and gain above 0) the background noise of every exposure is measured. The HDR fusion uses it to down-weight short exposures where they only contain noise (`hdr_noise_fusion_strength`), and the value is stored with the image (page *Camera → HDR*).
 
-This defines a circular area (centered on the image) where noise is measured. The region should be relatively uniform – typically a patch of sky without bright stars or other features.
+This key is the radius in pixels of the measured area. The default is 250 pixels.
+
+The area is a circle around the zenith (`image_zenith_x`/`image_zenith_y`). The region should be relatively uniform – typically a patch of sky without bright stars or other features.
 
 A radius of 250 pixels works well for most camera resolutions. For very high-resolution cameras, you might want to increase this (e.g., 300 or 400). For lower-resolution cameras, you could decrease it (e.g., 150 or 200).
 
 The important thing is that the measurement region contains a representative sample of the sky background, not bright stars or other features that would skew the noise measurement.
+
+### Other night-only processing
+
+Two filters only run at night and are described with the other filters in [POSTPROCESSING.md](POSTPROCESSING.md):
+
+- **SCNR** (`scnr_filter`, `scnr_filter_amount`, `scnr_filter_protection`) – removes the green cast of light pollution.
+- **Multiscale median filter** (`nighttime_multiscale_median_filter`, `nighttime_multiscale_median_filter_max_scale`, `nighttime_multiscale_median_filter_amount`) – removes fine noise and hot pixels at high gain.
 
 ## Practical Tips
 

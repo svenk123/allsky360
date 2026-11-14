@@ -85,7 +85,7 @@ an RS485 adapter, a mount with INDIGO driver, an ADS-B receiver.
    server, camera and mount. Nothing is started without your confirmation.
 3. **Open the web interface:** `http://<hostname>:3000/`
 4. **Check that everything runs:** the *System Status* page shows all services;
-   `make log` shows the live log of the camera.
+   `journalctl -u allsky360-camera -f` shows the live log of the camera.
 
 Details, options and the manual installation: [INSTALL.md](INSTALL.md).
 
@@ -94,40 +94,56 @@ Details, options and the manual installation: [INSTALL.md](INSTALL.md).
 ## After the installation
 
 The first image usually looks right with the defaults. To get the most out of
-your station, work through these points:
+your station, follow **[GETTING_STARTED.md](GETTING_STARTED.md)** – step by
+step, with a check after every step:
 
-1. **Location and time zone** – `location_*` in `/home/allskyuser/config.ini`,
-   see [GENERAL_SETTINGS.md](GENERAL_SETTINGS.md).
-2. **Camera** – exposure and gain limits, debayer algorithm, see
-   [CAMERA_SETTINGS.md](CAMERA_SETTINGS.md) and
-   [INDIGO_SETTINGS.md](INDIGO_SETTINGS.md).
-3. **Day and night** – brightness targets and white balance, see
-   [DAYTIME_NIGHTTIME_SETTINGS.md](DAYTIME_NIGHTTIME_SETTINGS.md).
-4. **Image geometry** – zenith position, horizon radius and north angle on
-   the *Camera → Calibration* page; overlays, keogram and SQM depend on it.
-5. **Image look** – HDR and filters, see [HDR-FUSION.md](HDR-FUSION.md) and
-   [POSTPROCESSING.md](POSTPROCESSING.md).
-6. **Optional modules** – sensors, mount, AI, see [TOOLS.md](TOOLS.md) and
-   [INSTALL.md](INSTALL.md).
+1. Check the services and the first image
+2. Location and time zone
+3. Camera limits and crop
+4. Calibrate the image geometry (zenith, horizon, north) – overlays, keogram
+   and SQM depend on it
+5. Day and night look
+6. After the first night: keogram, star trails, timelapse, SQM calibration
+7. Optional modules: sensors, mount, AI
 
-Changes to `config.ini` take effect with the next image; the camera does not
-need a restart. Every key is explained in the comments of
-[`config.ini.default`](config.ini.default).
+All settings are in `/home/allskyuser/config.ini`; changes take effect with
+the next image. Every key is listed in [CONFIGURATION.md](CONFIGURATION.md).
 
 ---
 
 ## Documentation
 
+**Start here**
+
 | Document | Content |
 |---|---|
 | [INSTALL.md](INSTALL.md) | Installation: INDIGO, `install.sh`, manual build, API token, AI |
-| [GENERAL_SETTINGS.md](GENERAL_SETTINGS.md) | Location, capture interval |
+| [GETTING_STARTED.md](GETTING_STARTED.md) | From the first image to a calibrated station |
+| [WEB_INTERFACE.md](WEB_INTERFACE.md) | All pages of the web interface |
+
+**Configuration**
+
+| Document | Content |
+|---|---|
+| [CONFIGURATION.md](CONFIGURATION.md) | Every `config.ini` key at a glance |
+| [GENERAL_SETTINGS.md](GENERAL_SETTINGS.md) | Location, time zone, capture interval |
 | [INDIGO_SETTINGS.md](INDIGO_SETTINGS.md) | INDIGO server, camera and mount selection |
 | [CAMERA_SETTINGS.md](CAMERA_SETTINGS.md) | Exposure, gain, debayering, binning |
 | [DAYTIME_NIGHTTIME_SETTINGS.md](DAYTIME_NIGHTTIME_SETTINGS.md) | Day and night mode, auto-exposure, white balance |
 | [HDR-FUSION.md](HDR-FUSION.md) | How the HDR exposures are captured and fused |
 | [POSTPROCESSING.md](POSTPROCESSING.md) | The image processing pipeline and its settings |
-| [TOOLS.md](TOOLS.md) | Companion tools: meteo, aurora, sensors, timelapse, keogram, star trails |
+
+**Optional hardware**
+
+| Document | Content |
+|---|---|
+| [SENSORS.md](SENSORS.md) | RS485 weather sensors: wiring, addresses, setup |
+
+**Reference**
+
+| Document | Content |
+|---|---|
+| [TOOLS.md](TOOLS.md) | Companion tools: meteo, aurora, timelapse, keogram, star trails, mount position, sensors |
 | [API.md](API.md) | REST API of the web server |
 | [CHANGELOG.md](CHANGELOG.md) | What has changed |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |

@@ -15,6 +15,7 @@ Here's what's in the `tools/` directory:
 * **allsky360-sensors** – Reads the local RS485/Modbus sensors (weather sensor, anemometer, wind vane, control cabinet) into the daily database
 * **allsky360-keogram** – Builds a keogram (the north-south meridian of every image over time) of a night or any time range
 * **allsky360-startrails** – Stacks the night images into star trails (brightest value of every pixel)
+* **allsky360-mount-position** – Reads the position of the telescope mount into `mount.json` (read-only)
 
 Each tool has its own Makefile, so you can build them individually if you want.
 
@@ -502,54 +503,80 @@ allsky360-startrails -n 20261103 -o /tmp/startrails.jpg -j /tmp/startrails.json 
 
 ---
 
-## Building the tools
+## 7. allsky360-mount-position
 
-You can build each tool individually from its directory:
+**Location:** `tools/indigo-mount-position/`
+**Binary:** `bin/indigo_mount_position`
+
+### What it does
+
+Reads the position of the telescope mount `indigo_mount` from the INDIGO
+server and writes it to `mount.json`, which the dashboard shows as an overlay
+(checkbox *Mount*). The mount is only read: the tool never connects, moves or
+parks it. Another client (AIN, KStars, …) must have connected the mount.
+
+### Running automatically
+
+`allsky360-mount-position.timer` runs the tool every minute:
 
 ```bash
-cd tools/aurora && make
-cd tools/meteo && make
-cd tools/timelapse && make
-cd tools/indigo-cameras && make
-cd tools/keogram && make
-cd tools/startrails && make
+sudo systemctl enable --now allsky360-mount-position.timer
 ```
 
-Or build all of them at once from the main directory:
+The service writes `/opt/allsky360/allsky-api/public/mount.json`. Exit status
+`2` (mount not available) counts as success for systemd, so a station
+without a mount does not show a failed service.
+
+### Output
+
+```json
+{
+  "timestamp": 1794684438,
+  "status": "ok",
+  "mount": "Mount LX200 @ indigo_server",
+  "equatorial": { "ra_h": 23.545, "ra_str": "23h 32m 42.00s",
+                  "dec_deg": -0.0203, "dec_str": "-00° 01' 13.00\"" },
+  "horizontal": { "alt_deg": 39.88, "az_deg": 179.56 },
+  "side_of_pier": "west",
+  "tracking": false
+}
+```
+
+`timestamp` (Unix time, UTC) and `status` are always present. `status`:
+
+| Value | Meaning |
+|---|---|
+| `ok` | Position read |
+| `not_configured` | `indigo_mount` is empty |
+| `disconnected` | The mount exists on the server but no client has connected it |
+| `no_response` | The mount did not deliver a position in time |
+| `server_unreachable` | The INDIGO server did not answer |
+
+### Manual usage
 
 ```bash
-make tools
+indigo_mount_position -c /home/allskyuser/config.ini -j     # position as JSON
+indigo_mount_position -h 127.0.0.1 -l                       # list the mounts
 ```
 
-The binaries will end up in each tool's `bin/` subdirectory.
+| Option | Meaning |
+|---|---|
+| `-c, --config FILE` | config.ini (server, port and mount) |
+| `-h, --host SERVER` | INDIGO server |
+| `-p, --port PORT` | port (default 7624) |
+| `-m, --mount NAME` | mount device |
+| `-t, --timeout SECS` | timeout (default 10) |
+| `-l, --list-mounts` | list the mounts and exit |
+| `-j, --json` | JSON output |
+| `-o, --output FILE` | write the JSON to a file (implies `-j`) |
 
 ---
 
-## Installation
+## 8. allsky360-sensors (RS485 / Modbus sensors)
 
-If you want to install all the tools to `/opt/allsky360/bin/`, use the main Makefile:
-
-```bash
-sudo make install
-```
-
-This installs all the tools along with the main `allsky360-camera` application.
-
----
-
-## A few notes
-
-* Most tools need a configuration file with your location coordinates and other settings. Make sure your `config.ini` is set up correctly.
-
-* The database tools (aurora and meteo) store everything in SQLite format. You can query it later with sqlite3 or use it in your own scripts.
-
-* The timelapse tool really needs an NVIDIA GPU to work well. If you try to run it without CUDA, it'll probably complain or be really slow.
-
-* All the tools follow the same coding standards and license (MIT) as the main application. If you want to modify them or add features, go for it!
-
----
-
-## allsky360-sensors (RS485 / Modbus sensors)
+Optional. Hardware, wiring, sensor addresses, first start and
+troubleshooting are described in [SENSORS.md](SENSORS.md); this section is
+the technical reference.
 
 Runs continuously and stores one row every 5 minutes (`modbus_interval`)
 in the table `sensors` of the daily database (`database_YYYYMMDD.db`, UTC day,
@@ -695,3 +722,51 @@ The register maps follow the manuals of the sensors listed above. Other
 sensors with a different register layout need a change in
 `tools/sensors/src/main.c`.
 
+---
+
+## Building the tools
+
+You can build each tool individually from its directory:
+
+```bash
+cd tools/aurora && make
+cd tools/meteo && make
+cd tools/timelapse && make
+cd tools/indigo-cameras && make
+cd tools/keogram && make
+cd tools/startrails && make
+cd tools/indigo-mount-position && make
+cd tools/sensors && make
+```
+
+Or build all of them at once from the main directory:
+
+```bash
+make tools
+```
+
+The binaries will end up in each tool's `bin/` subdirectory.
+
+---
+
+## Installation
+
+If you want to install all the tools to `/opt/allsky360/bin/`, use the main Makefile:
+
+```bash
+sudo make install
+```
+
+This installs all the tools along with the main `allsky360-camera` application.
+
+---
+
+## A few notes
+
+* Most tools need a configuration file with your location coordinates and other settings. Make sure your `config.ini` is set up correctly.
+
+* The database tools (aurora and meteo) store everything in SQLite format. You can query it later with sqlite3 or use it in your own scripts.
+
+* The timelapse tool really needs an NVIDIA GPU to work well. If you try to run it without CUDA, it'll probably complain or be really slow.
+
+* All the tools follow the same coding standards and license (MIT) as the main application. If you want to modify them or add features, go for it!
