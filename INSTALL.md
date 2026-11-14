@@ -222,45 +222,11 @@ This builds the CPU-only version that works on most Linux systems, including Ras
 
 #### GPU-accelerated build (for systems with NVIDIA GPU)
 
-If you have an NVIDIA GPU, build allsky360 with CUDA support (Step 2b). The
+If you have an NVIDIA GPU, build allsky360 with CUDA support. The
 CUDA architecture is detected automatically (`-arch=native`); for a cross
-build pass e.g. `CUDA_ARCH=sm_87`.
-
-##### Step 2a (optional): Build GPUJPEG
-
-GPUJPEG is **not required**: JPEG encoding uses nvjpeg from the CUDA toolkit.
-It is only used when you build with `make USE_CUDA=1 USE_GPUJPEG=1`.
-
-First, clone and build the GPUJPEG library:
-
-```bash
-git clone https://github.com/CESNET/GPUJPEG
-cd GPUJPEG/
-
-mkdir bld
-cd bld
-cmake .. -DCMAKE_BUILD_TYPE=Release -DGPUJPEG_CUDA_ARCHITECTURES="87" -DCMAKE_INSTALL_PREFIX=/usr/local
-make
-sudo make install
-```
-
-**Note**: The `GPUJPEG_CUDA_ARCHITECTURES` value should match your GPU's compute capability. For Jetson Orin NX, use `"87"`. For other GPUs, check NVIDIA's documentation for the correct architecture number.
-
-After installation, update the library cache:
-
-```bash
-sudo ldconfig
-```
-
-You can verify the installation by checking if the library is found:
-
-```bash
-ldconfig -p | grep gpujpeg
-```
-
-##### Step 2b: Build allsky360 with CUDA support
-
-Now build allsky360 with GPU acceleration enabled:
+build pass e.g. `CUDA_ARCH=sm_87`. JPEG encoding uses nvJPEG from the CUDA
+toolkit; no extra library is needed (the optional GPUJPEG encoder is
+described in [Appendix: GPUJPEG](#appendix-optional-gpujpeg-encoder)).
 
 ```bash
 cd /path/to/allsky360
@@ -389,3 +355,27 @@ After a JetPack upgrade export them again on the device:
 The old venv `/home/allskyuser/venvs/yolo11` (Python 3.10, JetPack 6) is no
 longer used and can be deleted.
 
+
+---
+
+## Appendix: optional GPUJPEG encoder
+
+GPUJPEG is **not required**: JPEG encoding uses nvJPEG from the CUDA toolkit.
+The [CESNET GPUJPEG](https://github.com/CESNET/GPUJPEG) library is only used
+when you build with `make USE_CUDA=1 USE_GPUJPEG=1`.
+
+```bash
+git clone https://github.com/CESNET/GPUJPEG
+cd GPUJPEG
+mkdir bld && cd bld
+cmake .. -DCMAKE_BUILD_TYPE=Release -DGPUJPEG_CUDA_ARCHITECTURES="87" \
+         -DCMAKE_INSTALL_PREFIX=/usr/local
+make
+sudo make install
+sudo ldconfig
+ldconfig -p | grep gpujpeg     # check that the library is found
+```
+
+`GPUJPEG_CUDA_ARCHITECTURES` must match the compute capability of your GPU:
+`87` for the Jetson Orin family (Orin Nano, Orin NX, AGX Orin); look up other
+GPUs in NVIDIA's CUDA GPU list.

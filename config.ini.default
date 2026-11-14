@@ -125,9 +125,10 @@ indigo_camera="Uranus-C @ indigo_server"
 indigo_mount=
 indigo_capture_timeout=30
 
-# RS485 / Modbus RTU sensors (allsky360-sensors, run every 5 minutes by
-# allsky360-sensors.timer). Values go into the table 'sensors' of the daily
-# database and into allsky-api/public/latest_sensor_data.json.
+# RS485 / Modbus RTU sensors (allsky360-sensors, runs continuously as
+# allsky360-sensors.service, one stored reading every modbus_interval
+# seconds). Values go into the table 'sensors' of the daily database and
+# into allsky-api/public/latest_sensor_data.json.
 # A sensor address of 0 disables that sensor; with all addresses 0 the tool
 # does nothing. Example addresses of the reference station:
 #   weather sensor 5, anemometer 11, wind vane 12, control cabinet 13
