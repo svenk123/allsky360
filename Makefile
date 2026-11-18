@@ -184,6 +184,11 @@ SRCDIR = src
 # and without -DUSE_CUDA (duplicate symbols at link time or a wrong binary).
 BUILD_VARIANT := $(if $(filter 1,$(USE_CUDA)),cuda,cpu)
 OBJDIR = obj/$(BUILD_VARIANT)
+# Every object also writes a .d file with the headers it includes, so a
+# changed header rebuilds all objects that use it (without this, e.g. a new
+# struct layout in config.h left main.o stale). -MP adds empty rules for the
+# headers, so deleting a header does not break the build.
+DEPFLAGS = -MMD -MP
 BINDIR = bin
 # Records the variant of the current binary, forces a relink on a switch
 VARIANT_STAMP = $(BINDIR)/.build-variant
@@ -272,45 +277,45 @@ node-build: node-check
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	@mkdir -p $(OBJDIR)
-	$(CC) $(CAIRO_CFLAGS) $(INCLUDE) $(CFLAGS) -c $< -o $@
+	$(CC) $(CAIRO_CFLAGS) $(INCLUDE) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 # Compile CUDA-Wrappers, when CUDA is active
 ifeq ($(USE_CUDA), 1)
 $(OBJDIR)/gpu_functions_cuda_wrapper.o: $(SRCDIR)/gpu_functions_cuda_wrapper.c
 	@mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDE) $(DEPFLAGS) -c $< -o $@
 
 $(OBJDIR)/acdnr_filter_cuda_wrapper.o: $(SRCDIR)/acdnr_filter_cuda_wrapper.c
 	@mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDE) $(DEPFLAGS) -c $< -o $@
 
 $(OBJDIR)/dehaze_filter_cuda_wrapper.o: $(SRCDIR)/dehaze_filter_cuda_wrapper.c
 	@mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDE) $(DEPFLAGS) -c $< -o $@
 
 $(OBJDIR)/clarity_filter_cuda_wrapper.o: $(SRCDIR)/clarity_filter_cuda_wrapper.c
 	@mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDE) $(DEPFLAGS) -c $< -o $@
 
 $(OBJDIR)/color_calibration_cuda_wrapper.o: $(SRCDIR)/color_calibration_cuda_wrapper.c
 	@mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDE) $(DEPFLAGS) -c $< -o $@
 
 $(OBJDIR)/jpeg_functions_cuda_wrapper.o: $(SRCDIR)/jpeg_functions_cuda_wrapper.c
 	@mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDE) $(DEPFLAGS) -c $< -o $@
 
 $(OBJDIR)/wavelet_sharpen_cuda_wrapper.o: $(SRCDIR)/wavelet_sharpen_cuda_wrapper.c
 	@mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDE) $(DEPFLAGS) -c $< -o $@
 
 $(OBJDIR)/white_balance_cuda_wrapper.o: $(SRCDIR)/white_balance_cuda_wrapper.c
 	@mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDE) $(DEPFLAGS) -c $< -o $@
 
 $(OBJDIR)/lights_and_shadows_cuda_wrapper.o: $(SRCDIR)/lights_and_shadows_cuda_wrapper.c
 	@mkdir -p $(OBJDIR)
-	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDE) $(DEPFLAGS) -c $< -o $@
 
 endif
 
@@ -332,8 +337,11 @@ endif
 ifeq ($(USE_CUDA), 1)
 $(OBJDIR)/%.o: $(SRCDIR)/%.cu
 	@mkdir -p $(OBJDIR)
-	$(NVCC) $(NVCCFLAGS) $(JPEG_CFLAGS) $(CUDA_INCLUDE) -c $< -o $@
+	$(NVCC) $(NVCCFLAGS) $(JPEG_CFLAGS) $(CUDA_INCLUDE) $(DEPFLAGS) -c $< -o $@
 endif
+
+# Header dependencies written by $(DEPFLAGS)
+-include $(wildcard $(OBJDIR)/*.d)
 
 # Build for utils
 tools: timelapse meteo aurora mount-position cameras panorama sensors keogram startrails
