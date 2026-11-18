@@ -24,7 +24,8 @@
 
 /**
  * Performs nearest-neighbor debayering on 16-bit Bayer data and converts it to RGBA 16-bit output.
- * A black border is added to the right and bottom edges to avoid out-of-bounds reads.
+ * Every pixel keeps its own value; the two missing colors come from its 2x2
+ * Bayer cell (green averaged), moved inside the image at the border.
  *
  * @param raw: pointer to the input Bayer image (16-bit, 1 channel per pixel).
  * @param width: image width in pixels.
@@ -33,14 +34,16 @@
  * @param x_offset: X-offset used for Bayer pattern alignment.
  * @param y_offset: Y-offset used for Bayer pattern alignment.
  * @param bayer_pattern: Bayer pattern as string ("RGGB", "GRBG", "GBRG", "BGGR", etc.).
- * @return: 0 on success, 1 if the Bayer pattern is invalid.
+ * @return: 0 on success, 1 if the Bayer pattern is invalid or the image is
+ *          smaller than 3x3.
  */
 int debayer_nearest_neighbor_rgb16(const uint16_t *raw, int width, int height, uint16_t *rgb, 
                               int x_offset, int y_offset, const char *bayer_pattern);
 
 /**
  * Performs nearest-neighbor debayering on 16-bit Bayer data and converts it to RGBA float output.
- * A black border is added to the right and bottom edges to avoid out-of-bounds reads.
+ * Every pixel keeps its own value; the two missing colors come from its 2x2
+ * Bayer cell (green averaged), moved inside the image at the border.
  *
  * @param raw: pointer to the input Bayer image (16-bit, 1 channel per pixel).
  * @param width: image width in pixels.
@@ -49,7 +52,8 @@ int debayer_nearest_neighbor_rgb16(const uint16_t *raw, int width, int height, u
  * @param x_offset: X-offset used for Bayer pattern alignment.
  * @param y_offset: Y-offset used for Bayer pattern alignment.
  * @param bayer_pattern: Bayer pattern as string ("RGGB", "GRBG", "GBRG", "BGGR", etc.).
- * @return: 0 on success, 1 if the Bayer pattern is invalid.
+ * @return: 0 on success, 1 if the Bayer pattern is invalid or the image is
+ *          smaller than 3x3.
  */
 int debayer_nearest_neighbor_rgbf(const uint16_t *raw, int width, int height, float *rgbf,
                                     int x_offset, int y_offset, const char *bayer_pattern);

@@ -293,15 +293,24 @@ int indigo_raw_to_rgbf1(float *rgba, int width, int height,
       image_data = temp_image_data;
     }
 
+    int debayer_rc;
     if (debayer_alg == 1)
-      debayer_bilinear_rgbf(image_data, crop_width, crop_height, rgba, x_offset,
-                            y_offset, bayer_pattern);
+      debayer_rc = debayer_bilinear_rgbf(image_data, crop_width, crop_height,
+                                         rgba, x_offset, y_offset,
+                                         bayer_pattern);
     else if (debayer_alg == 2)
-      debayer_vng_rgbf(image_data, crop_width, crop_height, rgba, x_offset,
-                       y_offset, bayer_pattern);
-    else
-      debayer_nearest_neighbor_rgbf(image_data, crop_width, crop_height, rgba,
+      debayer_rc = debayer_vng_rgbf(image_data, crop_width, crop_height, rgba,
                                     x_offset, y_offset, bayer_pattern);
+    else
+      debayer_rc = debayer_nearest_neighbor_rgbf(image_data, crop_width,
+                                                 crop_height, rgba, x_offset,
+                                                 y_offset, bayer_pattern);
+    if (debayer_rc != 0) {
+      /* rgba was not (completely) written */
+      allsky_safe_free(image_data);
+      allsky_safe_free(image_u8);
+      return 1;
+    }
   } else {
 #pragma omp parallel for
     for (int i = 0; i < crop_pixel_count; i++) {
