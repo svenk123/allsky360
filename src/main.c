@@ -339,6 +339,7 @@ static indigo_result client_update_property(indigo_client *client,
                   raw_buffer_size, needed_raw_buffer_size);
           allsky_safe_free(raw_buffer);
           raw_buffer = NULL;
+          raw_buffer_size = 0;
           return INDIGO_OK;
         }
 
@@ -1336,6 +1337,7 @@ int main(int argc, const char *argv[]) {
               fclose(file);
               allsky_safe_free(raw_buffer);
               raw_buffer = NULL;
+              raw_buffer_size = 0;
               abort_captures = 1;
               failed_no++;
               continue;
@@ -1413,6 +1415,20 @@ int main(int argc, const char *argv[]) {
                     "WARNING: Failed to save INDIGO raw HDR frame %d / %d\n",
                     i, MAX_IMAGES);
           }
+        }
+
+        /* The header getters below read the 12-byte INDIGO raw header:
+           a missing or shorter frame must not get that far. */
+        if (!raw_buffer || raw_buffer_size < sizeof(indigo_raw_header)) {
+          fprintf(stderr,
+                  "ERROR: taking HDR frame (no raw image or only %zu bytes "
+                  "received, less than the %zu byte header)\n",
+                  raw_buffer ? raw_buffer_size : (size_t)0,
+                  sizeof(indigo_raw_header));
+          abort_captures = 1;
+          exposure_sec = frames[0].exposure;
+          failed_no++;
+          continue;
         }
 
         /* Get raw image width and height */

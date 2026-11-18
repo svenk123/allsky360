@@ -368,6 +368,10 @@ int find_stars_raw(const unsigned char *raw_data, size_t raw_size,
   star_detect_stats_t st;
   memset(&st, 0, sizeof(st));
 
+  if (raw_size < sizeof(indigo_raw_header)) {
+    fprintf(stderr, "Star detector: raw frame shorter than its header\n");
+    return 2;
+  }
   size_t expected = indigo_raw_expected_size(raw_data);
   if (expected == 0 || raw_size < expected) {
     fprintf(stderr, "Star detector: invalid or incomplete raw frame\n");
