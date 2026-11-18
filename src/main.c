@@ -159,6 +159,19 @@ static void note_sensor_temperature(const indigo_property *property) {
  */
 void set_camera_binning(indigo_client *client, const char *device_name,
                         int binning_val) {
+  /* camera_binning2x2: 0 = 1x1, 1 = 2x2. Check before the allocation below:
+   * returning after it leaked the property on every capture. */
+  if (binning_val < 0 || binning_val > 1) {
+    static int reported = 0;
+    if (!reported)
+      fprintf(stderr,
+              "WARNING: camera_binning2x2=%d is invalid (0 = 1x1, 1 = 2x2), "
+              "binning is not changed\n",
+              binning_val);
+    reported = 1;
+    return;
+  }
+
   /* Allocate a property for CCD_BIN */
   indigo_property *binning = indigo_init_number_property(
       NULL,                  // no existing property
@@ -175,9 +188,6 @@ void set_camera_binning(indigo_client *client, const char *device_name,
     fprintf(stderr, "Failed to allocate CCD_BIN property\n");
     return;
   }
-
-  if (binning_val > 1)
-    return;
 
   binning_val++;
 
