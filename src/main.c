@@ -844,11 +844,11 @@ static void keep_startup_only_settings(config_t *cfg,
        startup->image_directory},
       {"database_directory", cfg->database_directory,
        sizeof(cfg->database_directory), startup->database_directory},
-      {"indigocamera", cfg->indigocamera, sizeof(cfg->indigocamera),
+      {"indigo_camera", cfg->indigocamera, sizeof(cfg->indigocamera),
        startup->indigocamera},
-      {"indigoserver", cfg->indigoserver, sizeof(cfg->indigoserver),
+      {"indigo_server", cfg->indigoserver, sizeof(cfg->indigoserver),
        startup->indigoserver},
-      {"indigoservername", cfg->indigoservername,
+      {"indigo_servername", cfg->indigoservername,
        sizeof(cfg->indigoservername), startup->indigoservername},
   };
   enum { NUM_STRINGS = sizeof(strings) / sizeof(strings[0]) };
@@ -872,7 +872,7 @@ static void keep_startup_only_settings(config_t *cfg,
   if (cfg->indigoport != startup->indigoport) {
     if (!reported[NUM_STRINGS])
       fprintf(stderr,
-              "WARNING: indigoport changed to %d, but it is only read at "
+              "WARNING: indigo_port changed to %d, but it is only read at "
               "startup: keeping %d until the camera service is restarted\n",
               cfg->indigoport, startup->indigoport);
     reported[NUM_STRINGS] = 1;
