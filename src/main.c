@@ -1562,6 +1562,11 @@ int main(int argc, const char *argv[]) {
             allsky_safe_free(frames[i].image);
             frames[i].image = NULL;
             frames[i].image_size = 0;
+            /* The frames are used by index: a missing frame must not be
+               followed by processed ones */
+            abort_captures = 1;
+            exposure_sec = frames[0].exposure;
+            failed_no++;
             continue;
           }
 
@@ -1896,7 +1901,8 @@ int main(int argc, const char *argv[]) {
 
       size_t needed_hdr_image_size =
           (size_t)(pixel_count * channels * sizeof(float));
-      if (needed_hdr_image_size > hdr_image_size) {
+      /* hdr_image_size is the capacity of hdr_image */
+      if (!hdr_image || needed_hdr_image_size > hdr_image_size) {
 #ifdef USE_CUDA
         /* Zero-copy mapped memory: GPU accesses host buffer directly via a
          * device pointer obtained with cudaHostGetDevicePointer(). On Jetson
@@ -1904,6 +1910,7 @@ int main(int argc, const char *argv[]) {
         if (hdr_image) {
           free_rgbf_on_host(hdr_image, ALLSKY_HOST_ALLOC_MAPPED);
           hdr_image = NULL;
+          hdr_image_size = 0;
         }
         hdr_image = (float *)alloc_rgbf_on_host(needed_hdr_image_size,
                                                  ALLSKY_HOST_ALLOC_MAPPED);
@@ -1919,12 +1926,13 @@ int main(int argc, const char *argv[]) {
           fprintf(stderr, "hdr_image realloc failed");
           allsky_safe_free(hdr_image);
           hdr_image = NULL;
+          hdr_image_size = 0;
           continue;
         }
         hdr_image = temp_hdr_image;
 #endif
+        hdr_image_size = needed_hdr_image_size;
       }
-      hdr_image_size = needed_hdr_image_size;
 
       printf("===== HDR fusion =====\n");
 
