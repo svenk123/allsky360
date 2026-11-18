@@ -237,12 +237,12 @@ int main(int argc, const char *argv[]) {
     }
     
     if (strcmp(ext, "jpg") == 0 || strcmp(ext, "jpeg") == 0) {
-        if (!load_jpeg_as_cairo_surface(&input_surface, infile)) {
+        if (load_jpeg_as_cairo_surface(&input_surface, infile) != 0) {
             fprintf(stderr, "Error: Cannot load JPEG file: %s\n", infile);
             return EXIT_FAILURE;
         }
     } else if (strcmp(ext, "png") == 0) {
-        if (!load_png_as_cairo_surface(&input_surface, infile)) {
+        if (load_png_as_cairo_surface(&input_surface, infile) != 0) {
             fprintf(stderr, "Error: Cannot load PNG file: %s\n", infile);
             return EXIT_FAILURE;
         }
@@ -265,7 +265,7 @@ int main(int argc, const char *argv[]) {
     if (mask_file) {
         cairo_surface_t *mask_surface = NULL;
         
-        if (!load_jpeg_as_cairo_surface(&mask_surface, mask_file)) {
+        if (load_jpeg_as_cairo_surface(&mask_surface, mask_file) != 0) {
             fprintf(stderr, "Error: Cannot load mask JPEG file: %s\n", mask_file);
             cairo_surface_destroy(input_surface);
             return EXIT_FAILURE;
@@ -307,7 +307,7 @@ int main(int argc, const char *argv[]) {
     }
     
     // Save panorama as JPEG
-    if (!save_cairo_surface_as_jpeg(panorama_surface, outfile, quality)) {
+    if (save_cairo_surface_as_jpeg(panorama_surface, outfile, quality) != 0) {
         fprintf(stderr, "Error: Cannot save panorama: %s\n", outfile);
         cairo_surface_destroy(input_surface);
         cairo_surface_destroy(panorama_surface);
