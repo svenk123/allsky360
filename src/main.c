@@ -2065,11 +2065,16 @@ int main(int argc, const char *argv[]) {
       /* Get CUDA device pointer for the zero-copy mapped hdr_image buffer.
        * No H2D transfer: on Jetson Orin the device pointer addresses the
        * same physical DDR as hdr_image. */
-      float *hdr_image_device = NULL;
+      float *hdr_image_device = hdr_image; /* CPU build: the host buffer */
 #ifdef USE_CUDA
+      /* The filters are bound to their CUDA versions at compile time, there
+       * is no CPU fallback at runtime: skip this image. */
       if (get_device_ptr_from_mapped(hdr_image, &hdr_image_device) != 0) {
-        printf("WARNING: Zero-copy mapping failed, using CPU processing\n");
-        hdr_image_device = NULL;
+        fprintf(stderr,
+                "ERROR: Zero-copy mapping of the HDR image failed, skipping "
+                "this image\n");
+        failed_no++;
+        continue;
       }
 #endif
 
