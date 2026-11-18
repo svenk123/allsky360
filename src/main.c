@@ -1631,8 +1631,13 @@ int main(int argc, const char *argv[]) {
           }
         }
 
-        /* Spectral analysis on first HDR frame only */
-        if (i == 0 && config.spektrum_enabled) {
+        /* Spectral analysis on first HDR frame only. It reconstructs the
+         * spectrum from three color channels: a mono camera has only one,
+         * the result would be the model alone. */
+        if (i == 0 && config.spektrum_enabled && config.camera_monochrome) {
+          printf("[spektrum] skipped: needs a color camera "
+                 "(camera_monochrome=1)\n");
+        } else if (i == 0 && config.spektrum_enabled) {
           int scx    = config.spektrum_cx >= 0 ? config.spektrum_cx : width / 2;
           int scy    = config.spektrum_cy >= 0 ? config.spektrum_cy : height / 2;
           int srad   = config.spektrum_radius;

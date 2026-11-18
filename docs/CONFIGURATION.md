@@ -297,7 +297,7 @@ After changing the detection keys, calibrate `sqm_intercept` again.
 
 | Key | Default | Description |
 |---|---|---|
-| `spektrum_enabled` | `0` | Rough spectrum from the RGB values (experimental, tuned to the IMX585) |
+| `spektrum_enabled` | `0` | Rough spectrum from the RGB values (experimental, uses estimated IMX585 response curves for every sensor, written as `qe_model` into the output file; color cameras only, skipped with `camera_monochrome=1`) |
 | `spektrum_cx`, `spektrum_cy` | `-1`, `-1` | Measuring center; `-1` = image center |
 | `spektrum_radius` | `50` | Measuring radius (1 – 100 pixels) |
 | `spektrum_regularization` | `0.01` | Smoothing of the spectrum |

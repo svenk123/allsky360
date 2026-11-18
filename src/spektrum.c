@@ -353,6 +353,9 @@ int spektrum_analyze(
   fprintf(fp, "    \"cy\": %d,\n", cy);
   fprintf(fp, "    \"radius\": %d,\n", radius);
   fprintf(fp, "    \"pixels_used\": %ld,\n", pixel_count);
+  /* The reconstruction depends on these fixed QE curves, whatever the
+   * actual sensor is */
+  fprintf(fp, "    \"qe_model\": \"IMX585 (estimated)\",\n");
   fprintf(fp, "    \"mean_rgb\": [%.6f, %.6f, %.6f],\n",
           mean_r, mean_g, mean_b);
 
