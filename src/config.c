@@ -54,6 +54,44 @@ static void config_copy_string(char *dst, size_t dst_size, const char *key,
   snprintf(dst, dst_size, "%.*s", (int)dst_size - 1, value);
 }
 
+/*
+ * Split a config line "key = value" at the first '='. Leading blanks of the
+ * value are skipped; a value in double quotes ends at the closing quote
+ * ("" is an empty string), an unquoted value runs to the end of the line.
+ * key/value are truncated to their buffers like the former sscanf widths.
+ * Returns 0 when the line has a '='.
+ */
+static int config_split_line(const char *line, char *key, size_t key_size,
+                             char *value, size_t value_size) {
+  const char *eq = strchr(line, '=');
+  if (!eq)
+    return 1;
+
+  size_t key_len = (size_t)(eq - line);
+  if (key_len >= key_size)
+    key_len = key_size - 1;
+  memcpy(key, line, key_len);
+  key[key_len] = '\0';
+
+  const char *v = eq + 1;
+  while (*v == ' ' || *v == '\t')
+    v++;
+
+  size_t value_len;
+  if (*v == '"') {
+    v++;
+    const char *close = strchr(v, '"');
+    value_len = close ? (size_t)(close - v) : strlen(v);
+  } else {
+    value_len = strlen(v);
+  }
+  if (value_len >= value_size)
+    value_len = value_size - 1;
+  memcpy(value, v, value_len);
+  value[value_len] = '\0';
+  return 0;
+}
+
 int load_config(const char *filename, config_t *config) {
   if (!filename || !config)
     return 1;
@@ -292,9 +330,10 @@ int load_config(const char *filename, config_t *config) {
     if (*trim_line == '\0' || *trim_line == '#')
       continue;
 
-    /* The widths must match key[64] and value[CONFIG_VALUE_MAX] above */
-    if (sscanf(trim_line, "%63[^=] = \"%511[^\"]\"", key, value) == 2 ||
-        sscanf(trim_line, "%63[^=] = %511[^\n]", key, value) == 2) {
+    /* The former sscanf("%63[^=] = %511[^\n]") needed at least one value
+     * character: "key=" and "key=\"\"" could not set an empty value */
+    if (config_split_line(trim_line, key, sizeof(key), value,
+                          sizeof(value)) == 0) {
       /* Unquoted values run to the end of the line. "%s" used to stop at
        * the first blank and silently drop the rest, e.g. the 'S' of
        * "33.9249 S" or everything after "Uranus-C" in a camera name.
@@ -315,6 +354,13 @@ int load_config(const char *filename, config_t *config) {
         key[--key_len] = '\0';
 
       if (key_len == 0)
+        continue;
+
+      /* An empty value disables a hook (documented in config.ini.default).
+       * For all other keys it is ignored as before: atoi("")/atof("") would
+       * silently turn e.g. "daytime_startexposure=" into 0. */
+      if (value[0] == '\0' && strcmp(key, "postprocessing_script") != 0 &&
+          strcmp(key, "endofnight_script") != 0)
         continue;
 
       if (strcmp(key, "daytime_capture") == 0)
