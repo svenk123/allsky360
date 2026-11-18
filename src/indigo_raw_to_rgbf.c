@@ -287,7 +287,7 @@ int indigo_raw_to_rgbf1(float *rgba, int width, int height,
       unsigned short *temp_image_data = (unsigned short *)allsky_safe_malloc(
           crop_pixel_count * sizeof(unsigned short));
       for (int i = 0; i < crop_pixel_count; i++)
-        temp_image_data[i] = image_u8[i] << 8;
+        temp_image_data[i] = (unsigned short)(image_u8[i] * 257); /* 255 -> 65535 */
       allsky_safe_free(image_u8);
       image_u8 = NULL; /* freed again at the end of the function */
       image_data = temp_image_data;
@@ -302,14 +302,11 @@ int indigo_raw_to_rgbf1(float *rgba, int width, int height,
     else
       debayer_nearest_neighbor_rgbf(image_data, crop_width, crop_height, rgba,
                                     x_offset, y_offset, bayer_pattern);
-
-    /* Normalize to 0.0-1.0f */
-    normalize_rgbf(rgba, crop_pixel_count);
   } else {
 #pragma omp parallel for
     for (int i = 0; i < crop_pixel_count; i++) {
       if (type == INDIGO_RAW_MONO8) {
-        float val = (float)(image_u8[i] << 8);
+        float val = (float)(image_u8[i] * 257);
         rgba[i * 4 + 0] = val;
         rgba[i * 4 + 1] = val;
         rgba[i * 4 + 2] = val;
@@ -321,20 +318,20 @@ int indigo_raw_to_rgbf1(float *rgba, int width, int height,
         rgba[i * 4 + 2] = val;
         rgba[i * 4 + 3] = val;
       } else if (type == INDIGO_RAW_RGB24) { // RGB24
-        rgba[i * 4 + 0] = (float)(image_u8[i * 3 + 2] << 8);
-        rgba[i * 4 + 1] = (float)(image_u8[i * 3 + 1] << 8);
-        rgba[i * 4 + 2] = (float)(image_u8[i * 3 + 0] << 8);
+        rgba[i * 4 + 0] = (float)(image_u8[i * 3 + 2] * 257);
+        rgba[i * 4 + 1] = (float)(image_u8[i * 3 + 1] * 257);
+        rgba[i * 4 + 2] = (float)(image_u8[i * 3 + 0] * 257);
         rgba[i * 4 + 3] = MAX_U16;
       } else if (type == INDIGO_RAW_RGBA32) { // RGBA32
-        rgba[i * 4 + 0] = (float)(image_u8[i * 4 + 2] << 8);
-        rgba[i * 4 + 1] = (float)(image_u8[i * 4 + 1] << 8);
-        rgba[i * 4 + 2] = (float)(image_u8[i * 4 + 0] << 8);
-        rgba[i * 4 + 3] = (float)(image_u8[i * 4 + 3] << 8);
+        rgba[i * 4 + 0] = (float)(image_u8[i * 4 + 2] * 257);
+        rgba[i * 4 + 1] = (float)(image_u8[i * 4 + 1] * 257);
+        rgba[i * 4 + 2] = (float)(image_u8[i * 4 + 0] * 257);
+        rgba[i * 4 + 3] = (float)(image_u8[i * 4 + 3] * 257);
       } else if (type == INDIGO_RAW_ABGR32) { // ABGR32
-        rgba[i * 4 + 0] = (float)(image_u8[i * 4 + 1] << 8);
-        rgba[i * 4 + 1] = (float)(image_u8[i * 4 + 2] << 8);
-        rgba[i * 4 + 2] = (float)(image_u8[i * 4 + 3] << 8);
-        rgba[i * 4 + 3] = (float)(image_u8[i * 4 + 0] << 8);
+        rgba[i * 4 + 0] = (float)(image_u8[i * 4 + 1] * 257);
+        rgba[i * 4 + 1] = (float)(image_u8[i * 4 + 2] * 257);
+        rgba[i * 4 + 2] = (float)(image_u8[i * 4 + 3] * 257);
+        rgba[i * 4 + 3] = (float)(image_u8[i * 4 + 0] * 257);
       } else if (type == INDIGO_RAW_RGB48) { // RGB48
         rgba[i * 4 + 0] = (float)(image_data[i * 3 + 2]);
         rgba[i * 4 + 1] = (float)(image_data[i * 3 + 1]);
@@ -343,6 +340,10 @@ int indigo_raw_to_rgbf1(float *rgba, int width, int height,
       }
     }
   }
+
+  /* All formats are on a 0..65535 scale here (8 bit: v * 257):
+     normalize to 0.0-1.0f, alpha becomes the luminance */
+  normalize_rgbf(rgba, crop_pixel_count);
 
   allsky_safe_free(image_data);
   allsky_safe_free(image_u8);
