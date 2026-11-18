@@ -115,9 +115,16 @@ char *indigo_camera = NULL;
 volatile double exposure_sec = 0.0;
 volatile double gain = 0;
 static bool connected = false;
+/* Exposures still to finish; decremented by the INDIGO client thread on
+ * "exposure done", read by capture_image() (atomic acquire/release) */
 static volatile int count = 1;
 unsigned char *raw_buffer = NULL;
 size_t raw_buffer_size = 0;
+/* Incremented by the INDIGO client thread after a new BLOB was copied into
+ * raw_buffer (release). capture_image() compares it before and after the
+ * exposure: "exposure done" without a new image (e.g. a failed URL BLOB
+ * download) must not process the previous frame again. */
+static unsigned int raw_buffer_generation = 0;
 
 /**
  * Configure 2x2 binning on an already connected camera
@@ -350,6 +357,9 @@ static indigo_result client_update_property(indigo_client *client,
       /* Copy image data to raw buffer */
       memcpy(raw_buffer, property->items[0].blob.value, raw_buffer_size);
       raw_buffer[raw_buffer_size] = '\0';
+      /* Publish the complete copy to capture_image() */
+      __atomic_store_n(&raw_buffer_generation, raw_buffer_generation + 1,
+                       __ATOMIC_RELEASE);
 
       /* In case we have URL BLOB transfer we need to release the blob ourselves
        */
@@ -365,7 +375,7 @@ static indigo_result client_update_property(indigo_client *client,
       fflush(stdout);
     } else if (property->state == INDIGO_OK_STATE) {
       printf("exposure done...\n");
-      if (--count > 0) {
+      if (__atomic_sub_fetch(&count, 1, __ATOMIC_ACQ_REL) > 0) {
         indigo_change_number_property(client, indigo_camera,
                                       CCD_EXPOSURE_PROPERTY_NAME, 1,
                                       exposure_items, exposure_values);
@@ -430,6 +440,16 @@ static bool wait_for_indigo_server(int timeout_sec) {
  * @param capture_timeout: capture timeout
  * @return: 0 if successful, 1 if failed
  */
+static volatile sig_atomic_t keep_running =
+    1; // Set to 0 when program should be terminated
+
+/* Seconds of a clock that a change of the system time does not move */
+static double monotonic_seconds(void) {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (double)ts.tv_sec + ts.tv_nsec / 1e9;
+}
+
 static int capture_image(double exposure, int capture_timeout) {
   int ret = 0;
 
@@ -442,37 +462,48 @@ static int capture_image(double exposure, int capture_timeout) {
   }
 
   exposure_sec = exposure;
+  unsigned int generation_before =
+      __atomic_load_n(&raw_buffer_generation, __ATOMIC_ACQUIRE);
   indigo_attach_client(&client);
 
-  time_t exposure_sec_begin = time(NULL);
+  double exposure_begin = monotonic_seconds();
 
   /* Wait until capture is finished */
-  while (count > 0) {
+  while (__atomic_load_n(&count, __ATOMIC_ACQUIRE) > 0) {
+    if (!keep_running) {
+      /* SIGTERM/SIGINT: do not wait for exposure + timeout */
+      printf("Capture interrupted by shutdown\n");
+      ret = 1;
+      break;
+    }
     indigo_usleep(ONE_SECOND_DELAY);
     /* Long exposures are legitimate waiting time; the loop itself is bounded
      * by exposure + capture_timeout below. */
     allsky_watchdog_ping();
 
-    time_t now_sec = time(NULL);
-    if (difftime(now_sec, exposure_sec_begin) >= (exposure + capture_timeout)) {
+    double elapsed = monotonic_seconds() - exposure_begin;
+    if (elapsed >= exposure + capture_timeout) {
       /* Exposure takes too long */
-      printf("Capture timeout: elapsed %.0f seconds\n",
-             difftime(now_sec, exposure_sec_begin));
+      printf("Capture timeout: elapsed %.0f seconds\n", elapsed);
       ret = 1;
       break;
     }
   }
 
+  if (ret == 0 && __atomic_load_n(&raw_buffer_generation, __ATOMIC_ACQUIRE) ==
+                      generation_before) {
+    fprintf(stderr, "ERROR: exposure finished without a new image from the "
+                    "camera, frame skipped\n");
+    ret = 1;
+  }
+
   connected = false;
-  count = 1;
+  __atomic_store_n(&count, 1, __ATOMIC_RELEASE);
   indigo_detach_client(&client);
   return ret;
 }
 
 /***** Signal handlers **********/
-
-static volatile sig_atomic_t keep_running =
-    1; // Set to 0 when program should be terminated
 
 /**
  *  Cleanup resources function
