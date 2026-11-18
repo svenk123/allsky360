@@ -704,6 +704,65 @@ int run_postprocessing(const char *script, const char *today_str,
   return spawn_hook(script, image_path);
 }
 
+/*
+ * The configuration is read again on every capture cycle, but these keys are
+ * only used at startup: the image and database directories (images_dir,
+ * database_dir, the open daily database), the camera name and the INDIGO
+ * server connection. Taking a changed value over halfway would split the
+ * output (e.g. images still in the old directory while the hooks and the
+ * retention use the new one). Keep the startup values instead and report
+ * the change once; a restart of the camera service applies it.
+ */
+static void keep_startup_only_settings(config_t *cfg,
+                                       const config_t *startup) {
+  struct {
+    const char *key;
+    char *value;
+    size_t size;
+    const char *startup_value;
+  } strings[] = {
+      {"image_directory", cfg->image_directory, sizeof(cfg->image_directory),
+       startup->image_directory},
+      {"database_directory", cfg->database_directory,
+       sizeof(cfg->database_directory), startup->database_directory},
+      {"indigocamera", cfg->indigocamera, sizeof(cfg->indigocamera),
+       startup->indigocamera},
+      {"indigoserver", cfg->indigoserver, sizeof(cfg->indigoserver),
+       startup->indigoserver},
+      {"indigoservername", cfg->indigoservername,
+       sizeof(cfg->indigoservername), startup->indigoservername},
+  };
+  enum { NUM_STRINGS = sizeof(strings) / sizeof(strings[0]) };
+  static int reported[NUM_STRINGS + 1]; /* + indigoport */
+
+  for (int i = 0; i < NUM_STRINGS; i++) {
+    if (strcmp(strings[i].value, strings[i].startup_value) == 0) {
+      reported[i] = 0;
+      continue;
+    }
+    if (!reported[i])
+      fprintf(stderr,
+              "WARNING: %s changed to '%s', but it is only read at startup: "
+              "keeping '%s' until the camera service is restarted\n",
+              strings[i].key, strings[i].value, strings[i].startup_value);
+    reported[i] = 1;
+    snprintf(strings[i].value, strings[i].size, "%s",
+             strings[i].startup_value);
+  }
+
+  if (cfg->indigoport != startup->indigoport) {
+    if (!reported[NUM_STRINGS])
+      fprintf(stderr,
+              "WARNING: indigoport changed to %d, but it is only read at "
+              "startup: keeping %d until the camera service is restarted\n",
+              cfg->indigoport, startup->indigoport);
+    reported[NUM_STRINGS] = 1;
+    cfg->indigoport = startup->indigoport;
+  } else {
+    reported[NUM_STRINGS] = 0;
+  }
+}
+
 /***** Main function **********/
 
 int main(int argc, const char *argv[]) {
@@ -903,6 +962,9 @@ int main(int argc, const char *argv[]) {
 
   /* Start INDIGO API */
   indigo_camera = allsky_safe_strdup(config.indigocamera);
+
+  /* Settings that are only read here (see keep_startup_only_settings()) */
+  const config_t startup_config = config;
   indigo_set_log_level(INDIGO_LOG_INFO);
   if (indigo_start() != INDIGO_OK) {
     fprintf(stderr, "Failed to start INDIGO.\n");
@@ -1010,6 +1072,7 @@ int main(int argc, const char *argv[]) {
         cleanup_resources();
         return EXIT_FAILURE;
       }
+      keep_startup_only_settings(&config, &startup_config);
       tz_apply(config.location_timezone); /* no-op if unchanged */
 
       if (allsky_debug >= 2) {

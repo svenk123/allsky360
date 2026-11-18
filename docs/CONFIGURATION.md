@@ -25,6 +25,10 @@ short description. The linked pages explain the keys of a topic in detail.
 * The camera reads the file again **at the start of every capture cycle**:
   changes take effect with the next image, no restart needed.
   `sudo systemctl reload allsky360-camera` does the same immediately.
+  Exceptions: `image_directory`, `database_directory`, `indigocamera`,
+  `indigoserver`, `indigoservername` and `indigoport` are only read at
+  startup. A change is reported in the log and applied with
+  `sudo systemctl restart allsky360-camera`.
 * The tools (meteo, aurora, sensors, keogram, …) read it at every start; the
   sensors daemon and the web API need a restart after changes:
   `sudo systemctl restart allsky360-sensors allsky360-api`.
