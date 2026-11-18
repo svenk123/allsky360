@@ -62,6 +62,35 @@ const API_TOKEN = process.env.API_TOKEN || config["api-token"] || "";
 // Directories
 const PUBLIC_PATH = path.resolve(__dirname, 'public');
 const DB_PATH = path.join(__dirname, 'database');
+
+/**
+ * Run a read-only query on a daily database and answer the request with
+ * the rows as JSON. The database is opened with a callback: without one, an
+ * open error (e.g. permissions, a damaged file) is emitted as an 'error'
+ * event that nobody handles, which terminates the whole API process, and
+ * a query queued on that handle never gets a callback.
+ *
+ * @param mapError optional (err) => [status, message] for query errors
+ */
+function queryDayDatabase(res, dbFullPath, sql, mapError) {
+    const db = new sqlite3.Database(dbFullPath, sqlite3.OPEN_READONLY, (openErr) => {
+        if (openErr) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ error: "Cannot open database: " + openErr.message }));
+        }
+        db.all(sql, [], (err, rows) => {
+            if (err) {
+                const [status, message] = mapError ? mapError(err) : [500, err.message];
+                res.writeHead(status, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: message }));
+            } else {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(rows));
+            }
+            db.close();
+        });
+    });
+}
 const IMAGE_PATH = path.join(__dirname, 'images');
 const VIDEO_PATH = path.join(__dirname, 'videos');
 
@@ -369,19 +398,9 @@ const server = http.createServer((req, res) => {
             return res.end(JSON.stringify({ error: "Database not found for date " + date }));
         }
 
-        const db = new sqlite3.Database(dbFullPath, sqlite3.OPEN_READONLY);
         const sql = `SELECT timestamp, timezone_offset, exposure, gain, brightness, mean_r, mean_g, mean_b, noise, hdr, night_mode, stars, sqm, focus FROM image ORDER BY timestamp ASC`;
 
-        db.all(sql, [], (err, rows) => {
-            if (err) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: err.message }));
-            } else {
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(rows));
-            }
-            db.close();
-        });
+        queryDayDatabase(res, dbFullPath, sql);
 
     // API call: /api/meteo?date=YYYY-MM-DD
     } else if (pathname === '/api/meteo') {
@@ -400,19 +419,9 @@ const server = http.createServer((req, res) => {
             return res.end(JSON.stringify({ error: "Database not found for date " + date }));
         }
 
-        const db = new sqlite3.Database(dbFullPath, sqlite3.OPEN_READONLY);
         const sql = `SELECT timestamp, temperature, humidity, dew_point, pressure_msl, surface_pressure, cloud_cover, cloud_low, cloud_mid, cloud_high, visibility, wind_speed_10m, wind_dir_10m, wind_speed_300hPa FROM meteo ORDER BY timestamp ASC`;
 
-        db.all(sql, [], (err, rows) => {
-            if (err) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: err.message }));
-            } else {
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(rows));
-            }
-            db.close();
-        });
+        queryDayDatabase(res, dbFullPath, sql);
 
     // API call: /api/sensors?date=YYYY-MM-DD (RS485/Modbus sensors, allsky360-sensors)
     } else if (pathname === '/api/sensors') {
@@ -431,21 +440,13 @@ const server = http.createServer((req, res) => {
             return res.end(JSON.stringify({ error: "Database not found for date " + date }));
         }
 
-        const db = new sqlite3.Database(dbFullPath, sqlite3.OPEN_READONLY);
         const sql = `SELECT timestamp, temperature, humidity, dew_point, pressure, ws_wind_speed, ws_wind_direction, noise, pm25, pm10, illuminance, rainfall, wind_speed, wind_direction, cabinet_temperature, cabinet_humidity, cabinet_dew_point FROM sensors ORDER BY timestamp ASC`;
 
-        db.all(sql, [], (err, rows) => {
-            if (err) {
-                // Days before the sensor tool was installed have no table
-                const missing = /no such table/.test(err.message);
-                res.writeHead(missing ? 404 : 500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: missing ? "No sensor data for date " + date : err.message }));
-            } else {
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(rows));
-            }
-            db.close();
-        });
+        // Days before the sensor tool was installed have no table
+        queryDayDatabase(res, dbFullPath, sql, (err) =>
+            /no such table/.test(err.message)
+                ? [404, "No sensor data for date " + date]
+                : [500, err.message]);
 
     // API call: /api/aurora?date=YYYY-MM-DD
     } else if (pathname === '/api/aurora') {
@@ -464,19 +465,9 @@ const server = http.createServer((req, res) => {
             return res.end(JSON.stringify({ error: "Database not found for date " + date }));
         }
 
-        const db = new sqlite3.Database(dbFullPath, sqlite3.OPEN_READONLY);
         const sql = `SELECT timestamp, probability_percent, probability_max, probability_avg, kp_index, bt, bz, density, speed, temperature FROM aurora ORDER BY timestamp ASC`;
 
-        db.all(sql, [], (err, rows) => {
-            if (err) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: err.message }));
-            } else {
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify(rows));
-            }
-            db.close();
-        });
+        queryDayDatabase(res, dbFullPath, sql);
 
     // API call: /api/thumbnails?date=YYYY-MM-DD&type=type
     } else if (pathname === '/api/thumbnails') {
