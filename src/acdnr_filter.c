@@ -146,9 +146,11 @@ printf("ACDNR Filter: stddev_l=%f, amount_l=%f, iterations_l=%d, structure_size_
     float u = U[i];
     float v = V[i];
 
-    float r = yv + 1.13983f * v;
-    float g = yv - 0.39465f * u - 0.58060f * v;
-    float b = yv + 2.03211f * u;
+    /* Inverse of the Rec.709 conversion above (was the BT.601 YUV inverse,
+     * which shifted colors even without any filtering) */
+    float r = yv + 1.5748f * v;
+    float g = yv - 0.187324f * u - 0.468124f * v;
+    float b = yv + 1.8556f * u;
 
     int idx = i * CHANNELS;
     rgba[idx + 0] = clampf1(r);

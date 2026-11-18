@@ -55,9 +55,11 @@ __global__ void yuv_to_rgb_kernel(float *rgba, const float *Y, const float *U, c
     if (i >= pixel_count) return;
 
     float y = Y[i], u = U[i], v = V[i];
-    float r = y + 1.13983f * v;
-    float g = y - 0.39465f * u - 0.58060f * v;
-    float b = y + 2.03211f * u;
+    /* Inverse of the Rec.709 conversion above (was the BT.601 YUV inverse,
+     * which shifted colors even without any filtering) */
+    float r = y + 1.5748f * v;
+    float g = y - 0.187324f * u - 0.468124f * v;
+    float b = y + 1.8556f * u;
 
     rgba[i * 4 + 0] = CLAMPF(r);
     rgba[i * 4 + 1] = CLAMPF(g);
@@ -65,8 +67,28 @@ __global__ void yuv_to_rgb_kernel(float *rgba, const float *Y, const float *U, c
     rgba[i * 4 + 3] = 1.0f;
 }
 
+/* Structure mask as in the CPU version: blur the luminance only where the
+ * 3x3 Laplace contrast is below stddev (protects stars and sharp edges);
+ * the 1-pixel border is not blurred */
+__global__ void luma_mask_kernel(const float *Y, float *mask, int width, int height, float stddev) {
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    if (x >= width || y >= height) return;
+
+    int idx = y * width + x;
+    if (x == 0 || y == 0 || x == width - 1 || y == height - 1) {
+        mask[idx] = 0.0f;
+        return;
+    }
+    float contrast = fabsf(4.0f * Y[idx] - Y[idx - width] - Y[idx + width] -
+                           Y[idx - 1] - Y[idx + 1]);
+    mask[idx] = (contrast < stddev) ? 1.0f : 0.0f;
+}
+
 // NOTE: Hier einfache Boxblur-Prototypen (nicht optimal)
-__global__ void box_blur_kernel(float *channel, float *temp, int width, int height, int radius, float amount) {
+/* mask: per-pixel factor for amount, NULL = blur everywhere */
+__global__ void box_blur_kernel(float *channel, float *temp, int width, int height, int radius, float amount,
+                                const float *mask) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= width || y >= height) return;
@@ -85,7 +107,8 @@ __global__ void box_blur_kernel(float *channel, float *temp, int width, int heig
     }
     int idx = y * width + x;
     float blurred = sum / count;
-    channel[idx] = (1.0f - amount) * temp[idx] + amount * blurred;
+    float effective_amount = mask ? mask[idx] * amount : amount;
+    channel[idx] = (1.0f - effective_amount) * temp[idx] + effective_amount * blurred;
 }
 
 extern "C" int acdnr_filter_rgbf1_cuda(float *rgba, int width, int height,
@@ -152,7 +175,14 @@ extern "C" int acdnr_filter_rgbf1_cuda(float *rgba, int width, int height,
             printf("cudaMemcpy Y_temp failed: %s\n", cudaGetErrorString(err));
             goto cleanup;
         }
-        box_blur_kernel<<<gridSize, blockSize>>>(Y, Y_temp, width, height, structure_size_l, amount_l);
+        /* V_temp is free until the chroma pass: use it as the mask */
+        luma_mask_kernel<<<gridSize, blockSize>>>(Y, V_temp, width, height, stddev_l);
+        err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            printf("luma_mask_kernel failed: %s\n", cudaGetErrorString(err));
+            goto cleanup;
+        }
+        box_blur_kernel<<<gridSize, blockSize>>>(Y, Y_temp, width, height, structure_size_l, amount_l, V_temp);
         err = cudaGetLastError();
         if (err != cudaSuccess) {
             printf("box_blur_kernel Y failed: %s\n", cudaGetErrorString(err));
@@ -171,13 +201,13 @@ extern "C" int acdnr_filter_rgbf1_cuda(float *rgba, int width, int height,
             printf("cudaMemcpy V_temp failed: %s\n", cudaGetErrorString(err));
             goto cleanup;
         }
-        box_blur_kernel<<<gridSize, blockSize>>>(U, U_temp, width, height, structure_size_c, amount_c);
+        box_blur_kernel<<<gridSize, blockSize>>>(U, U_temp, width, height, structure_size_c, amount_c, NULL);
         err = cudaGetLastError();
         if (err != cudaSuccess) {
             printf("box_blur_kernel U failed: %s\n", cudaGetErrorString(err));
             goto cleanup;
         }
-        box_blur_kernel<<<gridSize, blockSize>>>(V, V_temp, width, height, structure_size_c, amount_c);
+        box_blur_kernel<<<gridSize, blockSize>>>(V, V_temp, width, height, structure_size_c, amount_c, NULL);
         err = cudaGetLastError();
         if (err != cudaSuccess) {
             printf("box_blur_kernel V failed: %s\n", cudaGetErrorString(err));
