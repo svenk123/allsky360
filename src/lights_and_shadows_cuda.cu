@@ -205,7 +205,11 @@ extern "C" int autostretch_rgbf1_cuda(float *hdr_image, int width, int height, f
             return 1;
         }
         
-        cudaDeviceSynchronize();
+        err = cudaDeviceSynchronize();
+        if (err != cudaSuccess) {
+            printf("autostretch_stretch_kernel execution failed: %s\n", cudaGetErrorString(err));
+            return 1;
+        }
         printf("Autostretch (GPU): ok, %.2f . %.2f (%.3f . %.3f)\n",
                min_val * 100.0f, max_val * 100.0f, black, white);
         return 0;
@@ -238,7 +242,11 @@ extern "C" int autostretch_rgbf1_cuda(float *hdr_image, int width, int height, f
         return 1;
     }
     
-    cudaDeviceSynchronize();
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        printf("autostretch_stretch_kernel execution failed: %s\n", cudaGetErrorString(err));
+        return 1;
+    }
     printf("Autostretch (GPU): ok, %.2f . %.2f (%.3f . %.3f)\n",
            min_val * 100.0f, max_val * 100.0f, black, white);
     return 0;
@@ -387,7 +395,11 @@ extern "C" int adjust_black_point_rgbf1_cuda(float *rgbf, int width, int height,
         return 1;
     }
     
-    cudaDeviceSynchronize();
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        printf("apply_black_point_kernel execution failed: %s\n", cudaGetErrorString(err));
+        return 1;
+    }
     printf("Blackpoint adjustment (GPU): ok, %.1f%% (%.4f . %.4f)\n", 
            black_shift_pct * 100.0, min_val, black_point);
     

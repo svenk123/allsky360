@@ -51,18 +51,29 @@ extern "C" int subtract_darkframe_rgb16_cuda(unsigned short *rgb_image, unsigned
     err = cudaMalloc((void**)&d_dark, image_size);
     if (err != cudaSuccess) { cudaFree(d_rgb); return 3; }
 
-    cudaMemcpy(d_rgb, rgb_image, image_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_dark, darkframe, image_size, cudaMemcpyHostToDevice);
+    err = cudaMemcpy(d_rgb, rgb_image, image_size, cudaMemcpyHostToDevice);
+    if (err == cudaSuccess)
+        err = cudaMemcpy(d_dark, darkframe, image_size, cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "CUDA: Darkframe upload failed: %s\n", cudaGetErrorString(err));
+        cudaFree(d_rgb);
+        cudaFree(d_dark);
+        return 4;
+    }
 
     int pixel_count = width * height;
     int threadsPerBlock = 256;
     int blocksPerGrid = (pixel_count + threadsPerBlock - 1) / threadsPerBlock;
     subtract_darkframe_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_rgb, d_dark, pixel_count);
-    cudaDeviceSynchronize();
-
-    cudaMemcpy(rgb_image, d_rgb, image_size, cudaMemcpyDeviceToHost);
+    err = cudaDeviceSynchronize();
+    if (err == cudaSuccess)
+        err = cudaMemcpy(rgb_image, d_rgb, image_size, cudaMemcpyDeviceToHost);
     cudaFree(d_rgb);
     cudaFree(d_dark);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "CUDA: Darkframe calibration failed: %s\n", cudaGetErrorString(err));
+        return 5;
+    }
 
     printf("CUDA: Darkframe calibration (%dx%d) ok.\n", width, height);
     return 0;

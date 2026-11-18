@@ -244,6 +244,7 @@ extern "C" int perceptual_dehaze_rgbf1_multiscale_full_cuda(float *rgba_image, i
     h_valid_luma = (float*)malloc(valid_count * sizeof(float));
     if (!h_valid_luma) {
         printf("Host memory allocation failed\n");
+        err = cudaErrorMemoryAllocation; /* report the failure, not 0 */
         goto cleanup;
     }
     
@@ -283,8 +284,12 @@ extern "C" int perceptual_dehaze_rgbf1_multiscale_full_cuda(float *rgba_image, i
         goto cleanup;
     }
     
-    // Synchronize to ensure all kernels have completed
-    cudaDeviceSynchronize();
+    // Synchronize to ensure all kernels have completed (reports execution errors)
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        printf("Perceptual Dehaze (GPU): kernel execution failed: %s\n", cudaGetErrorString(err));
+        goto cleanup;
+    }
     
     printf("Perceptual Dehaze (GPU): ok, haze_level=%.4f\n", haze_level);
     

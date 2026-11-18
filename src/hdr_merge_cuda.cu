@@ -257,14 +257,19 @@ extern "C" int hdr_normalize_range_rgbf1_cuda(float *rgba, int width, int height
         return 1;
     }
     
-    // Synchronize to ensure all kernels have completed
-    cudaDeviceSynchronize();
-    
+    // Synchronize to ensure all kernels have completed (reports execution errors)
+    err = cudaDeviceSynchronize();
+
     // Cleanup
     cudaFree(d_min_vals);
     cudaFree(d_max_vals);
     free(h_min_vals);
     free(h_max_vals);
+
+    if (err != cudaSuccess) {
+        printf("HDR Normalize (GPU): kernel execution failed: %s\n", cudaGetErrorString(err));
+        return 1;
+    }
     
     printf("HDR Normalize (GPU): ok\n");
     

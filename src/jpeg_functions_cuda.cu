@@ -150,7 +150,13 @@ extern "C" int save_jpeg_rgbf16_cuda(const float *rgba, int width, int height,
     return 6;
   }
 
-  cudaDeviceSynchronize();
+  cerr = cudaDeviceSynchronize();
+  if (cerr != cudaSuccess) {
+    fprintf(stderr, "CUDA kernel execution failed: %s\n",
+            cudaGetErrorString(cerr));
+    cudaFree(rgb8_d);
+    return 7;
+  }
 
 #ifdef USE_GPUJPEG
   /* GPU input + GPUJPEG (DEVICE to DEVICE, zero-copy) */
@@ -406,7 +412,12 @@ extern "C" int tonemap_rgbf1_to_rgbf16_cuda(float *rgbf_d, int width,
             cudaGetErrorString(err));
     return 6;
   }
-  cudaDeviceSynchronize();
+  err = cudaDeviceSynchronize();
+  if (err != cudaSuccess) {
+    fprintf(stderr, "CUDA kernel execution failed (tonemap_normalize): %s\n",
+            cudaGetErrorString(err));
+    return 7;
+  }
 
   printf("Tonemapping (GPU): ok, float RGB (0.0–1.0) to RGB float 16-bit "
          "(0.0–65535.0).\n");

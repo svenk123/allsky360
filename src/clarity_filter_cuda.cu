@@ -296,6 +296,7 @@ extern "C" int clarity_filter_rgbf_masked_cuda(float *rgba, int width, int heigh
     h_kernel = (float*)malloc(klen * sizeof(float));
     if (!h_kernel) {
         printf("Host kernel allocation failed\n");
+        err = cudaErrorMemoryAllocation; /* report the failure, not 0 */
         goto cleanup;
     }
     
@@ -371,8 +372,12 @@ extern "C" int clarity_filter_rgbf_masked_cuda(float *rgba, int width, int heigh
         goto cleanup;
     }
     
-    // Synchronize to ensure all kernels have completed
-    cudaDeviceSynchronize();
+    // Synchronize to ensure all kernels have completed (reports execution errors)
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        printf("Clarity Filter (GPU): kernel execution failed: %s\n", cudaGetErrorString(err));
+        goto cleanup;
+    }
     
     printf("Clarity Filter (GPU): ok\n");
     
