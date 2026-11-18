@@ -31,10 +31,38 @@
 /* An archive of one day per entry; 4096 days is ~11 years. */
 #define RETENTION_MAX_DAYS 4096
 
-/* Video basenames written by scripts/endofnight.sh */
-static const char *const video_prefixes[] = {"normal", "max", "motion"};
-#define VIDEO_PREFIX_COUNT                                                     \
-  (sizeof(video_prefixes) / sizeof(video_prefixes[0]))
+/* Night products written by scripts/endofnight.sh into video_directory as
+ * <prefix>_<YYYYMMDD>.<ext>: the timelapses with their preview image, the
+ * keogram and the star trails with their JSON. */
+static const struct {
+  const char *prefix;
+  const char *ext;
+} night_products[] = {
+    {"normal", "mp4"},   {"normal", "png"},     {"max", "mp4"},
+    {"max", "png"},      {"motion", "mp4"},     {"motion", "png"},
+    {"keogram", "jpg"},  {"keogram", "json"},   {"startrails", "jpg"},
+    {"startrails", "json"},
+};
+#define NIGHT_PRODUCT_COUNT (sizeof(night_products) / sizeof(night_products[0]))
+
+/* Day key of a night product file name (exactly <prefix>_<YYYYMMDD>.<ext>
+ * of the table above), else 0 */
+static int night_product_day(const char *name, char day[9]) {
+  for (size_t i = 0; i < NIGHT_PRODUCT_COUNT; i++) {
+    size_t plen = strlen(night_products[i].prefix);
+    size_t elen = strlen(night_products[i].ext);
+    if (strlen(name) != plen + 1 + 8 + 1 + elen)
+      continue;
+    if (strncmp(name, night_products[i].prefix, plen) != 0 ||
+        name[plen] != '_' || name[plen + 9] != '.' ||
+        strcmp(name + plen + 10, night_products[i].ext) != 0)
+      continue;
+    memcpy(day, name + plen + 1, 8);
+    day[8] = '\0';
+    return 1;
+  }
+  return 0;
+}
 
 typedef struct {
   char day[9]; /* YYYYMMDD */
@@ -228,7 +256,6 @@ static int day_side_files(const config_t *config, const char *day,
                           char paths[][PATH_MAX], int max_paths) {
   int n = 0;
   static const char *const db_suffix[] = {"", "-wal", "-shm"};
-  static const char *const video_ext[] = {"mp4", "png"};
 
   for (size_t s = 0; s < sizeof(db_suffix) / sizeof(db_suffix[0]); s++) {
     if (n >= max_paths)
@@ -238,21 +265,23 @@ static int day_side_files(const config_t *config, const char *day,
       n++;
   }
 
-  for (size_t p = 0; p < VIDEO_PREFIX_COUNT; p++) {
-    for (size_t e = 0; e < sizeof(video_ext) / sizeof(video_ext[0]); e++) {
-      if (n >= max_paths)
-        break;
-      if (allsky_safe_snprintf(paths[n], PATH_MAX, "%s/%s_%s.%s",
-                               config->video_directory, video_prefixes[p], day,
-                               video_ext[e]) == 0)
-        n++;
-    }
+  for (size_t i = 0; i < NIGHT_PRODUCT_COUNT; i++) {
+    if (n >= max_paths)
+      break;
+    if (allsky_safe_snprintf(paths[n], PATH_MAX, "%s/%s_%s.%s",
+                             config->video_directory,
+                             night_products[i].prefix, day,
+                             night_products[i].ext) == 0)
+      n++;
   }
 
   return n;
 }
 
+/* 3 database files + NIGHT_PRODUCT_COUNT (10) night products */
 #define MAX_SIDE_FILES 16
+_Static_assert(3 + NIGHT_PRODUCT_COUNT <= MAX_SIDE_FILES,
+               "MAX_SIDE_FILES too small for the side files of a day");
 
 static unsigned long long day_bytes(const config_t *config, const char *day) {
   unsigned long long total = 0;
@@ -399,6 +428,20 @@ int run_retention(const config_t *config, const char *today_str) {
         }
       }
       closedir(dbdir);
+    }
+  }
+
+  /* 2c) Days that only have night products left (videos, keogram, star
+   * trails): otherwise they would never be deleted */
+  if (is_usable_directory(config->video_directory)) {
+    DIR *videodir = opendir(config->video_directory);
+    if (videodir) {
+      while ((entry = readdir(videodir)) != NULL) {
+        char day[9];
+        if (night_product_day(entry->d_name, day))
+          add_day(days, &count, day);
+      }
+      closedir(videodir);
     }
   }
 

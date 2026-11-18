@@ -83,7 +83,7 @@ Both scripts run detached, as `allskyuser`, and must be executable.
 |---|---|---|
 | `retention` | `1` | `0` = never delete anything |
 | `retention_max_days` | `365` | Delete days older than this |
-| `retention_max_size_gb` | `500` | Delete the oldest days while the archive (images + videos + databases) is larger than this (GiB). Leave headroom for the system. |
+| `retention_max_size_gb` | `500` | Delete the oldest days while the archive (images, videos, keogram, star trails and databases) is larger than this (GiB). Leave headroom for the system. |
 | `retention_keep_days` | `2` | The newest days that are never deleted (minimum 2) |
 | `retention_dry_run` | `0` | `1` = only log what would be deleted |
 
