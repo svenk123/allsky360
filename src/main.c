@@ -1753,11 +1753,19 @@ int main(int argc, const char *argv[]) {
         TIMED_BLOCK("compute_filtered_median_brightness_rgbf1", {
           int brightness_radius =
               (int)(config.measure_brightness_area * config.image_horizon_radius);
-          compute_filtered_median_brightness_rgbf1(
-              frames[i].image, width, height, &frames[i].median_r,
-              &frames[i].median_g, &frames[i].median_b, &frames[i].median_l,
-              config.image_center_x, config.image_center_y,
-              brightness_radius);
+          if (compute_filtered_median_brightness_rgbf1(
+                  frames[i].image, width, height, &frames[i].median_r,
+                  &frames[i].median_g, &frames[i].median_b,
+                  &frames[i].median_l, config.image_center_x,
+                  config.image_center_y, brightness_radius) != 0) {
+            /* The medians stay 0: the HDR fusion rejects the frame */
+            fprintf(stderr,
+                    "ERROR: HDR frame %d: brightness measurement failed "
+                    "(center %d,%d, radius %d px = measure_brightness_area * "
+                    "image_horizon_radius)\n",
+                    i, config.image_center_x, config.image_center_y,
+                    brightness_radius);
+          }
         });
         /* HDR frames are raw (white balance after the fusion): report the
          * medians white-balanced, as before, so the database, the metadata
@@ -1977,15 +1985,24 @@ int main(int argc, const char *argv[]) {
             use_max_images = MAX_IMAGES;
           }
 
-          hdr_multi_scale_fusion_laplacian_rgbf1(
-              frames, use_max_images, width, height,
-              (float)config.hdr_clipping_threshold, y_max_expected, hdr_image,
-              images_dir, config.hdr_weight_maps, config.hdr_weight_stats,
-              (float)config.hdr_contrast_weight_strength,
-              (float)config.hdr_noise_fusion_strength,
-              config.hdr_pyramid_levels_override,
-              (float)config.hdr_weight_sigma,
-              (float)config.hdr_weight_clip_factor, hdr_wb_r, hdr_wb_b);
+          /* On failure hdr_image still holds the previous image (or, on the
+           * first cycle, uninitialized memory): do not publish it. continue
+           * applies to the capture loop, TIMED_BLOCK is no loop. */
+          if (hdr_multi_scale_fusion_laplacian_rgbf1(
+                  frames, use_max_images, width, height,
+                  (float)config.hdr_clipping_threshold, y_max_expected,
+                  hdr_image, images_dir, config.hdr_weight_maps,
+                  config.hdr_weight_stats,
+                  (float)config.hdr_contrast_weight_strength,
+                  (float)config.hdr_noise_fusion_strength,
+                  config.hdr_pyramid_levels_override,
+                  (float)config.hdr_weight_sigma,
+                  (float)config.hdr_weight_clip_factor, hdr_wb_r,
+                  hdr_wb_b) != 0) {
+            fprintf(stderr, "ERROR: HDR fusion failed, skipping this image\n");
+            failed_no++;
+            continue;
+          }
         });
 
         /* White balance on the fused (linear, unclamped) image */
