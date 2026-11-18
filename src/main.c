@@ -1188,6 +1188,8 @@ int main(int argc, const char *argv[]) {
 
       /* Capture frames */
       int abort_captures = 0;
+      /* All frames of a series are processed with one width/height */
+      int series_width = 0, series_height = 0;
 
       allsky_safe_free(sqm_stars);
       sqm_stars = NULL;
@@ -1494,6 +1496,19 @@ int main(int argc, const char *argv[]) {
         } else {
           width = raw_width;
           height = raw_height;
+        }
+        if (i == 0) {
+          series_width = width;
+          series_height = height;
+        } else if (width != series_width || height != series_height) {
+          fprintf(stderr,
+                  "ERROR: taking HDR frame (image size changed within the "
+                  "series: %dx%d, frame 0 was %dx%d)\n",
+                  width, height, series_width, series_height);
+          abort_captures = 1;
+          exposure_sec = frames[0].exposure;
+          failed_no++;
+          continue;
         }
         printf("Indigo raw image (header data): %dx%d px, %d byte(s) per "
                "pixel (%zu bytes)\n",
