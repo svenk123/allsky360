@@ -92,6 +92,74 @@ static int config_split_line(const char *line, char *key, size_t key_size,
   return 0;
 }
 
+/*
+ * Plausibility checks of numeric values. The config is re-read every capture
+ * cycle, so an invalid value is reported once per key and value (again after
+ * it was changed), not on every cycle.
+ */
+#define CONFIG_MAX_REPORTED 64
+static struct {
+  char key[64];
+  double value;
+} config_reported[CONFIG_MAX_REPORTED];
+static int config_reported_count = 0;
+
+/* 1 if this invalid value of key was not reported yet */
+static int report_invalid(const char *key, double value) {
+  for (int i = 0; i < config_reported_count; i++) {
+    if (strcmp(config_reported[i].key, key) == 0) {
+      int same = (isnan(value) && isnan(config_reported[i].value)) ||
+                 value == config_reported[i].value;
+      config_reported[i].value = value;
+      return !same;
+    }
+  }
+  if (config_reported_count < CONFIG_MAX_REPORTED) {
+    snprintf(config_reported[config_reported_count].key,
+             sizeof(config_reported[0].key), "%s", key);
+    config_reported[config_reported_count].value = value;
+    config_reported_count++;
+  }
+  return 1;
+}
+
+/* A valid value again: report a later invalid one */
+static void forget_invalid(const char *key) {
+  for (int i = 0; i < config_reported_count; i++) {
+    if (strcmp(config_reported[i].key, key) == 0) {
+      config_reported[i] = config_reported[--config_reported_count];
+      return;
+    }
+  }
+}
+
+/* Non-finite or out-of-range values fall back to the built-in default */
+static void check_double(const char *filename, const char *key, double *value,
+                         double default_value, double min, double max) {
+  if (isfinite(*value) && *value >= min && *value <= max) {
+    forget_invalid(key);
+    return;
+  }
+  if (report_invalid(key, *value))
+    fprintf(stderr,
+            "WARNING: %s: %s=%g is outside %g..%g, using the default %g\n",
+            filename, key, *value, min, max, default_value);
+  *value = default_value;
+}
+
+static void check_int(const char *filename, const char *key, int *value,
+                      int default_value, int min, int max) {
+  if (*value >= min && *value <= max) {
+    forget_invalid(key);
+    return;
+  }
+  if (report_invalid(key, (double)*value))
+    fprintf(stderr,
+            "WARNING: %s: %s=%d is outside %d..%d, using the default %d\n",
+            filename, key, *value, min, max, default_value);
+  *value = default_value;
+}
+
 int load_config(const char *filename, config_t *config) {
   if (!filename || !config)
     return 1;
@@ -126,7 +194,7 @@ int load_config(const char *filename, config_t *config) {
   config->daytime_move_blackpoint_min_shift_pct = 0.005;
   config->daytime_move_blackpoint_max_shift_pct = 0.02;
   config->daytime_move_blackpoint_dark_threshold = 0.2;
-  config->daytime_hdr_exposure_factor = 12.0;
+  config->daytime_hdr_exposure_factor = 2.0; /* EV steps, see docs */
   config->daytime_white_balance_red = 1.0;
   config->daytime_white_balance_blue = 1.0;
   config->daytime_white_balance_light_protect = 0.0;
@@ -137,7 +205,7 @@ int load_config(const char *filename, config_t *config) {
   config->nighttime_move_blackpoint_min_shift_pct = 0.005;
   config->nighttime_move_blackpoint_max_shift_pct = 0.02;
   config->nighttime_move_blackpoint_dark_threshold = 0.2;
-  config->nighttime_hdr_exposure_factor = 6.0;
+  config->nighttime_hdr_exposure_factor = 2.0;
   config->nighttime_white_balance_red = 1.0;
   config->nighttime_white_balance_blue = 1.0;
   config->nighttime_white_balance_light_protect = 0.0;
@@ -300,6 +368,9 @@ int load_config(const char *filename, config_t *config) {
            "Uranus-C @ localhost");
   config->indigomount[0] = '\0';
   config->indigo_capture_timeout = 20;
+
+  /* Built-in defaults, the fallback of the plausibility checks below */
+  const config_t defaults = *config;
 
   char line[CONFIG_LINE_MAX], key[64], value[CONFIG_VALUE_MAX];
   while (fgets(line, sizeof(line), file)) {
@@ -813,6 +884,137 @@ int load_config(const char *filename, config_t *config) {
   }
 
   fclose(file);
+
+  /* Plausibility: non-finite (nan, inf, 1e999) or nonsensical values would
+   * otherwise pass every later comparison (NaN) or overflow (radius^2 in
+   * int above 46340). The limits are wide on purpose: they only reject
+   * values no station can mean. */
+#define CHECK_D(field, min, max)                                               \
+  check_double(filename, #field, &config->field, defaults.field, min, max)
+#define CHECK_I(field, min, max)                                               \
+  check_int(filename, #field, &config->field, defaults.field, min, max)
+  CHECK_D(daytime_startexposure, 1e-6, 3600.0);
+  CHECK_D(nighttime_startexposure, 1e-6, 3600.0);
+  CHECK_I(daytime_startgain, 0, 100000);
+  CHECK_I(nighttime_startgain, 0, 100000);
+  CHECK_D(daytime_meanbrightness, 0.0, 1.0);
+  CHECK_D(nighttime_meanbrightness, 0.0, 1.0);
+  CHECK_D(daytime_move_blackpoint, 0.0, 1.0);
+  CHECK_D(nighttime_move_blackpoint, 0.0, 1.0);
+  CHECK_D(daytime_move_blackpoint_min_shift_pct, 0.0, 1.0);
+  CHECK_D(daytime_move_blackpoint_max_shift_pct, 0.0, 1.0);
+  CHECK_D(daytime_move_blackpoint_dark_threshold, 0.0, 1.0);
+  CHECK_D(nighttime_move_blackpoint_min_shift_pct, 0.0, 1.0);
+  CHECK_D(nighttime_move_blackpoint_max_shift_pct, 0.0, 1.0);
+  CHECK_D(nighttime_move_blackpoint_dark_threshold, 0.0, 1.0);
+  CHECK_D(daytime_hdr_exposure_factor, 0.0, 10.0);
+  CHECK_D(nighttime_hdr_exposure_factor, 0.0, 10.0);
+  CHECK_D(daytime_white_balance_red, 0.0, 10.0);
+  CHECK_D(daytime_white_balance_blue, 0.0, 10.0);
+  CHECK_D(nighttime_white_balance_red, 0.0, 10.0);
+  CHECK_D(nighttime_white_balance_blue, 0.0, 10.0);
+  CHECK_D(daytime_white_balance_light_protect, 0.0, 1.0);
+  CHECK_D(nighttime_white_balance_light_protect, 0.0, 1.0);
+  CHECK_D(nighttime_sunangle, -90.0, 90.0); /* NaN; clamped further below */
+  CHECK_I(nighttime_measure_noise_radius, 1, 46340);
+  CHECK_D(measure_brightness_area, 0.0, 1.0);
+  CHECK_I(nighttime_multiscale_median_filter_max_scale, 1, 10);
+  CHECK_D(nighttime_multiscale_median_filter_amount, 0.0, 1.0);
+  CHECK_D(hdr_clipping_threshold, 0.0, 1.0);
+  CHECK_D(hdr_min_clipped_pixels, 0.0, 1.0);
+  CHECK_D(hdr_y_max_expected, 0.0, 100.0);
+  CHECK_D(hdr_weight_sigma, 0.01, 10.0); /* 0 = division by zero */
+  CHECK_D(hdr_weight_clip_factor, 0.0, 1.0);
+  CHECK_D(hdr_highlight_knee, 0.0, 1.0);
+  CHECK_D(hdr_contrast_weight_strength, 0.0, 1.0);
+  CHECK_D(hdr_noise_fusion_strength, 0.0, 1.0);
+  CHECK_I(hdr_pyramid_levels_override, 0, 16);
+  CHECK_D(spektrum_regularization, 0.0, 1000.0);
+  CHECK_D(autostretch_min_val, 0.0, 1.0);
+  CHECK_D(autostretch_max_val, 0.0, 1.0);
+  CHECK_D(acdnr_filter_lum_stddev, 0.0, 100.0);
+  CHECK_D(acdnr_filter_chrom_stddev, 0.0, 100.0);
+  CHECK_D(acdnr_filter_lum_amount, 0.0, 1.0);
+  CHECK_D(acdnr_filter_chrom_amount, 0.0, 1.0);
+  CHECK_I(acdnr_filter_lum_iterations, 0, 20);
+  CHECK_I(acdnr_filter_chrom_iterations, 0, 20);
+  CHECK_I(acdnr_filter_lum_kernel_size, 0, 50);
+  CHECK_I(acdnr_filter_chrom_kernel_size, 0, 50);
+  CHECK_D(gamma, 0.05, 10.0);
+  CHECK_D(auto_gamma_target, 0.001, 0.999);
+  CHECK_D(auto_gamma_min, 0.05, 10.0);
+  CHECK_D(auto_gamma_max, 0.05, 10.0);
+  CHECK_D(reinhard_white_point, 0.0, 1e6);
+  CHECK_D(tone_curve_shadow_lift, 0.0, 1.0);
+  CHECK_D(tone_curve_midtone_contrast, 0.0, 1.0);
+  CHECK_D(saturation, 0.0, 10.0);
+  CHECK_D(dehaze_amount, 0.0, 10.0);
+  CHECK_D(dehaze_estimate, 0.0, 1.0);
+  CHECK_D(clarity_filter_strength, -10.0, 10.0);
+  CHECK_I(clarity_filter_radius, 1, 1000);
+  CHECK_D(clarity_filter_midtone_width, 0.0, 10.0);
+  CHECK_D(scnr_filter_amount, 0.0, 1.0);
+  CHECK_D(wavelet_sharpen_gain_small, -10.0, 100.0);
+  CHECK_D(wavelet_sharpen_gain_medium, -10.0, 100.0);
+  CHECK_D(wavelet_sharpen_gain_large, -10.0, 100.0);
+  CHECK_I(sqm_max_stars, 1, 1000000);
+  CHECK_I(sqm_radius, 0, 46340);
+  CHECK_D(sqm_star_sigma, 0.1, 100.0);
+  CHECK_D(sqm_detect_sigma, 0.1, 1000.0);
+  CHECK_D(sqm_max_fwhm, 0.1, 1000.0);
+  CHECK_D(sqm_max_elongation, 0.0, 1.0);
+  CHECK_D(sqm_intercept, -100.0, 100.0);
+  CHECK_D(sqm_slope, -100.0, 100.0);
+  CHECK_D(camera_max_exposure, 1e-6, 3600.0);
+  CHECK_D(camera_min_exposure, 0.0, 3600.0);
+  CHECK_I(camera_max_gain, 0, 100000);
+  CHECK_I(camera_min_gain, 0, 100000);
+  CHECK_I(jpeg_quality, 1, 100);
+  CHECK_I(image_mask_radius, 0, 46340);
+  CHECK_I(image_horizon_radius, 0, 46340);
+  CHECK_I(focus_radius, 0, 46340);
+  CHECK_D(image_north_angle, -360.0, 360.0);
+  CHECK_I(font_size, 1, 1000);
+  CHECK_I(thumbnail_width, 1, 100000);
+  CHECK_D(location_latitude, -90.0, 90.0);
+  CHECK_D(location_longitude, -180.0, 180.0);
+  CHECK_D(retention_max_size_gb, -1e9, 1e9); /* NaN/Inf; <= 0 see below */
+  CHECK_I(capture_interval, 1, 86400);
+  /* the key is indigo_port */
+  check_int(filename, "indigo_port", &config->indigoport, defaults.indigoport,
+            1, 65535);
+  CHECK_I(indigo_capture_timeout, 1, 3600);
+#undef CHECK_D
+#undef CHECK_I
+
+  /* Pairs that must be ordered */
+  if (config->camera_min_exposure > config->camera_max_exposure) {
+    if (report_invalid("camera_min_exposure>camera_max_exposure",
+                       config->camera_min_exposure))
+      fprintf(stderr,
+              "WARNING: %s: camera_min_exposure %g is above "
+              "camera_max_exposure %g, using the defaults %g..%g\n",
+              filename, config->camera_min_exposure,
+              config->camera_max_exposure, defaults.camera_min_exposure,
+              defaults.camera_max_exposure);
+    config->camera_min_exposure = defaults.camera_min_exposure;
+    config->camera_max_exposure = defaults.camera_max_exposure;
+  } else {
+    forget_invalid("camera_min_exposure>camera_max_exposure");
+  }
+  if (config->camera_min_gain > config->camera_max_gain) {
+    if (report_invalid("camera_min_gain>camera_max_gain",
+                       config->camera_min_gain))
+      fprintf(stderr,
+              "WARNING: %s: camera_min_gain %d is above camera_max_gain %d, "
+              "using the defaults %d..%d\n",
+              filename, config->camera_min_gain, config->camera_max_gain,
+              defaults.camera_min_gain, defaults.camera_max_gain);
+    config->camera_min_gain = defaults.camera_min_gain;
+    config->camera_max_gain = defaults.camera_max_gain;
+  } else {
+    forget_invalid("camera_min_gain>camera_max_gain");
+  }
 
   /* Range checks for values that would otherwise misbehave silently. */
   if (config->retention_max_days < 1) {

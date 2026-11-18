@@ -34,6 +34,9 @@ short description. The linked pages explain the keys of a topic in detail.
   `sudo systemctl restart allsky360-sensors allsky360-api`.
 * Unknown keys are reported once in the log (`unknown configuration key`), so
   typos do not go unnoticed. Keys that were removed are reported with a note.
+* Numbers are checked for plausibility: `nan`, `inf` or a value far outside
+  any sensible range (e.g. `capture_interval=0`, `hdr_weight_sigma=0`) is
+  reported once in the log and replaced by the built-in default.
 * Edit the file as the service user, so it keeps its owner:
   `sudo -u allskyuser nano /home/allskyuser/config.ini`.
 
