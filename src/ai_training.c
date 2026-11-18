@@ -25,6 +25,7 @@
 #include <json-c/json.h>
 
 #include "ai_training.h"
+#include "allsky.h"
 
 int save_patches_with_metadata(const float *rgba, int width, int height, int patch_size,
                                const int (*positions)[2], int n_patches,
@@ -76,7 +77,7 @@ int save_patches_with_metadata(const float *rgba, int width, int height, int pat
         png_write_info(png_ptr, info_ptr);
 
         // Write rows
-        png_bytep row = (png_bytep)malloc(6 * patch_size); // 3 channels x 2 bytes
+        png_bytep row = (png_bytep)allsky_safe_malloc(6 * patch_size); // 3 channels x 2 bytes
         for (int y = 0; y < patch_size; ++y)
         {
             for (int x = 0; x < patch_size; ++x)
@@ -93,7 +94,7 @@ int save_patches_with_metadata(const float *rgba, int width, int height, int pat
             }
             png_write_row(png_ptr, row);
         }
-        free(row);
+        allsky_safe_free(row);
         png_write_end(png_ptr, NULL);
         png_destroy_write_struct(&png_ptr, &info_ptr);
         fclose(fp);

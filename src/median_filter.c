@@ -21,6 +21,8 @@
 #include <string.h>
 #include <omp.h>
 
+#include "allsky.h"
+
 #ifndef USE_CUDA
 
 #define CLAMPF(x) ((x) < 0.0f ? 0.0f : ((x) > 65535.0f ? 65535.0f : (x)))
@@ -59,9 +61,11 @@ int median_filter_rgbf(float *rgba, int width, int height, int kernel_radius) {
 
     #pragma omp parallel
     {
-        float *r_vals = (float *)malloc(window_area * sizeof(float));
-        float *g_vals = (float *)malloc(window_area * sizeof(float));
-        float *b_vals = (float *)malloc(window_area * sizeof(float));
+        /* Per-thread windows: abort with a message instead of a NULL
+         * dereference on out of memory */
+        float *r_vals = (float *)allsky_safe_malloc(window_area * sizeof(float));
+        float *g_vals = (float *)allsky_safe_malloc(window_area * sizeof(float));
+        float *b_vals = (float *)allsky_safe_malloc(window_area * sizeof(float));
 
         #pragma omp for schedule(dynamic)
         for (int y = kernel_radius; y < height - kernel_radius; y++) {
@@ -86,9 +90,9 @@ int median_filter_rgbf(float *rgba, int width, int height, int kernel_radius) {
             }
         }
 
-        free(r_vals);
-        free(g_vals);
-        free(b_vals);
+        allsky_safe_free(r_vals);
+        allsky_safe_free(g_vals);
+        allsky_safe_free(b_vals);
     }
 
     free(copy);
