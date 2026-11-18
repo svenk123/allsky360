@@ -25,17 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Custom libjpeg error handler — uses longjmp instead of exit() */
-struct allsky_jpeg_err_mgr {
-  struct jpeg_error_mgr pub;
-  jmp_buf setjmp_buf;
-};
-
-static void allsky_jpeg_error_exit(j_common_ptr cinfo) {
-  struct allsky_jpeg_err_mgr *err = (struct allsky_jpeg_err_mgr *)cinfo->err;
-  (*cinfo->err->output_message)(cinfo);
-  longjmp(err->setjmp_buf, 1);
-}
+#include "jpeg_error.h" /* libjpeg error handler with longjmp, no exit() */
 
 int save_jpeg_rgbf1(const float *rgba, int width, int height,
                     int compression_ratio, float scale, const char *filename) {
@@ -92,8 +82,10 @@ int save_jpeg_rgbf1(const float *rgba, int width, int height,
   jerr.pub.error_exit = allsky_jpeg_error_exit;
 
   if (setjmp(jerr.setjmp_buf)) {
+    /* e.g. write error on a full disk: do not leave a truncated file */
     jpeg_destroy_compress(&cinfo);
     fclose(outfile);
+    remove(filename);
     allsky_safe_free(rgb8);
     return 5;
   }
@@ -119,9 +111,13 @@ int save_jpeg_rgbf1(const float *rgba, int width, int height,
   }
 
   jpeg_finish_compress(&cinfo);
-  fclose(outfile);
   jpeg_destroy_compress(&cinfo);
   allsky_safe_free(rgb8);
+  if (fclose(outfile) != 0) {
+    fprintf(stderr, "ERROR: Save JPEG: write error on %s\n", filename);
+    remove(filename);
+    return 6;
+  }
 
   printf("Save JPEG: ok, filename: %s\n", filename);
   return 0;
@@ -186,8 +182,10 @@ int save_jpeg_rgbf16(const float *rgba, int width, int height,
   jerr.pub.error_exit = allsky_jpeg_error_exit;
 
   if (setjmp(jerr.setjmp_buf)) {
+    /* e.g. write error on a full disk: do not leave a truncated file */
     jpeg_destroy_compress(&cinfo);
     fclose(outfile);
+    remove(filename);
     allsky_safe_free(rgb8);
     return 5;
   }
@@ -213,9 +211,13 @@ int save_jpeg_rgbf16(const float *rgba, int width, int height,
   }
 
   jpeg_finish_compress(&cinfo);
-  fclose(outfile);
   jpeg_destroy_compress(&cinfo);
   allsky_safe_free(rgb8);
+  if (fclose(outfile) != 0) {
+    fprintf(stderr, "ERROR: Save JPEG: write error on %s\n", filename);
+    remove(filename);
+    return 6;
+  }
 
   printf("Save JPEG: ok, filename: %s\n", filename);
   return 0;

@@ -21,21 +21,38 @@
 #include <cairo.h>
 #include "allsky.h"
 #include "jpeg_to_cairo.h"
+#include "jpeg_error.h"
 
 int load_jpeg_as_cairo_surface(cairo_surface_t **surface, const char *filename) {
     struct jpeg_decompress_struct cinfo;
-    struct jpeg_error_mgr jerr;
+    struct allsky_jpeg_err_mgr jerr;
     FILE *infile;
     JSAMPARRAY buffer;
     int row_stride;
+
+    if (!surface)
+        return 1;
+    *surface = NULL;
 
     if ((infile = fopen(filename, "rb")) == NULL) {
         fprintf(stderr, "ERROR: Can not open file %s\n", filename);
         return 1;
     }
 
-    // Initialize jpeg
-    cinfo.err = jpeg_std_error(&jerr);
+    // Initialize jpeg: longjmp instead of exit() on errors (e.g. a
+    // truncated or corrupt file)
+    cinfo.err = jpeg_std_error(&jerr.pub);
+    jerr.pub.error_exit = allsky_jpeg_error_exit;
+    if (setjmp(jerr.setjmp_buf)) {
+        fprintf(stderr, "ERROR: Can not decode JPEG file %s\n", filename);
+        jpeg_destroy_decompress(&cinfo);
+        fclose(infile);
+        if (*surface) {
+            cairo_surface_destroy(*surface);
+            *surface = NULL;
+        }
+        return 1;
+    }
     jpeg_create_decompress(&cinfo);
     jpeg_stdio_src(&cinfo, infile);
     jpeg_read_header(&cinfo, TRUE);
@@ -106,15 +123,32 @@ int save_cairo_surface_as_jpeg(cairo_surface_t *surface, const char *output_file
     }
 
     struct jpeg_compress_struct cinfo;
-    struct jpeg_error_mgr jerr;
-
-    cinfo.err = jpeg_std_error(&jerr);
-    jpeg_create_compress(&cinfo);
-    jpeg_stdio_dest(&cinfo, outfile);
+    struct allsky_jpeg_err_mgr jerr;
 
     unsigned int width = cairo_image_surface_get_width(surface);
     unsigned int height = cairo_image_surface_get_height(surface);
     unsigned char *data = cairo_image_surface_get_data(surface);
+    unsigned char *row_data = (unsigned char *)allsky_safe_malloc(width * 3);
+    if (!row_data) {
+        fclose(outfile);
+        remove(output_filename);
+        return 1;
+    }
+
+    // longjmp instead of exit() on errors, e.g. a write error on a full disk
+    cinfo.err = jpeg_std_error(&jerr.pub);
+    jerr.pub.error_exit = allsky_jpeg_error_exit;
+    if (setjmp(jerr.setjmp_buf)) {
+        fprintf(stderr, "ERROR: Can not write JPEG file %s\n", output_filename);
+        jpeg_destroy_compress(&cinfo);
+        fclose(outfile);
+        remove(output_filename);
+        allsky_safe_free(row_data);
+        return 1;
+    }
+
+    jpeg_create_compress(&cinfo);
+    jpeg_stdio_dest(&cinfo, outfile);
 
     cinfo.image_width = width;
     cinfo.image_height = height;
@@ -126,7 +160,6 @@ int save_cairo_surface_as_jpeg(cairo_surface_t *surface, const char *output_file
     jpeg_start_compress(&cinfo, TRUE);
 
     JSAMPROW row_pointer;
-    unsigned char *row_data = (unsigned char *)allsky_safe_malloc(width * 3);
 
     while (cinfo.next_scanline < cinfo.image_height) {
         unsigned char *src = data + cinfo.next_scanline * width * CHANNELS;
@@ -139,10 +172,14 @@ int save_cairo_surface_as_jpeg(cairo_surface_t *surface, const char *output_file
         jpeg_write_scanlines(&cinfo, &row_pointer, 1);
     }
 
-    allsky_safe_free(row_data);
     jpeg_finish_compress(&cinfo);
     jpeg_destroy_compress(&cinfo);
-    fclose(outfile);
+    allsky_safe_free(row_data);
+    if (fclose(outfile) != 0) {
+        fprintf(stderr, "ERROR: Write error on JPEG file %s\n", output_filename);
+        remove(output_filename);
+        return 1;
+    }
 
     printf("Save Cairo surface as JPEG: ok, filename: %s (%dx%d)\n",output_filename, width, height);
 

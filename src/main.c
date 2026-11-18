@@ -1914,11 +1914,15 @@ int main(int argc, const char *argv[]) {
           }
           cairo_surface_mark_dirty(surface1);
 
-          save_cairo_surface_as_jpeg(surface1, hdr_frame_filename,
-                                     config.jpeg_quality);
+          int hdr_frame_rc = save_cairo_surface_as_jpeg(
+              surface1, hdr_frame_filename, config.jpeg_quality);
           cairo_surface_destroy(surface1);
 
-          printf("HDR exposure image %s saved.\n", hdr_frame_filename);
+          if (hdr_frame_rc != 0)
+            fprintf(stderr, "ERROR: Failed to save HDR exposure image %s\n",
+                    hdr_frame_filename);
+          else
+            printf("HDR exposure image %s saved.\n", hdr_frame_filename);
         }
       }
 
@@ -2353,12 +2357,19 @@ int main(int argc, const char *argv[]) {
         fprintf(stderr, "WARNING: String %s truncated\n",
                 latest_image_filepath);
 
+      /* Without the image file nothing can be archived or published
+       * (e.g. a full disk): skip this image. continue applies to the
+       * capture loop, TIMED_BLOCK is no loop. */
       TIMED_BLOCK("save_jpeg_rgbf16", {
         if (save_jpeg_rgbf16(hdr_image_device, width, height,
                              config.jpeg_quality, 1.0f,
                              latest_image_filepath) != 0) {
-          fprintf(stderr, "ERROR: Failed to save latest image to %s\n",
+          fprintf(stderr,
+                  "ERROR: Failed to save latest image to %s, skipping this "
+                  "image\n",
                   latest_image_filepath);
+          failed_no++;
+          continue;
         }
         printf("Latest image %s saved\n", latest_image_filepath);
       });
@@ -2432,8 +2443,11 @@ int main(int argc, const char *argv[]) {
             config.panorama_center_x, config.panorama_center_y,
             config.panorama_horizontal_start);
 
-        save_cairo_surface_as_jpeg(panorama_surface, latest_panorama_filepath,
-                                   config.jpeg_quality);
+        if (save_cairo_surface_as_jpeg(panorama_surface,
+                                       latest_panorama_filepath,
+                                       config.jpeg_quality) != 0)
+          fprintf(stderr, "ERROR: Failed to save panorama %s\n",
+                  latest_panorama_filepath);
 
         char archive_panorama_filepath[PATH_MAX + 1];
         if (allsky_safe_snprintf(

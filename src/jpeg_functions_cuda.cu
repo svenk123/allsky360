@@ -17,6 +17,7 @@
  *****************************************************************************/
 #include "allsky.h"
 #include "jpeg_functions.h"
+#include "jpeg_error.h"
 #include <cuda_runtime.h>
 #include <float.h>
 #ifdef USE_GPUJPEG
@@ -48,9 +49,18 @@ static int save_jpeg_libjpeg_rgb8(const unsigned char *rgb8, int width,
     return 2;
 
   struct jpeg_compress_struct cinfo;
-  struct jpeg_error_mgr jerr;
+  struct allsky_jpeg_err_mgr jerr;
 
-  cinfo.err = jpeg_std_error(&jerr);
+  /* longjmp instead of exit() on errors, e.g. a full disk */
+  cinfo.err = jpeg_std_error(&jerr.pub);
+  jerr.pub.error_exit = allsky_jpeg_error_exit;
+  if (setjmp(jerr.setjmp_buf)) {
+    jpeg_destroy_compress(&cinfo);
+    fclose(outfile);
+    remove(filename);
+    return 3;
+  }
+
   jpeg_create_compress(&cinfo);
   jpeg_stdio_dest(&cinfo, outfile);
 
@@ -73,8 +83,12 @@ static int save_jpeg_libjpeg_rgb8(const unsigned char *rgb8, int width,
   }
 
   jpeg_finish_compress(&cinfo);
-  fclose(outfile);
   jpeg_destroy_compress(&cinfo);
+  if (fclose(outfile) != 0) {
+    fprintf(stderr, "ERROR: Save JPEG: write error on %s\n", filename);
+    remove(filename);
+    return 4;
+  }
 
   return 0;
 }
@@ -225,8 +239,15 @@ extern "C" int save_jpeg_rgbf16_cuda(const float *rgba, int width, int height,
     return 13;
   }
 
-  fwrite(jpg_data, 1, jpg_size, f);
-  fclose(f);
+  size_t written = fwrite(jpg_data, 1, jpg_size, f);
+  int close_rc = fclose(f);
+  if (written != jpg_size || close_rc != 0) {
+    fprintf(stderr, "ERROR: Save JPEG: write error on %s\n", filename);
+    remove(filename);
+    gpujpeg_encoder_destroy(enc);
+    cudaFree(rgb8_d);
+    return 14;
+  }
 
   gpujpeg_encoder_destroy(enc);
   cudaFree(rgb8_d);
@@ -255,7 +276,8 @@ extern "C" int save_jpeg_rgbf16_cuda(const float *rgba, int width, int height,
       save_jpeg_libjpeg_rgb8(rgb8_h, new_w, new_h, compression_ratio, filename);
   allsky_safe_free(rgb8_h);
 
-  printf("Save JPEG (GPU + libjpeg): ok %s\n", filename);
+  if (rc == 0)
+    printf("Save JPEG (GPU + libjpeg): ok %s\n", filename);
   return rc;
 
 #endif
