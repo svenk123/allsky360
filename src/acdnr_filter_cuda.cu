@@ -97,113 +97,119 @@ extern "C" int acdnr_filter_rgbf1_cuda(float *rgba, int width, int height,
     printf("ACDNR Filter (GPU): stddev_l=%f, amount_l=%f, iterations_l=%d, structure_size_l=%d, stddev_c=%f, amount_c=%f, iterations_c=%d, structure_size_c=%d\n", stddev_l, amount_l, iterations_l, structure_size_l, stddev_c, amount_c, iterations_c, structure_size_c);
 
     int pixel_count = width * height;
-    size_t image_bytes = pixel_count * sizeof(float);
+    size_t image_bytes = (size_t)pixel_count * sizeof(float);
 
-    float *Y, *U, *V;
-    float *Y_temp, *U_temp, *V_temp;
-    
-    cudaError_t err;
-    err = cudaMalloc(&Y, image_bytes);
-    if (err != cudaSuccess) { 
-        printf("CUDA malloc Y failed: %s\n", cudaGetErrorString(err)); 
-        return 1; 
-    }
-    err = cudaMalloc(&U, image_bytes);
-    if (err != cudaSuccess) { 
-        printf("CUDA malloc U failed: %s\n", cudaGetErrorString(err)); 
-        return 1; 
-    }
-    err = cudaMalloc(&V, image_bytes);
-    if (err != cudaSuccess) { 
-        printf("CUDA malloc V failed: %s\n", cudaGetErrorString(err)); 
-        return 1; 
-    }
-    err = cudaMalloc(&Y_temp, image_bytes);
-    if (err != cudaSuccess) { 
-        printf("CUDA malloc Y_temp failed: %s\n", cudaGetErrorString(err)); 
-        return 1; 
-    }
-    err = cudaMalloc(&U_temp, image_bytes);
-    if (err != cudaSuccess) { 
-        printf("CUDA malloc U_temp failed: %s\n", cudaGetErrorString(err)); 
-        return 1; 
-    }
-    err = cudaMalloc(&V_temp, image_bytes);
-    if (err != cudaSuccess) { 
-        printf("CUDA malloc V_temp failed: %s\n", cudaGetErrorString(err)); 
-        return 1; 
-    }
+    float *Y = NULL, *U = NULL, *V = NULL;
+    float *Y_temp = NULL, *U_temp = NULL, *V_temp = NULL;
 
     int threads = 256;
     int blocks = (pixel_count + threads - 1) / threads;
-
-    rgb_to_yuv_kernel<<<blocks, threads>>>(rgba, Y, U, V, pixel_count);
-    err = cudaGetLastError();
-    if (err != cudaSuccess) { 
-        printf("rgb_to_yuv_kernel failed: %s\n", cudaGetErrorString(err)); 
-        return 1; 
-    }
-
     dim3 blockSize(16, 16);
     dim3 gridSize((width + 15) / 16, (height + 15) / 16);
 
+    cudaError_t err;
+    err = cudaMalloc(&Y, image_bytes);
+    if (err != cudaSuccess) {
+        printf("CUDA malloc Y failed: %s\n", cudaGetErrorString(err));
+        goto cleanup;
+    }
+    err = cudaMalloc(&U, image_bytes);
+    if (err != cudaSuccess) {
+        printf("CUDA malloc U failed: %s\n", cudaGetErrorString(err));
+        goto cleanup;
+    }
+    err = cudaMalloc(&V, image_bytes);
+    if (err != cudaSuccess) {
+        printf("CUDA malloc V failed: %s\n", cudaGetErrorString(err));
+        goto cleanup;
+    }
+    err = cudaMalloc(&Y_temp, image_bytes);
+    if (err != cudaSuccess) {
+        printf("CUDA malloc Y_temp failed: %s\n", cudaGetErrorString(err));
+        goto cleanup;
+    }
+    err = cudaMalloc(&U_temp, image_bytes);
+    if (err != cudaSuccess) {
+        printf("CUDA malloc U_temp failed: %s\n", cudaGetErrorString(err));
+        goto cleanup;
+    }
+    err = cudaMalloc(&V_temp, image_bytes);
+    if (err != cudaSuccess) {
+        printf("CUDA malloc V_temp failed: %s\n", cudaGetErrorString(err));
+        goto cleanup;
+    }
+
+    rgb_to_yuv_kernel<<<blocks, threads>>>(rgba, Y, U, V, pixel_count);
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("rgb_to_yuv_kernel failed: %s\n", cudaGetErrorString(err));
+        goto cleanup;
+    }
+
     for (int i = 0; i < iterations_l; i++) {
         err = cudaMemcpy(Y_temp, Y, image_bytes, cudaMemcpyDeviceToDevice);
-        if (err != cudaSuccess) { 
-            printf("cudaMemcpy Y_temp failed: %s\n", cudaGetErrorString(err)); 
-            return 1; 
+        if (err != cudaSuccess) {
+            printf("cudaMemcpy Y_temp failed: %s\n", cudaGetErrorString(err));
+            goto cleanup;
         }
         box_blur_kernel<<<gridSize, blockSize>>>(Y, Y_temp, width, height, structure_size_l, amount_l);
         err = cudaGetLastError();
-        if (err != cudaSuccess) { 
-            printf("box_blur_kernel Y failed: %s\n", cudaGetErrorString(err)); 
-            return 1; 
+        if (err != cudaSuccess) {
+            printf("box_blur_kernel Y failed: %s\n", cudaGetErrorString(err));
+            goto cleanup;
         }
     }
 
     for (int i = 0; i < iterations_c; i++) {
         err = cudaMemcpy(U_temp, U, image_bytes, cudaMemcpyDeviceToDevice);
-        if (err != cudaSuccess) { 
-            printf("cudaMemcpy U_temp failed: %s\n", cudaGetErrorString(err)); 
-            return 1; 
+        if (err != cudaSuccess) {
+            printf("cudaMemcpy U_temp failed: %s\n", cudaGetErrorString(err));
+            goto cleanup;
         }
         err = cudaMemcpy(V_temp, V, image_bytes, cudaMemcpyDeviceToDevice);
-        if (err != cudaSuccess) { 
-            printf("cudaMemcpy V_temp failed: %s\n", cudaGetErrorString(err)); 
-            return 1; 
+        if (err != cudaSuccess) {
+            printf("cudaMemcpy V_temp failed: %s\n", cudaGetErrorString(err));
+            goto cleanup;
         }
         box_blur_kernel<<<gridSize, blockSize>>>(U, U_temp, width, height, structure_size_c, amount_c);
         err = cudaGetLastError();
         if (err != cudaSuccess) {
-            printf("box_blur_kernel U failed: %s\n", cudaGetErrorString(err)); 
-            return 1; 
+            printf("box_blur_kernel U failed: %s\n", cudaGetErrorString(err));
+            goto cleanup;
         }
         box_blur_kernel<<<gridSize, blockSize>>>(V, V_temp, width, height, structure_size_c, amount_c);
         err = cudaGetLastError();
-        if (err != cudaSuccess) { 
-            printf("box_blur_kernel V failed: %s\n", cudaGetErrorString(err)); 
-            return 1; 
+        if (err != cudaSuccess) {
+            printf("box_blur_kernel V failed: %s\n", cudaGetErrorString(err));
+            goto cleanup;
         }
     }
 
     yuv_to_rgb_kernel<<<blocks, threads>>>(rgba, Y, U, V, pixel_count);
     err = cudaGetLastError();
-    if (err != cudaSuccess) { 
-        printf("yuv_to_rgb_kernel failed: %s\n", cudaGetErrorString(err)); 
-        return 1; 
+    if (err != cudaSuccess) {
+        printf("yuv_to_rgb_kernel failed: %s\n", cudaGetErrorString(err));
+        goto cleanup;
     }
 
-    // Synchronize to ensure all kernels have completed
-    cudaDeviceSynchronize();
+    // Synchronize to ensure all kernels have completed (reports execution errors)
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        printf("ACDNR Filter (GPU): kernel execution failed: %s\n", cudaGetErrorString(err));
+        goto cleanup;
+    }
 
+cleanup:
     cudaFree(Y);
     cudaFree(U);
     cudaFree(V);
-    cudaFree(Y_temp); 
+    cudaFree(Y_temp);
     cudaFree(U_temp);
     cudaFree(V_temp);
 
-    printf("ACDNR Filter (GPU): ok\n");
+    if (err != cudaSuccess)
+        return 1;
 
+    printf("ACDNR Filter (GPU): ok\n");
     return 0;
 }

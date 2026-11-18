@@ -71,37 +71,42 @@ extern "C" int median_filter_rgbf_cuda(float *rgba, int width, int height, int k
     if (!rgba || width <= 0 || height <= 0 || kernel_radius < 1 || kernel_radius > 10) return 1;
 
     int pixel_count = width * height;
-    size_t bufsize = pixel_count * 4 * sizeof(float);
+    size_t bufsize = (size_t)pixel_count * 4 * sizeof(float);
 
     float *dev_input = nullptr;
     float *dev_output = nullptr;
-    
-    cudaError_t err;
-    err = cudaMalloc(&dev_input, bufsize);
-    if (err != cudaSuccess) { printf("CUDA malloc dev_input failed: %s\n", cudaGetErrorString(err)); return 1; }
-    err = cudaMalloc(&dev_output, bufsize);
-    if (err != cudaSuccess) { printf("CUDA malloc dev_output failed: %s\n", cudaGetErrorString(err)); return 1; }
-    
-    err = cudaMemcpy(dev_input, rgba, bufsize, cudaMemcpyHostToDevice);
-    if (err != cudaSuccess) { printf("cudaMemcpy H2D failed: %s\n", cudaGetErrorString(err)); return 1; }
 
     dim3 blockSize(16, 16);
     dim3 gridSize((width + 15) / 16, (height + 15) / 16);
     int kernel_size = 2 * kernel_radius + 1;
     int shared_mem_size = 3 * kernel_size * kernel_size * sizeof(float);
 
+    cudaError_t err;
+    err = cudaMalloc(&dev_input, bufsize);
+    if (err != cudaSuccess) { printf("CUDA malloc dev_input failed: %s\n", cudaGetErrorString(err)); goto cleanup; }
+    err = cudaMalloc(&dev_output, bufsize);
+    if (err != cudaSuccess) { printf("CUDA malloc dev_output failed: %s\n", cudaGetErrorString(err)); goto cleanup; }
+
+    err = cudaMemcpy(dev_input, rgba, bufsize, cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) { printf("cudaMemcpy H2D failed: %s\n", cudaGetErrorString(err)); goto cleanup; }
+
     median_filter_rgbf_kernel<<<gridSize, blockSize, shared_mem_size>>>(dev_input, dev_output, width, height, kernel_radius);
     err = cudaGetLastError();
-    if (err != cudaSuccess) { printf("median_filter_rgbf_kernel failed: %s\n", cudaGetErrorString(err)); return 1; }
-    
-    // Synchronize to ensure kernel completion
-    cudaDeviceSynchronize();
-    
-    err = cudaMemcpy(rgba, dev_output, bufsize, cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess) { printf("cudaMemcpy D2H failed: %s\n", cudaGetErrorString(err)); return 1; }
+    if (err != cudaSuccess) { printf("median_filter_rgbf_kernel failed: %s\n", cudaGetErrorString(err)); goto cleanup; }
 
+    // Synchronize to ensure kernel completion (reports execution errors)
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) { printf("median_filter_rgbf_kernel execution failed: %s\n", cudaGetErrorString(err)); goto cleanup; }
+
+    err = cudaMemcpy(rgba, dev_output, bufsize, cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) { printf("cudaMemcpy D2H failed: %s\n", cudaGetErrorString(err)); goto cleanup; }
+
+cleanup:
     cudaFree(dev_input);
     cudaFree(dev_output);
+
+    if (err != cudaSuccess)
+        return 1;
 
     printf("Median filter (GPU): ok\n");
     return 0;
@@ -230,19 +235,19 @@ extern "C" int multiscale_median_filter_rgbf1_cuda(
 
     int use_quickselect = 1;
     float *dev_rgba = NULL, *dev_temp = NULL;
-    size_t bytes = sizeof(float) * 4 * width * height;
-
-    cudaError_t err;
-    err = cudaMalloc(&dev_rgba, bytes);
-    if (err != cudaSuccess) { printf("CUDA malloc dev_rgba failed: %s\n", cudaGetErrorString(err)); return 1; }
-    err = cudaMalloc(&dev_temp, bytes);
-    if (err != cudaSuccess) { printf("CUDA malloc dev_temp failed: %s\n", cudaGetErrorString(err)); return 1; }
-    
-    err = cudaMemcpy(dev_rgba, host_rgba, bytes, cudaMemcpyHostToDevice);
-    if (err != cudaSuccess) { printf("cudaMemcpy H2D failed: %s\n", cudaGetErrorString(err)); return 1; }
+    size_t bytes = sizeof(float) * 4 * (size_t)width * (size_t)height;
 
     dim3 block(16, 16);
     dim3 grid((width + block.x - 1) / block.x, (height + block.y - 1) / block.y);
+
+    cudaError_t err;
+    err = cudaMalloc(&dev_rgba, bytes);
+    if (err != cudaSuccess) { printf("CUDA malloc dev_rgba failed: %s\n", cudaGetErrorString(err)); goto cleanup; }
+    err = cudaMalloc(&dev_temp, bytes);
+    if (err != cudaSuccess) { printf("CUDA malloc dev_temp failed: %s\n", cudaGetErrorString(err)); goto cleanup; }
+
+    err = cudaMemcpy(dev_rgba, host_rgba, bytes, cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) { printf("cudaMemcpy H2D failed: %s\n", cudaGetErrorString(err)); goto cleanup; }
 
     for (int scale = 1; scale <= max_scale; ++scale) {
         int radius = scale;
@@ -259,9 +264,10 @@ extern "C" int multiscale_median_filter_rgbf1_cuda(
         multiscale_median_kernel<<<grid, block>>>(
             dev_rgba, dev_temp, width, height, radius, blend_factor, use_quickselect);
         err = cudaGetLastError();
-        if (err != cudaSuccess) { printf("multiscale_median_kernel failed: %s\n", cudaGetErrorString(err)); return 1; }
-        
-        cudaDeviceSynchronize();
+        if (err != cudaSuccess) { printf("multiscale_median_kernel failed: %s\n", cudaGetErrorString(err)); goto cleanup; }
+
+        err = cudaDeviceSynchronize();
+        if (err != cudaSuccess) { printf("multiscale_median_kernel execution failed: %s\n", cudaGetErrorString(err)); goto cleanup; }
 
         // swap pointers
         float *tmp = dev_rgba;
@@ -270,10 +276,14 @@ extern "C" int multiscale_median_filter_rgbf1_cuda(
     }
 
     err = cudaMemcpy(host_rgba, dev_rgba, bytes, cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess) { printf("cudaMemcpy D2H failed: %s\n", cudaGetErrorString(err)); return 1; }
-    
+    if (err != cudaSuccess) { printf("cudaMemcpy D2H failed: %s\n", cudaGetErrorString(err)); goto cleanup; }
+
+cleanup:
     cudaFree(dev_rgba);
     cudaFree(dev_temp);
+
+    if (err != cudaSuccess)
+        return 1;
 
     printf("Multi-scale median filter (GPU): ok\n");
     return 0;
