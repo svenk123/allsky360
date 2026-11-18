@@ -380,7 +380,13 @@ extern "C" int adjust_black_point_rgbf1_cuda(float *rgbf, int width, int height,
     const float range = (float)(max_val - min_val);
     const float black_point = (float)(min_val + black_shift_pct * range);
     const float denom = (float)(range * (1.0 - black_shift_pct));
-    
+
+    /* Guard (as in the CPU version): nothing to stretch when all pixels have
+     * the same luminance, or a shift of 100%: a division by 0 would turn
+     * every pixel white */
+    if (!isfinite(denom) || denom < 1e-7f)
+        return 0;
+
     apply_black_point_kernel<<<blocks, threads>>>(rgbf, pixel_count, black_point, denom, eps);
     err = cudaGetLastError();
     if (err != cudaSuccess) {
