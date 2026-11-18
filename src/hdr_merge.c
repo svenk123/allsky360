@@ -703,8 +703,9 @@ int hdr_multi_scale_fusion_laplacian_rgbf1(
       int hist[256] = {0};
 #pragma omp parallel for reduction(+ : hist[:256])
       for (size_t i = 0; i < pixel_count; ++i) {
-        int bin = (int)(C[i] / maxv * 255.0f);
-        hist[(bin < 0) ? 0 : (bin > 255 ? 255 : bin)]++;
+        /* Clamp before the conversion: (int)NaN is undefined */
+        int bin = (int)(clampf1(C[i] / maxv) * 255.0f);
+        hist[bin]++;
       }
       size_t target99 = (size_t)(pixel_count * 0.99);
       size_t cum = 0;

@@ -21,7 +21,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define CLAMPF(x) ((x) < 0.0f ? 0.0f : ((x) > 1.0f ? 1.0f : (x)))
+#define CLAMPF(x) (!((x) > 0.0f) ? 0.0f : ((x) > 1.0f ? 1.0f : (x))) /* NaN -> 0 */
 #define CHANNELS 4  // RGBA
 #define EPSILON 1e-8f
 #define TINY 1e-8f

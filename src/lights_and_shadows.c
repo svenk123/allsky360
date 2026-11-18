@@ -62,12 +62,8 @@ int adjust_black_point_rgbf1(float *rgbf, int width, int height,
         continue;
 
       // Compute luminance (Rec.709)
-      float L = rgb_to_luminance_rec709(px[0], px[1], px[2]);
-
-      if (L < 0.0f)
-        L = 0.0f;
-      if (L > 1.0f)
-        L = 1.0f;
+      /* clampf1: NaN would otherwise become an undefined bin index */
+      float L = clampf1(rgb_to_luminance_rec709(px[0], px[1], px[2]));
 
       int bin = (int)(L * (hist_bins - 1));
       local_hist[bin]++;

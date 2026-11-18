@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define CLAMPF(x) ((x) < 0.0f ? 0.0f : ((x) > 1.0f ? 1.0f : (x)))
+#define CLAMPF(x) (!((x) > 0.0f) ? 0.0f : ((x) > 1.0f ? 1.0f : (x))) /* NaN -> 0 */
 #define CHANNELS 4 // RGBA
 
 // CUDA kernel for computing statistics in a subframe region
@@ -615,7 +615,7 @@ extern "C" SceneType detect_scene_rgbf1_cuda(float *d_rgba, int width,
 
 // Simple clamp
 __device__ __forceinline__ float d_clampf1(float v) {
-  if (v < 0.0f)
+  if (!(v > 0.0f)) /* also NaN */
     return 0.0f;
   if (v > 1.0f)
     return 1.0f;

@@ -22,7 +22,7 @@
 
 #include "color_calibration_cuda.h"
 
-#define CLAMPF(x) ((x) < 0.0f ? 0.0f : ((x) > 1.0f ? 1.0f : (x)))
+#define CLAMPF(x) (!((x) > 0.0f) ? 0.0f : ((x) > 1.0f ? 1.0f : (x))) /* NaN -> 0 */
 
 // RGB to HSV (0.0..1.0)
 __device__ static void rgb_to_hsv_f(float r, float g, float b, float *h, float *s, float *v) {

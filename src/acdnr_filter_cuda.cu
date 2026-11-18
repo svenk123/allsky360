@@ -21,7 +21,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define CLAMPF(x) ((x) < 0.0f ? 0.0f : ((x) > 1.0f ? 1.0f : (x)))
+#define CLAMPF(x) (!((x) > 0.0f) ? 0.0f : ((x) > 1.0f ? 1.0f : (x))) /* NaN -> 0 */
 
 __device__ float laplace3x3(const float *luminance, int x, int y, int width, int height) {
     const int k[3][3] = {{0, -1, 0}, {-1, 4, -1}, {0, -1, 0}};

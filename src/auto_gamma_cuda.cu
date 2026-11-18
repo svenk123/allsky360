@@ -19,7 +19,7 @@
 #include <math.h>
 #include <stdio.h>
 
-#define CLAMPF(x) ((x) < 0.0f ? 0.0f : ((x) > 1.0f ? 1.0f : (x)))
+#define CLAMPF(x) (!((x) > 0.0f) ? 0.0f : ((x) > 1.0f ? 1.0f : (x))) /* NaN -> 0 */
 
 /* Get a device pointer for an image buffer without copying, if possible.
  * main.c passes hdr_image_device: the device pointer of a zero-copy mapped

@@ -21,7 +21,7 @@
 #include <stdlib.h>
 
 #define CHANNELS 4
-#define CLAMPF1(x) ((x) < 0.0f ? 0.0f : ((x) > 1.0f ? 1.0f : (x)))
+#define CLAMPF1(x) (!((x) > 0.0f) ? 0.0f : ((x) > 1.0f ? 1.0f : (x))) /* NaN -> 0 */
 
 // CUDA kernel for autostretch stretch operation
 __global__ void autostretch_stretch_kernel(float *rgba, int pixel_count, float black, float scale) {

@@ -378,8 +378,11 @@ static inline int allsky_check_directory(const char *path) {
 
 /***** Utility functions **********/
 
+/* Clamp to 0..1. NaN becomes 0: "x < 0" and "x > 1" are both false for
+ * NaN, it used to pass through, and (int)(NaN * bins) as a histogram index
+ * is undefined behavior (INT_MIN on x86, an out-of-bounds write). */
 static inline float clampf1(float x) {
-  return (x < 0.0f) ? 0.0f : (x > 1.0f ? 1.0f : x);
+  return !(x > 0.0f) ? 0.0f : (x > 1.0f ? 1.0f : x);
 }
 
 /* Compute Rec.709 linear luminance from RGB. */
