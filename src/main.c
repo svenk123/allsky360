@@ -635,11 +635,18 @@ void setup_signal_handlers() {
  *
  * @param script: absolute path of the hook, empty or NULL disables it
  * @param arg: optional single argument for the hook (may be NULL)
+ * Whether the exec succeeded is reported back through a close-on-exec pipe:
+ * a successful exec closes the write end (the parent reads EOF), a failed
+ * exec or second fork writes errno into it. A broken hook (e.g. a shebang
+ * pointing to a missing interpreter) is thus an error here, not a silent
+ * no-op.
+ *
  * @return:
- *   0 = hook spawned (or deliberately disabled)
+ *   0 = hook started (or deliberately disabled)
  *   1 = parameter/usage error, script missing or not executable
- *   2 = fork error
+ *   2 = fork/pipe error
  *   3 = waitpid error on intermediate child
+ *   4 = exec of the hook failed
  */
 static int spawn_hook(const char *script, const char *arg) {
   if (!script || script[0] == '\0')
@@ -651,22 +658,58 @@ static int spawn_hook(const char *script, const char *arg) {
     return 1;
   }
 
-  pid_t pid = fork();
-  if (pid < 0)
+  int status_pipe[2];
+  if (pipe(status_pipe) != 0)
     return 2;
+  fcntl(status_pipe[0], F_SETFD, FD_CLOEXEC);
+  fcntl(status_pipe[1], F_SETFD, FD_CLOEXEC);
+
+  pid_t pid = fork();
+  if (pid < 0) {
+    close(status_pipe[0]);
+    close(status_pipe[1]);
+    return 2;
+  }
 
   if (pid > 0) {
     /* Parent: reap the intermediate child right away */
+    close(status_pipe[1]);
     int status;
-    if (waitpid(pid, &status, 0) < 0)
+    if (waitpid(pid, &status, 0) < 0) {
+      close(status_pipe[0]);
       return 3;
+    }
+
+    /* EOF = the hook was exec'd; otherwise the child sent errno */
+    int child_errno = 0;
+    ssize_t got;
+    do {
+      got = read(status_pipe[0], &child_errno, sizeof(child_errno));
+    } while (got < 0 && errno == EINTR);
+    close(status_pipe[0]);
+
+    if (got == (ssize_t)sizeof(child_errno)) {
+      fprintf(stderr, "ERROR: hook %s could not be started: %s\n", script,
+              strerror(child_errno));
+      return 4;
+    }
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+      fprintf(stderr, "ERROR: hook %s: fork failed\n", script);
+      return 2;
+    }
     return 0;
   }
 
   /* First child: fork again so the worker is re-parented to init */
+  close(status_pipe[0]);
   pid_t pid2 = fork();
-  if (pid2 < 0)
+  if (pid2 < 0) {
+    int e = errno;
+    if (write(status_pipe[1], &e, sizeof(e)) < 0) {
+      /* nothing left to report to */
+    }
     _exit(2);
+  }
   if (pid2 > 0)
     _exit(0);
 
@@ -675,10 +718,12 @@ static int spawn_hook(const char *script, const char *arg) {
     /* not fatal */
   }
 
+  /* Close inherited descriptors, except the status pipe (close-on-exec) */
   struct rlimit rl;
   if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
     for (int fd = 3; fd < (int)rl.rlim_cur; fd++)
-      close(fd);
+      if (fd != status_pipe[1])
+        close(fd);
   }
 
   int devnull = open("/dev/null", O_RDWR);
@@ -696,6 +741,10 @@ static int spawn_hook(const char *script, const char *arg) {
     execl(script, script, (char *)NULL);
 
   /* Only reached when execl failed */
+  int e = errno;
+  if (write(status_pipe[1], &e, sizeof(e)) < 0) {
+    /* nothing left to report to */
+  }
   _exit(127);
 }
 
@@ -1165,6 +1214,9 @@ int main(int argc, const char *argv[]) {
           /* Record the attempt BEFORE spawning: the hook is detached and may
            * run for minutes. If the daemon dies meanwhile, the next start must
            * not launch a second, competing run. */
+          char previous_endofnight_day[sizeof(last_endofnight_day)];
+          allsky_safe_strncpy(previous_endofnight_day, last_endofnight_day,
+                              sizeof(previous_endofnight_day));
           allsky_safe_strncpy(last_endofnight_day, eon_day,
                               sizeof(last_endofnight_day));
           if (run_state_set(config.database_directory, "last_endofnight",
@@ -1176,7 +1228,16 @@ int main(int argc, const char *argv[]) {
           if (run_end_of_night(config.endofnight_script, config.image_directory,
                                config.database_directory,
                                config.video_directory) != 0) {
-            fprintf(stderr, "ERROR: Failed to spawn end of night tasks.\n");
+            /* Nothing was started, so no duplicate run is possible: restore
+             * the previous state, the next cycle tries again (e.g. after the
+             * script was fixed) instead of skipping this night for good */
+            fprintf(stderr, "ERROR: Failed to spawn end of night tasks, "
+                            "retrying in the next cycle.\n");
+            allsky_safe_strncpy(last_endofnight_day, previous_endofnight_day,
+                                sizeof(last_endofnight_day));
+            if (previous_endofnight_day[0])
+              run_state_set(config.database_directory, "last_endofnight",
+                            previous_endofnight_day);
           } else {
             printf("End of night tasks spawned\n");
           }
