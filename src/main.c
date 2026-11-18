@@ -125,6 +125,31 @@ size_t raw_buffer_size = 0;
  * exposure: "exposure done" without a new image (e.g. a failed URL BLOB
  * download) must not process the previous frame again. */
 static unsigned int raw_buffer_generation = 0;
+/* Sensor temperature from the camera's CCD_TEMPERATURE property in 1/10 °C,
+ * written by the INDIGO client thread; valid only while
+ * sensor_temperature_valid is set (reset before every series) */
+static int sensor_temperature_tenths = 0;
+static int sensor_temperature_valid = 0;
+
+/* Remember the sensor temperature reported by the camera (define and update
+ * of CCD_TEMPERATURE); an alert state means no usable reading */
+static void note_sensor_temperature(const indigo_property *property) {
+  if (strcmp(property->name, CCD_TEMPERATURE_PROPERTY_NAME) != 0)
+    return;
+  if (property->state == INDIGO_ALERT_STATE)
+    return;
+  for (int i = 0; i < property->count; i++) {
+    if (!strcmp(property->items[i].name, CCD_TEMPERATURE_ITEM_NAME)) {
+      double t = property->items[i].number.value;
+      if (!isfinite(t))
+        return;
+      __atomic_store_n(&sensor_temperature_tenths, (int)lround(t * 10.0),
+                       __ATOMIC_RELAXED);
+      __atomic_store_n(&sensor_temperature_valid, 1, __ATOMIC_RELEASE);
+      return;
+    }
+  }
+}
 
 /**
  * Configure 2x2 binning on an already connected camera
@@ -202,6 +227,8 @@ static indigo_result client_define_property(indigo_client *client,
 
   if (strcmp(property->device, indigo_camera))
     return INDIGO_OK;
+
+  note_sensor_temperature(property);
 
   if (!strcmp(property->name, CONNECTION_PROPERTY_NAME)) {
     if (indigo_get_switch(property, CONNECTION_CONNECTED_ITEM_NAME)) {
@@ -287,6 +314,8 @@ static indigo_result client_update_property(indigo_client *client,
 
   if (strcmp(property->device, indigo_camera))
     return INDIGO_OK;
+
+  note_sensor_temperature(property);
 
   /* Exposure */
   static const char *exposure_items[] = {CCD_EXPOSURE_ITEM_NAME};
@@ -1350,6 +1379,8 @@ int main(int argc, const char *argv[]) {
       printf("\n");
 
       /* Capture frames */
+      /* Only a temperature reported during this series belongs to it */
+      __atomic_store_n(&sensor_temperature_valid, 0, __ATOMIC_RELEASE);
       int abort_captures = 0;
       /* All frames of a series are processed with one width/height */
       int series_width = 0, series_height = 0;
@@ -2659,13 +2690,19 @@ int main(int argc, const char *argv[]) {
       image_metadata.sigma_noise_t2 = frames[2].sigma_noise;
       image_metadata.sigma_noise_t3 = frames[3].sigma_noise;
       image_metadata.sigma_noise_t4 = frames[4].sigma_noise;
-      image_metadata.gain =
-          gain; // FIXME, das ist hier schon der neu berechnete gain
+      /* gain is already the value for the next image: use the gain this
+       * image was taken with */
+      image_metadata.gain = frames[0].gain;
       image_metadata.focus = sharpness;
       image_metadata.capture_interval = config.capture_interval;
       image_metadata.night_mode = is_night;
       image_metadata.hdr = use_max_images;
-      image_metadata.sensor_temperature = 9.0;
+      /* Reported by the camera during this series, else unknown (null) */
+      image_metadata.sensor_temperature =
+          __atomic_load_n(&sensor_temperature_valid, __ATOMIC_ACQUIRE)
+              ? __atomic_load_n(&sensor_temperature_tenths, __ATOMIC_RELAXED) /
+                    10.0
+              : NAN;
       image_metadata.mean_brightness = frames[0].median_l;
       image_metadata.target_brightness = is_night
                                              ? config.nighttime_meanbrightness
@@ -2729,7 +2766,8 @@ int main(int argc, const char *argv[]) {
       }
 
       if (insert_measurement(
-              db_filepath, now, timezone_offset, frames[0].exposure, gain,
+              db_filepath, now, timezone_offset, frames[0].exposure,
+              frames[0].gain,
               frames[0].median_g, frames[0].median_r, frames[0].median_g,
               frames[0].median_b, frames[0].sigma_noise, use_max_images,
               is_night, num_stars, estimated_sqm, sharpness) != 0) {

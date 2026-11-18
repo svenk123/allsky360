@@ -1263,7 +1263,8 @@
         }
         if (imageMeta.width)  imageDataHtml += `<div>Width  <span>${imageMeta.width} px</span></div>`;
         if (imageMeta.height) imageDataHtml += `<div>Height <span>${imageMeta.height} px</span></div>`;
-        imageDataHtml += `<div>Sensor temp (°C) <span>${imageMeta.sensor_temperature.toFixed(1)}</span></div>`;
+        if (imageMeta.sensor_temperature != null)
+          imageDataHtml += `<div>Sensor temp (°C) <span>${imageMeta.sensor_temperature.toFixed(1)}</span></div>`;
         imageDataHtml += `<div>Brightness <span>${imageMeta.mean_brightness.toFixed(2)} → ${imageMeta.target_brightness.toFixed(2)}</span></div>`;
         if (imageMeta.focus) imageDataHtml += `<div>Focus <span>${imageMeta.focus.toFixed(2)}</span></div>`;
         if (imageMeta.night_mode) {

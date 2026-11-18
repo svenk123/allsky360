@@ -63,7 +63,11 @@ int save_image_metadata_json(const char *image_filename, const image_metadata_t 
     json_object_object_add(root, "capture_interval", json_object_new_int(metadata->capture_interval));
     json_object_object_add(root, "night_mode", json_object_new_int(metadata->night_mode));
     json_object_object_add(root, "hdr", json_object_new_int(metadata->hdr));
-    json_object_object_add(root, "sensor_temperature", json_object_new_double(round_to_precision(metadata->sensor_temperature, 1)));
+    /* NaN = the camera reported no temperature */
+    json_object_object_add(root, "sensor_temperature",
+                           isnan(metadata->sensor_temperature)
+                               ? NULL
+                               : json_object_new_double(round_to_precision(metadata->sensor_temperature, 1)));
     json_object_object_add(root, "temperature", json_object_new_double(round_to_precision(metadata->temperature, 1)));
     json_object_object_add(root, "humidity", json_object_new_double(round_to_precision(metadata->humidity, 0)));
     json_object_object_add(root, "pressure", json_object_new_double(round_to_precision(metadata->pressure, 2)));

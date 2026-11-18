@@ -297,7 +297,7 @@
         <b>Background noise t4:</b> ${imageMeta.sigma_noise_t4.toFixed(8)}<br>`;
         }
         html += `
-        <b>Sensor temperature (°C):</b> ${imageMeta.sensor_temperature.toFixed(1)}<br>
+        ${imageMeta.sensor_temperature != null ? `<b>Sensor temperature (°C):</b> ${imageMeta.sensor_temperature.toFixed(1)}<br>` : ''}
         <b>Brightness:</b> ${imageMeta.mean_brightness.toFixed(2)} -> ${imageMeta.target_brightness.toFixed(2)}<br>`;
 
         if (imageMeta.night_mode) {
