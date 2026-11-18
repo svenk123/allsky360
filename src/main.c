@@ -433,6 +433,14 @@ static bool wait_for_indigo_server(int timeout_sec) {
 static int capture_image(double exposure, int capture_timeout) {
   int ret = 0;
 
+  /* Inf/NaN would disable the timeout below (elapsed >= Inf is never true)
+   * while the loop keeps pinging the watchdog: never start such a capture */
+  if (!isfinite(exposure) || exposure <= 0.0) {
+    fprintf(stderr, "ERROR: invalid exposure time %f s, capture skipped\n",
+            exposure);
+    return 1;
+  }
+
   exposure_sec = exposure;
   indigo_attach_client(&client);
 
@@ -1205,10 +1213,23 @@ int main(int argc, const char *argv[]) {
         frames[i].gain = gain;
 
         /* Calculate exposure */
-        if (i == 0)
+        if (i == 0) {
+          /* A non-finite exposure (e.g. NaN from a NaN brightness median in
+           * the exposure control) would fail every following capture:
+           * restart the control at the start exposure */
+          if (!isfinite(exposure_sec) || exposure_sec <= 0.0) {
+            double start_exposure = is_night ? config.nighttime_startexposure
+                                             : config.daytime_startexposure;
+            fprintf(stderr,
+                    "ERROR: invalid exposure time %f s, restarting with the "
+                    "%s start exposure %f s\n",
+                    exposure_sec, is_night ? "nighttime" : "daytime",
+                    start_exposure);
+            exposure_sec = start_exposure;
+          }
           // Reference exposure
           frames[i].exposure = exposure_sec;
-        else {
+        } else {
 
           /* Calculate exposure */
           frames[i].exposure =
