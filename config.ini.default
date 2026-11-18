@@ -192,8 +192,6 @@ camera_min_exposure=0.0007
 camera_max_gain=200
 camera_min_gain=0
 camera_binning2x2=0
-camera_cooling=0
-camera_cooling_temperature=5
 # ROI is not implemented in the daemon yet - these keys have no effect.
 #camera_roi_width=0
 #camera_roi_height=0
@@ -201,12 +199,6 @@ camera_cooling_temperature=5
 #camera_roi_y=0
 # Debayer algorithm: nni, bilinear or vng
 camera_debayer=vng
-
-# Lens
-######
-lens_name="ZWO 2.1mm f/2.0"
-lens_focallength=2.1
-lens_focalratio=1.6
 
 # Image settings
 ######################
@@ -234,7 +226,6 @@ crop_width=2280
 crop_height=2180
 crop_x_offset=760
 crop_y_offset=0
-rotate_image=0
 
 # Panorama (horizon view)
 #########################

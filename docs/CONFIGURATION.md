@@ -312,16 +312,18 @@ Signals for the running camera (`sudo systemctl kill -s <signal> allsky360-camer
 | `USR1` | Save the INDIGO raw frames of the next image into `raw_dump_directory` |
 | `USR2` | Save the debug images of every processing stage for the next image |
 
-## Keys without effect
+## Removed keys
 
-These keys are still read but do not change anything at the moment. You can
-leave them in the file or remove them.
+These keys never had an effect and were removed. An older `config.ini` may
+still contain them: the camera prints a `NOTE` at startup, and you can delete
+the lines.
 
 | Key | Note |
 |---|---|
 | `camera_cooling`, `camera_cooling_temperature` | Sensor cooling is not set by Allsky360; set it in the INDIGO control panel |
-| `rotate_image` | Image rotation is not implemented; use `image_north_angle` |
-| `lens_name`, `lens_focallength`, `lens_focalratio` | Not used |
-| `camera_r_factor`, `camera_g_factor`, `camera_b_factor` | Not used |
-| `black_clipping_point`, `white_clipping_point`, `target_mean`, `nighttime_fullmoongain`, `working_directory` | Not used |
-| `camera_roi_*` | Commented out in `config.ini.default`; ROI is not implemented |
+| `rotate_image` | Image rotation was never implemented; the north direction is `image_north_angle` |
+| `nighttime_measure_noise` | The night noise is always measured |
+| `lens_name`, `lens_focallength`, `lens_focalratio`, `camera_r_factor`, `camera_g_factor`, `camera_b_factor`, `black_clipping_point`, `white_clipping_point`, `target_mean`, `nighttime_fullmoongain`, `working_directory` | Never used |
+
+`camera_roi_*` is commented out in `config.ini.default`: ROI is not
+implemented, the keys have no effect.

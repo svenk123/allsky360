@@ -72,7 +72,6 @@ int load_config(const char *filename, config_t *config) {
   config->daytime_capture = 1;
   config->daytime_meanbrightness = 0.20;
   config->nighttime_meanbrightness = 0.15;
-  config->nighttime_fullmoongain = 0;
   /* Radius of the auto-exposure brightness measurement, as a fraction
    * (0.0 - 1.0) of image_horizon_radius. */
   config->measure_brightness_area = 0.55;
@@ -81,7 +80,6 @@ int load_config(const char *filename, config_t *config) {
   config->crop_height = 0;
   config->crop_x_offset = 0;
   config->crop_y_offset = 0;
-  config->rotate_image = 0;
   snprintf(config->indigoservername, sizeof(config->indigoservername),
            "indigo_server");
   config->daytime_startexposure = 0.05;
@@ -110,9 +108,6 @@ int load_config(const char *filename, config_t *config) {
   config->nighttime_multiscale_median_filter_max_scale = 2;
   config->nighttime_multiscale_median_filter_amount = 0.5f;
 
-  config->target_mean = 0.5;
-  config->black_clipping_point = 0.02;
-  config->white_clipping_point = 0.98;
 
   config->hdr = 1;
   config->hdr_clipping_threshold = 0.98f;
@@ -220,12 +215,7 @@ int load_config(const char *filename, config_t *config) {
   config->camera_min_exposure = 0.000032;
   config->camera_max_gain = 350;
   config->camera_min_gain = 0;
-  config->camera_cooling = 0;
-  config->camera_cooling_temperature = -5;
   config->camera_binning2x2 = 0;
-  config->camera_r_factor = 0.2126f;
-  config->camera_g_factor = 0.7152f;
-  config->camera_b_factor = 0.0722f;
   snprintf(config->camera_debayer, sizeof(config->camera_debayer), "vng");
   config->thumbnail = 1;
   config->thumbnail_width = 100;
@@ -259,16 +249,12 @@ int load_config(const char *filename, config_t *config) {
   config->retention_max_size_gb = 500.0;
   config->retention_keep_days = 2;
   config->retention_dry_run = 0;
-  snprintf(config->working_directory, sizeof(config->working_directory), "/opt/allsky360");
   snprintf(config->image_directory, sizeof(config->image_directory), "/home/allskyuser/images");
   snprintf(config->raw_dump_directory, sizeof(config->raw_dump_directory), "/home/allskyuser/raw");
   snprintf(config->video_directory, sizeof(config->video_directory), "/home/allskyuser/videos");
   snprintf(config->database_directory, sizeof(config->database_directory), "/home/allskyuser/database");
 
   config->jpeg_quality = 100;
-  snprintf(config->lens_name, sizeof(config->lens_name), "ZWO 2.1mm f/2.0");
-  config->lens_focallength = 2.1;
-  config->lens_focalratio = 1.6;
 
   snprintf(config->indigoserver, sizeof(config->indigoserver), "127.0.0.1");
   config->indigoport = 7624;
@@ -364,8 +350,6 @@ int load_config(const char *filename, config_t *config) {
         config->nighttime_startgain = atoi(value);
       else if (strcmp(key, "nighttime_meanbrightness") == 0)
         config->nighttime_meanbrightness = atof(value);
-      else if (strcmp(key, "nighttime_fullmoongain") == 0)
-        config->nighttime_fullmoongain = atoi(value);
       else if (strcmp(key, "nighttime_move_blackpoint") == 0)
         config->nighttime_move_blackpoint = atof(value);
       else if (strcmp(key, "nighttime_move_blackpoint_min_shift_pct") == 0)
@@ -394,12 +378,6 @@ int load_config(const char *filename, config_t *config) {
       else if (strcmp(key, "measure_brightness_area") == 0)
         config->measure_brightness_area = atof(value);
 
-      else if (strcmp(key, "target_mean") == 0)
-        config->target_mean = atof(value);
-      else if (strcmp(key, "black_clipping_point") == 0)
-        config->black_clipping_point = atof(value);
-      else if (strcmp(key, "white_clipping_point") == 0)
-        config->white_clipping_point = atof(value);
 
       else if (strcmp(key, "hdr") == 0)
         config->hdr = atoi(value);
@@ -546,11 +524,39 @@ int load_config(const char *filename, config_t *config) {
       else if (strcmp(key, "dehaze_gamma") == 0 ||
                strcmp(key, "dehaze_saturation") == 0 ||
                strcmp(key, "auto_color_calibration_area") == 0 ||
-               strcmp(key, "nighttime_measure_noise") == 0) {
+               strcmp(key, "nighttime_measure_noise") == 0 ||
+               strcmp(key, "lens_name") == 0 ||
+               strcmp(key, "lens_focallength") == 0 ||
+               strcmp(key, "lens_focalratio") == 0 ||
+               strcmp(key, "camera_r_factor") == 0 ||
+               strcmp(key, "camera_g_factor") == 0 ||
+               strcmp(key, "camera_b_factor") == 0 ||
+               strcmp(key, "black_clipping_point") == 0 ||
+               strcmp(key, "white_clipping_point") == 0 ||
+               strcmp(key, "target_mean") == 0 ||
+               strcmp(key, "nighttime_fullmoongain") == 0 ||
+               strcmp(key, "working_directory") == 0) {
         if (warn_unknown_keys)
           fprintf(stderr,
                   "NOTE: %s: '%s' is no longer used (it never had an effect "
                   "on the image), remove it\n",
+                  filename, key);
+      }
+      else if (strcmp(key, "camera_cooling") == 0 ||
+               strcmp(key, "camera_cooling_temperature") == 0) {
+        if (warn_unknown_keys)
+          fprintf(stderr,
+                  "NOTE: %s: '%s' is no longer used (Allsky360 never set the "
+                  "sensor cooling; set it in the INDIGO control panel), "
+                  "remove it\n",
+                  filename, key);
+      }
+      else if (strcmp(key, "rotate_image") == 0) {
+        if (warn_unknown_keys)
+          fprintf(stderr,
+                  "NOTE: %s: '%s' is no longer used (image rotation was never "
+                  "implemented; the north direction is image_north_angle), "
+                  "remove it\n",
                   filename, key);
       }
       /* Never implemented (local histogram normalization / CLAHE) */
@@ -601,29 +607,12 @@ int load_config(const char *filename, config_t *config) {
         config->camera_min_gain = atoi(value);
       else if (strcmp(key, "camera_binning2x2") == 0)
         config->camera_binning2x2 = atoi(value);
-      else if (strcmp(key, "camera_cooling") == 0)
-        config->camera_cooling = atoi(value);
-      else if (strcmp(key, "camera_cooling_temperature") == 0)
-        config->camera_cooling_temperature = atoi(value);
-      else if (strcmp(key, "camera_r_factor") == 0)
-        config->camera_r_factor = atof(value);
-      else if (strcmp(key, "camera_g_factor") == 0)
-        config->camera_g_factor = atof(value);
-      else if (strcmp(key, "camera_b_factor") == 0)
-        config->camera_b_factor = atof(value);
       else if (strcmp(key, "camera_debayer") == 0)
         config_copy_string(config->camera_debayer, sizeof(config->camera_debayer), key,
                            value);
 
       else if (strcmp(key, "jpeg_quality") == 0)
         config->jpeg_quality = atoi(value);
-      else if (strcmp(key, "lens_name") == 0)
-        config_copy_string(config->lens_name, sizeof(config->lens_name), key,
-                           value);
-      else if (strcmp(key, "lens_focallength") == 0)
-        config->lens_focallength = atof(value);
-      else if (strcmp(key, "lens_focalratio") == 0)
-        config->lens_focalratio = atof(value);
 
       else if (strcmp(key, "image_center_x") == 0)
         config->image_center_x = atoi(value);
@@ -659,8 +648,6 @@ int load_config(const char *filename, config_t *config) {
         config->crop_x_offset = atoi(value);
       else if (strcmp(key, "crop_y_offset") == 0)
         config->crop_y_offset = atoi(value);
-      else if (strcmp(key, "rotate_image") == 0)
-        config->rotate_image = atoi(value);
 
       else if (strcmp(key, "thumbnail") == 0)
         config->thumbnail = atoi(value);
@@ -706,9 +693,6 @@ int load_config(const char *filename, config_t *config) {
       else if (strcmp(key, "location_timezone") == 0)
         config_copy_string(config->location_timezone,
                            sizeof(config->location_timezone), key, value);
-      else if (strcmp(key, "working_directory") == 0)
-        config_copy_string(config->working_directory, sizeof(config->working_directory), key,
-                           value);
       else if (strcmp(key, "image_directory") == 0)
         config_copy_string(config->image_directory, sizeof(config->image_directory), key,
                            value);
@@ -864,7 +848,6 @@ int show_config(config_t *config) {
   printf("nighttime_startexposure: %.6f\n", config->nighttime_startexposure);
   printf("nighttime_startgain: %d\n", config->nighttime_startgain);
   printf("nighttime_meanbrightness: %.2f\n", config->nighttime_meanbrightness);
-  printf("nighttime_fullmoongain: %d\n", config->nighttime_fullmoongain);
   printf("nighttime_move_blackpoint: %.2f\n",
          config->nighttime_move_blackpoint);
   printf("nighttime_move_blackpoint_min_shift_pct: %.1f\n",
@@ -892,9 +875,6 @@ int show_config(config_t *config) {
          config->nighttime_multiscale_median_filter_amount);
 
   printf("measure_brightness_area: %.1f\n", config->measure_brightness_area);
-  printf("target_mean: %.2f\n", config->target_mean);
-  printf("black_clipping_point: %.2f\n", config->black_clipping_point);
-  printf("white_clipping_point: %.2f\n", config->white_clipping_point);
 
   printf("hdr: %d (%s)\n", config->hdr, config->hdr == 1 ? "yes" : "no");
   printf("hdr_clipping_threshold: %.2f\n", config->hdr_clipping_threshold);
@@ -1020,18 +1000,8 @@ int show_config(config_t *config) {
   printf("camera_min_gain: %d\n", config->camera_min_gain);
   printf("camera_binning2x2: %d (%s)\n", config->camera_binning2x2,
          config->camera_binning2x2 == 1 ? "yes" : "no");
-  printf("camera_cooling: %d (%s)\n", config->camera_cooling,
-         config->camera_cooling == 1 ? "yes" : "no");
-  printf("camera_cooling_temperature: %d °C\n",
-         config->camera_cooling_temperature);
-  printf("camera_r_factor: %.4f\n", config->camera_r_factor);
-  printf("camera_g_factor: %.4f\n", config->camera_g_factor);
-  printf("camera_b_factor: %.4f\n", config->camera_b_factor);
   printf("camera_debayer: %s\n", config->camera_debayer);
   printf("jpeg_quality: %d%%\n", config->jpeg_quality);
-  printf("lensname: %s\n", config->lens_name);
-  printf("lensfocallength: %.2f\n", config->lens_focallength);
-  printf("lensfocalratio: %.2f\n", config->lens_focalratio);
 
   printf("image_center_x: %d\n", config->image_center_x);
   printf("image_center_y: %d\n", config->image_center_y);
@@ -1051,7 +1021,6 @@ int show_config(config_t *config) {
   printf("font_path: %s\n", config->font_path);
   printf("font_size: %d\n", config->font_size);
 
-  printf("rotate_image: %d\n", config->rotate_image);
 
   printf("thumbnail: %d (%s)\n", config->thumbnail,
          config->thumbnail == 1 ? "yes" : "no");
@@ -1074,7 +1043,6 @@ int show_config(config_t *config) {
   printf("location_timezone: %s (in use: %s)\n",
          config->location_timezone[0] ? config->location_timezone : "system",
          tz_name());
-  printf("working_directory: %s\n", config->working_directory);
   printf("image_directory: %s\n", config->image_directory);
   printf("raw_dump_directory: %s\n", config->raw_dump_directory);
   printf("video_directory: %s\n", config->video_directory);
@@ -1148,8 +1116,6 @@ int config_to_json(const char *filename, const config_t *config) {
   json_object_object_add(
       jroot, "nighttime_meanbrightness",
       json_object_new_double(config->nighttime_meanbrightness));
-  json_object_object_add(jroot, "nighttime_fullmoongain",
-                         json_object_new_int(config->nighttime_fullmoongain));
   json_object_object_add(
       jroot, "nighttime_move_blackpoint",
       json_object_new_double(config->nighttime_move_blackpoint));
@@ -1191,12 +1157,6 @@ int config_to_json(const char *filename, const config_t *config) {
   json_object_object_add(
       jroot, "measure_brightness_area",
       json_object_new_double(config->measure_brightness_area));
-  json_object_object_add(jroot, "target_mean",
-                         json_object_new_double(config->target_mean));
-  json_object_object_add(jroot, "black_clipping_point",
-                         json_object_new_double(config->black_clipping_point));
-  json_object_object_add(jroot, "white_clipping_point",
-                         json_object_new_double(config->white_clipping_point));
   json_object_object_add(jroot, "hdr", json_object_new_int(config->hdr));
   json_object_object_add(
       jroot, "hdr_clipping_threshold",
@@ -1367,27 +1327,10 @@ int config_to_json(const char *filename, const config_t *config) {
                          json_object_new_int(config->camera_min_gain));
   json_object_object_add(jroot, "camera_binning2x2",
                          json_object_new_int(config->camera_binning2x2));
-  json_object_object_add(jroot, "camera_cooling",
-                         json_object_new_int(config->camera_cooling));
-  json_object_object_add(
-      jroot, "camera_cooling_temperature",
-      json_object_new_int(config->camera_cooling_temperature));
-  json_object_object_add(jroot, "camera_r_factor",
-                         json_object_new_double(config->camera_r_factor));
-  json_object_object_add(jroot, "camera_g_factor",
-                         json_object_new_double(config->camera_g_factor));
-  json_object_object_add(jroot, "camera_b_factor",
-                         json_object_new_double(config->camera_b_factor));
   json_object_object_add(jroot, "camera_debayer",
                          json_object_new_string(config->camera_debayer));
   json_object_object_add(jroot, "jpeg_quality",
                          json_object_new_int(config->jpeg_quality));
-  json_object_object_add(jroot, "lens_name",
-                         json_object_new_string(config->lens_name));
-  json_object_object_add(jroot, "lens_focallength",
-                         json_object_new_double(config->lens_focallength));
-  json_object_object_add(jroot, "lens_focalratio",
-                         json_object_new_double(config->lens_focalratio));
   json_object_object_add(jroot, "image_center_x",
                          json_object_new_int(config->image_center_x));
   json_object_object_add(jroot, "image_center_y",
@@ -1418,8 +1361,6 @@ int config_to_json(const char *filename, const config_t *config) {
                          json_object_new_int(config->crop_x_offset));
   json_object_object_add(jroot, "crop_y_offset",
                          json_object_new_int(config->crop_y_offset));
-  json_object_object_add(jroot, "rotate_image",
-                         json_object_new_int(config->rotate_image));
   json_object_object_add(jroot, "thumbnail",
                          json_object_new_int(config->thumbnail));
   json_object_object_add(jroot, "thumbnail_width",
@@ -1462,8 +1403,6 @@ int config_to_json(const char *filename, const config_t *config) {
   /* Time zone in use for display (location_timezone or the system zone);
    * the web pages format all times with it. Timestamps are UTC. */
   json_object_object_add(jroot, "timezone", json_object_new_string(tz_name()));
-  json_object_object_add(jroot, "working_directory",
-                         json_object_new_string(config->working_directory));
   json_object_object_add(jroot, "image_directory",
                          json_object_new_string(config->image_directory));
   json_object_object_add(jroot, "raw_dump_directory",

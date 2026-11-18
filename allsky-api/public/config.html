@@ -292,7 +292,7 @@
     function getCategory(key) {
       const loc  = ['latitude','longitude','altitude','city','sunangle','owner'];
       const conn = ['indigoservername','indigoserver','indigoport','indigocamera','debayer','indigo_capture_timeout','capture_interval'];
-      const exp  = ['measure_brightness_area','target_mean','black_clipping_point','white_clipping_point','median_brightness'];
+      const exp  = ['measure_brightness_area','median_brightness'];
       const flt  = ['gamma','saturation'];
       if (loc.includes(key))  return 'location';
       if (conn.includes(key)) return 'connection';
@@ -305,8 +305,8 @@
       if (key.startsWith('acdnr_') || key.startsWith('clarity_') || key.startsWith('wavelet_') ||
           key.startsWith('scnr_')  || key.startsWith('dehaze_') ) return 'filters';
       if (key.startsWith('image_') || key.startsWith('focus_') || key.startsWith('crop_') ||
-          key.startsWith('lens_')  || key.startsWith('png_')   || key.startsWith('jpeg_') ||
-          key === 'rotate_image'   || key.startsWith('thumbnail')) return 'image';
+          key.startsWith('png_')   || key.startsWith('jpeg_')  ||
+          key.startsWith('thumbnail')) return 'image';
       if (key.startsWith('panorama')) return 'panorama';
       if (key.startsWith('sqm'))      return 'sqm';
       if (key.endsWith('_directory')) return 'storage';

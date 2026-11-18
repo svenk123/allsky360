@@ -38,7 +38,6 @@ typedef struct {
     double nighttime_startexposure;
     int nighttime_startgain;
     double nighttime_meanbrightness;
-    int nighttime_fullmoongain;
     double nighttime_move_blackpoint;
     double nighttime_move_blackpoint_min_shift_pct;
     double nighttime_move_blackpoint_max_shift_pct;
@@ -50,9 +49,6 @@ typedef struct {
     int nighttime_measure_noise_radius;
 
     double measure_brightness_area;
-    double target_mean;
-    double black_clipping_point;
-    double white_clipping_point;
 
     int nighttime_multiscale_median_filter;
     int nighttime_multiscale_median_filter_max_scale;
@@ -148,16 +144,8 @@ typedef struct {
     int camera_max_gain;
     int camera_min_gain;
     int camera_binning2x2;
-    int camera_cooling;
-    int camera_cooling_temperature;
-    double camera_r_factor;
-    double camera_g_factor;
-    double camera_b_factor;
     char camera_debayer[50];
     int jpeg_quality;
-    char lens_name[100];
-    double lens_focallength;
-    double lens_focalratio;
 
     int image_center_x;
     int image_center_y;
@@ -177,7 +165,6 @@ typedef struct {
     int crop_height;
     int crop_x_offset;
     int crop_y_offset;
-    int rotate_image;
     int thumbnail;
     int thumbnail_width;
     int panorama;
@@ -208,7 +195,6 @@ typedef struct {
     int    retention_keep_days;
     int    retention_dry_run;
 
-    char working_directory[NAME_MAX+1];
     char image_directory[NAME_MAX+1];
     char raw_dump_directory[NAME_MAX+1];
     char video_directory[NAME_MAX+1];
