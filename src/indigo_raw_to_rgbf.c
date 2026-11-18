@@ -293,6 +293,12 @@ int indigo_raw_to_rgbf1(float *rgba, int width, int height,
       image_data = temp_image_data;
     }
 
+    /* The crop starts at crop_offset_x/y of the sensor: an odd crop offset
+       shifts the Bayer phase of the cropped image. Only the parity counts
+       (& 1 also normalizes negative or large XBAYROFF/YBAYROFF values). */
+    x_offset = (x_offset + crop_offset_x) & 1;
+    y_offset = (y_offset + crop_offset_y) & 1;
+
     int debayer_rc;
     if (debayer_alg == 1)
       debayer_rc = debayer_bilinear_rgbf(image_data, crop_width, crop_height,
