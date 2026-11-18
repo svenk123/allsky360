@@ -116,6 +116,8 @@ static void gauss_blur_h_masked(const float *Y, const unsigned char *valid,
           xi = -xi;
         if (xi >= width)
           xi = 2 * width - 2 - xi;
+        /* Radius >= width: a single reflection is not enough */
+        xi = xi < 0 ? 0 : (xi >= width ? width - 1 : xi);
 
         float w = k[i + radius];
         if (sV[xi]) {
@@ -150,6 +152,8 @@ static void gauss_blur_v_masked(const float *Y, const unsigned char *valid,
           yi = -yi;
         if (yi >= height)
           yi = 2 * height - 2 - yi;
+        /* Radius >= height: a single reflection is not enough */
+        yi = yi < 0 ? 0 : (yi >= height ? height - 1 : yi);
 
         const float *rowY = Y + (size_t)yi * width;
         const unsigned char *rowV = valid + (size_t)yi * width;

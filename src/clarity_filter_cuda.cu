@@ -120,6 +120,8 @@ __global__ void gauss_blur_h_masked_kernel(const float *src, const unsigned char
         // Mirror border handling
         if (xi < 0) xi = -xi;
         if (xi >= width) xi = 2 * width - 2 - xi;
+        // Radius >= width: a single reflection is not enough
+        xi = max(0, min(xi, width - 1));
         
         int kernel_idx = i + radius;
         float w = kernel[kernel_idx];
@@ -151,6 +153,8 @@ __global__ void gauss_blur_v_masked_kernel(const float *src, const unsigned char
         // Mirror border handling
         if (yi < 0) yi = -yi;
         if (yi >= height) yi = 2 * height - 2 - yi;
+        // Radius >= height: a single reflection is not enough
+        yi = max(0, min(yi, height - 1));
         
         int kernel_idx = i + radius;
         float w = kernel[kernel_idx];
