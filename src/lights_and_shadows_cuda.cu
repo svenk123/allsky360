@@ -107,13 +107,11 @@ extern "C" int autostretch_rgbf1_cuda(float *hdr_image, int width, int height, f
     cudaError_t err;
     float *dev_valid_values = nullptr;
     int *dev_valid_count = nullptr;
-    int *h_valid_count = (int*)malloc(sizeof(int));
-    *h_valid_count = 0;
+    int h_valid_count = 0;
     
     err = cudaMalloc(&dev_valid_values, pixel_count * 3 * sizeof(float));
     if (err != cudaSuccess) {
         printf("CUDA malloc dev_valid_values failed: %s\n", cudaGetErrorString(err));
-        free(h_valid_count);
         return 1;
     }
     
@@ -121,7 +119,6 @@ extern "C" int autostretch_rgbf1_cuda(float *hdr_image, int width, int height, f
     if (err != cudaSuccess) {
         printf("CUDA malloc dev_valid_count failed: %s\n", cudaGetErrorString(err));
         cudaFree(dev_valid_values);
-        free(h_valid_count);
         return 1;
     }
     
@@ -130,7 +127,6 @@ extern "C" int autostretch_rgbf1_cuda(float *hdr_image, int width, int height, f
         printf("CUDA memset failed: %s\n", cudaGetErrorString(err));
         cudaFree(dev_valid_values);
         cudaFree(dev_valid_count);
-        free(h_valid_count);
         return 1;
     }
     
@@ -143,24 +139,21 @@ extern "C" int autostretch_rgbf1_cuda(float *hdr_image, int width, int height, f
         printf("collect_valid_values_kernel failed: %s\n", cudaGetErrorString(err));
         cudaFree(dev_valid_values);
         cudaFree(dev_valid_count);
-        free(h_valid_count);
         return 1;
     }
     
     cudaDeviceSynchronize();
     
     // Copy valid count back
-    err = cudaMemcpy(h_valid_count, dev_valid_count, sizeof(int), cudaMemcpyDeviceToHost);
+    err = cudaMemcpy(&h_valid_count, dev_valid_count, sizeof(int), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) {
         printf("cudaMemcpy D2H (valid_count) failed: %s\n", cudaGetErrorString(err));
         cudaFree(dev_valid_values);
         cudaFree(dev_valid_count);
-        free(h_valid_count);
         return 1;
     }
     
-    int k = *h_valid_count;
-    free(h_valid_count);
+    int k = h_valid_count;
     
     if (k < 2) {
         printf("Autostretch: not enough valid values: k=%d\n", k);

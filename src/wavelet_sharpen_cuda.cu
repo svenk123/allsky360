@@ -122,6 +122,12 @@ static void make_gaussian_kernel(float sigma, float **outKernel, int *outRadius)
     int radius = (int)ceilf(3.0f * sigma);
     int size = 2 * radius + 1;
     float *kernel = (float *)malloc(size * sizeof(float));
+    if (!kernel) {
+        /* The caller checks *outKernel */
+        *outKernel = NULL;
+        *outRadius = 0;
+        return;
+    }
     float sum = 0.0f;
 
     for (int i = -radius; i <= radius; i++) {
@@ -193,10 +199,6 @@ int wavelet_sharpen_rgbf1_cuda(float *d_rgba, int width, int height,
         make_gaussian_kernel(sigmas[s], &h_kernel, &radius);
         if (!h_kernel) {
             fprintf(stderr, "wavelet_sharpen_rgbf1_cuda: malloc failed for kernel (sigma=%.1f)\n", sigmas[s]);
-            // Cleanup
-            for (int i = 0; i < s; i++) {
-                // Free kernels from previous iterations would be needed, but they're already freed
-            }
             cudaFree(d_tmp1);
             cudaFree(d_tmp2);
             cudaFree(d_tmp3);
