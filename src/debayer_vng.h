@@ -24,7 +24,9 @@
 
 /**
  * Performs VNG (Variable Number of Gradients) debayering on 16-bit Bayer data and converts it to RGBA 16-bit output.
- * This method uses a weighted 3x3 neighborhood to interpolate color values based on the Bayer pattern.
+ * This method uses a weighted 3x3 neighborhood per color (center weight 5) to
+ * interpolate color values based on the Bayer pattern; neighbors outside the
+ * image are reflected, so every pixel is written.
  *
  * @param raw: pointer to the input Bayer image (16-bit, 1 channel per pixel).
  * @param width: image width in pixels.
@@ -33,14 +35,17 @@
  * @param x_offset: X-offset used for Bayer pattern alignment.
  * @param y_offset: Y-offset used for Bayer pattern alignment.
  * @param bayer_pattern: Bayer pattern as string ("RGGB", "GRBG", "GBRG", or "BGGR").
- * @return: 0 on success, 1 if the Bayer pattern is invalid.
+ * @return: 0 on success, 1 if the Bayer pattern is invalid or the image is
+ *          smaller than 2x2.
  */
 int debayer_vng_rgb16(const uint16_t *raw, int width, int height, uint16_t *rgb, int x_offset, int y_offset, const char *bayer_pattern);
 
 
 /**
  * Performs VNG (Variable Number of Gradients) debayering on 16-bit Bayer data and converts it to RGBA float output.
- * This method uses a weighted 3x3 neighborhood to interpolate color values based on the Bayer pattern.
+ * This method uses a weighted 3x3 neighborhood per color (center weight 5) to
+ * interpolate color values based on the Bayer pattern; neighbors outside the
+ * image are reflected, so every pixel is written.
  *
  * @param raw: pointer to the input Bayer image (16-bit, 1 channel per pixel).
  * @param width: image width in pixels.
@@ -49,7 +54,8 @@ int debayer_vng_rgb16(const uint16_t *raw, int width, int height, uint16_t *rgb,
  * @param x_offset: X-offset used for Bayer pattern alignment.
  * @param y_offset: Y-offset used for Bayer pattern alignment.
  * @param bayer_pattern: Bayer pattern as string ("RGGB", "GRBG", "GBRG", or "BGGR").
- * @return: 0 on success, 1 if the Bayer pattern is invalid.
+ * @return: 0 on success, 1 if the Bayer pattern is invalid or the image is
+ *          smaller than 2x2.
  */
 int debayer_vng_rgbf(const unsigned short *raw, int width, int height, float *rgbf,
                        int x_offset, int y_offset, const char *bayer_pattern);
