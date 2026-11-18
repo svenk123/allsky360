@@ -81,18 +81,18 @@ TIME=$(date -u +%H%M%S)
 YESTERDAY=$(date -u -d "yesterday" +%Y%m%d 2>/dev/null || date -u -v-1d +%Y%m%d 2>/dev/null || echo "")
 
 # Get the latest image
-LATEST_IMAGE=$(ls -t ${IMAGEDIR}/*.jpg 2>/dev/null | head -n 1)
+LATEST_IMAGE=$(ls -t "${IMAGEDIR}"/*.jpg 2>/dev/null | head -n 1)
 
 # Function to get night images from database
+# Prints the night images, one path per line (paths may contain blanks)
 get_night_images() {
-  local FILES_LIST=""
+  local -A SEEN=()
   local DB_TODAY="${DATABASEDIR}/database_${DATE}.db"
   local DB_YESTERDAY=""
   
   # Check if sqlite3 is available
   if ! command -v sqlite3 &> /dev/null; then
     echo "ERROR: sqlite3 command not found!" >&2
-    echo ""
     return 1
   fi
   
@@ -119,7 +119,6 @@ get_night_images() {
   fi
   
   if [ -z "$LAST_NIGHT_END" ]; then
-    echo ""
     return 0
   fi
   
@@ -167,8 +166,9 @@ get_night_images() {
           local image_file="${IMAGEDIR}/${file_date}/image-${file_date}${file_time}.jpg"
           
           # Check if file exists
-          if [ -f "$image_file" ]; then
-            FILES_LIST="${FILES_LIST}${FILES_LIST:+ }${image_file}"
+          if [ -f "$image_file" ] && [ -z "${SEEN[$image_file]}" ]; then
+            SEEN[$image_file]=1
+            printf '%s\n' "$image_file"
           fi
         fi
       fi
@@ -186,42 +186,42 @@ get_night_images() {
           local image_file="${IMAGEDIR}/${file_date}/image-${file_date}${file_time}.jpg"
           
           # Check if file exists and not already in list
-          if [ -f "$image_file" ] && [[ ! "$FILES_LIST" =~ "$image_file" ]]; then
-            FILES_LIST="${FILES_LIST}${FILES_LIST:+ }${image_file}"
+          if [ -f "$image_file" ] && [ -z "${SEEN[$image_file]}" ]; then
+            SEEN[$image_file]=1
+            printf '%s\n' "$image_file"
           fi
         fi
       fi
     done < <(sqlite3 "$DB_YESTERDAY" "SELECT timestamp FROM image WHERE night_mode = 1 AND timestamp > ${LAST_DAY_BEFORE_NIGHT} AND timestamp <= ${LAST_NIGHT_END} ORDER BY timestamp ASC;" 2>/dev/null)
   fi
-  
-  # Return the list
-  echo "$FILES_LIST"
 }
 
 generate_timelapse() {
   local MODES="max motion"
   local DATESTAMP=$(date -u +%Y%m%d)
   
-  # Get night images from database
-  FILES=$(get_night_images)
+  # Get night images from database: one path per line into an array, so
+  # paths with blanks stay one argument each
+  local -a FILES=()
+  mapfile -t FILES < <(get_night_images)
   
-  if [ -z "$FILES" ]; then
+  if [ "${#FILES[@]}" -eq 0 ]; then
     echo "WARNING: No night images found in database!"
     return 1
   fi
   
   # Normal
   echo "Generating normal timelapse for $1"
-  echo "Found $(echo $FILES | wc -w) night images"
+  echo "Found ${#FILES[@]} night images"
   mkdir -p "$VIDEODIR"
-  $BINDIR/allsky360-timelapse -o ${VIDEODIR}/normal_${DATESTAMP}.mp4 -w $WIDTH -h $HEIGHT -p $FPS -s ${VIDEODIR}/normal_${DATESTAMP}.png -v $FILES
+  "$BINDIR/allsky360-timelapse" -o "${VIDEODIR}/normal_${DATESTAMP}.mp4" -w "$WIDTH" -h "$HEIGHT" -p "$FPS" -s "${VIDEODIR}/normal_${DATESTAMP}.png" -v "${FILES[@]}"
 
   # All other modes
   for MODE in $MODES; do
     echo "Generating $MODE timelapse for $1"
-    echo "Found $(echo $FILES | wc -w) night images"
+    echo "Found ${#FILES[@]} night images"
     mkdir -p "$VIDEODIR"
-    $BINDIR/allsky360-timelapse -o ${VIDEODIR}/${MODE}_${DATESTAMP}.mp4 -w $WIDTH -h $HEIGHT -p $FPS -s ${VIDEODIR}/${MODE}_${DATESTAMP}.png -m ${MODE} -v $FILES
+    "$BINDIR/allsky360-timelapse" -o "${VIDEODIR}/${MODE}_${DATESTAMP}.mp4" -w "$WIDTH" -h "$HEIGHT" -p "$FPS" -s "${VIDEODIR}/${MODE}_${DATESTAMP}.png" -m "${MODE}" -v "${FILES[@]}"
   done
 }
 
@@ -237,7 +237,7 @@ generate_night_images() {
 
   if [ -x "$BINDIR/allsky360-keogram" ]; then
     echo "Generating keogram"
-    $BINDIR/allsky360-keogram -c "$CONFIG_FILE" -i "$IMAGEDIR" -s "$START" -e "$END" --night-only --trim \
+    "$BINDIR/allsky360-keogram" -c "$CONFIG_FILE" -i "$IMAGEDIR" -s "$START" -e "$END" --night-only --trim \
       -o "${VIDEODIR}/keogram_${DATESTAMP}.jpg" -j "${VIDEODIR}/keogram_${DATESTAMP}.json" \
       || echo "WARNING: keogram failed (exit $?)"
   else
@@ -246,7 +246,7 @@ generate_night_images() {
 
   if [ -x "$BINDIR/allsky360-startrails" ]; then
     echo "Generating star trails"
-    $BINDIR/allsky360-startrails -c "$CONFIG_FILE" -i "$IMAGEDIR" -s "$START" -e "$END" \
+    "$BINDIR/allsky360-startrails" -c "$CONFIG_FILE" -i "$IMAGEDIR" -s "$START" -e "$END" \
       -o "${VIDEODIR}/startrails_${DATESTAMP}.jpg" -j "${VIDEODIR}/startrails_${DATESTAMP}.json" \
       || echo "WARNING: star trails failed (exit $?)"
   else
@@ -258,5 +258,5 @@ generate_night_images() {
 generate_night_images
 
 # Generate the timelapse
-generate_timelapse $LATEST_IMAGE
+generate_timelapse "$LATEST_IMAGE"
 
