@@ -147,7 +147,13 @@ ORIG_UID="$(stat -c %u "$JSON")"
 ORIG_GID="$(stat -c %g "$JSON")"
 ORIG_MODE="$(stat -c %a "$JSON")"
 
-TMP_JSON="$(mktemp -t allsky360-json.XXXXXXXX)"
+# Temporary file next to the JSON: the final mv is then a rename within one
+# file system, so the web pages never read a half-written file (/tmp is a
+# separate, private file system for the service, PrivateTmp=yes)
+if ! TMP_JSON="$(mktemp "$(dirname "$JSON")/.$(basename "$JSON").XXXXXXXX")"; then
+    log "ERROR: cannot create a temporary file next to $JSON - metadata left untouched"
+    exit 1
+fi
 if ! jq --arg weather "$WEATHER" --arg score "$SCORE" \
         '.weather=$weather | .weather_score=($score|tonumber)' \
         "$JSON" > "$TMP_JSON"; then
