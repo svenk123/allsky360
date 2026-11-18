@@ -91,42 +91,29 @@ int compute_background_noise_mad_rgbf1(
   if (!absdev)
     return 1;
 
-  /* Second pass: compute absolute deviations */
+  /* Second pass: compute absolute deviations. Serial, directly into absdev
+   * (per-thread buffers of count floats each multiplied the peak memory by
+   * the thread count). Only the bounding box of the circle can contain
+   * valid pixels; the condition is the same as in the first pass. */
   int idx = 0;
-#pragma omp parallel
-  {
-    float *local_absdev = (float *)allsky_safe_malloc(
-        count * sizeof(float)); // overalloc but safe
-    int local_idx = 0;
-
-#pragma omp for nowait
-    for (int i = 0; i < num_pixels; i++) {
-      int y = i / width;
-      int x = i % width;
+  int y0 = cy - radius > 0 ? cy - radius : 0;
+  int y1 = cy + radius < height - 1 ? cy + radius : height - 1;
+  int x0 = cx - radius > 0 ? cx - radius : 0;
+  int x1 = cx + radius < width - 1 ? cx + radius : width - 1;
+  for (int y = y0; y <= y1 && idx < count; y++) {
+    int dy = y - cy;
+    for (int x = x0; x <= x1 && idx < count; x++) {
       int dx = x - cx;
-      int dy = y - cy;
       if ((dx * dx + dy * dy) <= radius2) {
-        const float *pixel = image + CHANNELS * i;
-        float val = pixel[1]; // green channel
-        if (val > 0.0f) {
-          local_absdev[local_idx++] = fabsf(val - median);
-        }
+        float val = image[CHANNELS * ((size_t)y * width + x) + 1]; // green
+        if (val > 0.0f)
+          absdev[idx++] = fabsf(val - median);
       }
     }
-
-/* Merge local results */
-#pragma omp critical
-    {
-      for (int j = 0; j < local_idx; j++) {
-        absdev[idx++] = local_absdev[j];
-      }
-    }
-
-    allsky_safe_free(local_absdev);
   }
 
   /* Compute MAD and sigma */
-  float mad = compute_median_float(absdev, count);
+  float mad = compute_median_float(absdev, idx);
   *sigma_out = 1.4826f * mad;
 
   allsky_safe_free(absdev);
