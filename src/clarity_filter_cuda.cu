@@ -314,7 +314,6 @@ extern "C" int clarity_filter_rgbf_masked_cuda(float *rgba, int width, int heigh
     err = cudaMemcpy(d_kernel, h_kernel, klen * sizeof(float), cudaMemcpyHostToDevice);
     if (err != cudaSuccess) {
         printf("cudaMemcpy d_kernel failed: %s\n", cudaGetErrorString(err));
-        free(h_kernel);
         goto cleanup;
     }
     

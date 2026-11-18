@@ -250,7 +250,6 @@ extern "C" int perceptual_dehaze_rgbf1_multiscale_full_cuda(float *rgba_image, i
     err = cudaMemcpy(h_valid_luma, d_valid_luma, valid_count * sizeof(float), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) {
         printf("cudaMemcpy h_valid_luma failed: %s\n", cudaGetErrorString(err));
-        free(h_valid_luma);
         goto cleanup;
     }
     
