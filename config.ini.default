@@ -290,8 +290,7 @@ nighttime_move_blackpoint_max_shift_pct=0.02
 nighttime_move_blackpoint_dark_threshold=0.2
 # HDR exposure factor (should be 1.0 or 2.0 for good results)
 nighttime_hdr_exposure_factor=2.0
-# Noise estimation
-nighttime_measure_noise=1
+# Noise estimation (always at night)
 nighttime_measure_noise_radius=250
 
 # Brightness measurement for auto-exposure

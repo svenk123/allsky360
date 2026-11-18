@@ -322,7 +322,6 @@ leave them in the file or remove them.
 | `camera_cooling`, `camera_cooling_temperature` | Sensor cooling is not set by Allsky360; set it in the INDIGO control panel |
 | `rotate_image` | Image rotation is not implemented; use `image_north_angle` |
 | `lens_name`, `lens_focallength`, `lens_focalratio` | Not used |
-| `nighttime_measure_noise` | The night noise is always measured |
 | `camera_r_factor`, `camera_g_factor`, `camera_b_factor` | Not used |
 | `black_clipping_point`, `white_clipping_point`, `target_mean`, `nighttime_fullmoongain`, `working_directory` | Not used |
 | `camera_roi_*` | Commented out in `config.ini.default`; ROI is not implemented |

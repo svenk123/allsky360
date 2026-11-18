@@ -47,7 +47,6 @@ typedef struct {
     double nighttime_white_balance_red;
     double nighttime_white_balance_blue;
     double nighttime_white_balance_light_protect;
-    int nighttime_measure_noise;
     int nighttime_measure_noise_radius;
 
     double measure_brightness_area;

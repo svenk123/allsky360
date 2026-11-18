@@ -24,7 +24,6 @@
   "nighttime_white_balance_red": {"description": "White balance red channel multiplier for nighttime", "unit": "float", "range": "0-3", "default": "1.0"},
   "nighttime_white_balance_blue": {"description": "White balance blue channel multiplier for nighttime", "unit": "float", "range": "0-3", "default": "1.0"},
   "nighttime_white_balance_light_protect": {"description": "Light protection strength for nighttime white balance (0-1), 0.0 means light protection is disabled", "unit": "float", "range": "0-1", "default": "0.85"},
-  "nighttime_measure_noise": {"description": "Enable noise measurement for nighttime images (1=enabled, 0=disabled)", "unit": "boolean", "range": "0-1", "default": "0"},
   "nighttime_measure_noise_radius": {"description": "Radius in pixels for noise measurement", "unit": "pixels", "range": "1-50", "default": "10"},
   "nighttime_multiscale_median_filter": {"description": "Enable multiscale median filter (1=enabled, 0=disabled)", "unit": "boolean", "range": "0-1", "default": "0"},
   "nighttime_multiscale_median_filter_max_scale": {"description": "Maximum scale level for multiscale median filter", "unit": "integer", "range": "1-10", "default": "3"},

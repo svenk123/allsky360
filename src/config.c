@@ -105,7 +105,6 @@ int load_config(const char *filename, config_t *config) {
   config->nighttime_white_balance_red = 1.0;
   config->nighttime_white_balance_blue = 1.0;
   config->nighttime_white_balance_light_protect = 0.0;
-  config->nighttime_measure_noise = 1;
   config->nighttime_measure_noise_radius = 250;
   config->nighttime_multiscale_median_filter = 0;
   config->nighttime_multiscale_median_filter_max_scale = 2;
@@ -383,8 +382,6 @@ int load_config(const char *filename, config_t *config) {
         config->nighttime_white_balance_blue = atof(value);
       else if (strcmp(key, "nighttime_white_balance_light_protect") == 0)
         config->nighttime_white_balance_light_protect = atof(value);
-      else if (strcmp(key, "nighttime_measure_noise") == 0)
-        config->nighttime_measure_noise = atoi(value);
       else if (strcmp(key, "nighttime_measure_noise_radius") == 0)
         config->nighttime_measure_noise_radius = atoi(value);
       else if (strcmp(key, "nighttime_multiscale_median_filter") == 0)
@@ -548,7 +545,8 @@ int load_config(const char *filename, config_t *config) {
       /* Read but never used by the pipeline */
       else if (strcmp(key, "dehaze_gamma") == 0 ||
                strcmp(key, "dehaze_saturation") == 0 ||
-               strcmp(key, "auto_color_calibration_area") == 0) {
+               strcmp(key, "auto_color_calibration_area") == 0 ||
+               strcmp(key, "nighttime_measure_noise") == 0) {
         if (warn_unknown_keys)
           fprintf(stderr,
                   "NOTE: %s: '%s' is no longer used (it never had an effect "
@@ -883,8 +881,6 @@ int show_config(config_t *config) {
          config->nighttime_white_balance_blue);
   printf("nighttime_white_balance_light_protect: %.1f\n",
          config->nighttime_white_balance_light_protect);
-  printf("nighttime_measure_noise: %d (%s)\n", config->nighttime_measure_noise,
-         config->nighttime_measure_noise == 1 ? "yes" : "no");
   printf("nighttime_measure_noise_radius: %dpx\n",
          config->nighttime_measure_noise_radius);
   printf("nighttime_multiscale_median_filter: %d (%s)\n",
@@ -1178,8 +1174,6 @@ int config_to_json(const char *filename, const config_t *config) {
   json_object_object_add(
       jroot, "nighttime_white_balance_light_protect",
       json_object_new_double(config->nighttime_white_balance_light_protect));
-  json_object_object_add(jroot, "nighttime_measure_noise",
-                         json_object_new_int(config->nighttime_measure_noise));
   json_object_object_add(
       jroot, "nighttime_measure_noise_radius",
       json_object_new_int(config->nighttime_measure_noise_radius));
